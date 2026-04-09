@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+node_modules/
+server/build/
+*.nupkg
