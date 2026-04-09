@@ -3,6 +3,8 @@
     <Configurations>Debug R23;Debug R24;Debug R25;Debug R26;Release R23;Release R24;Release R25;Release R26</Configurations>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
     <RootNamespace>RevitCortex.Plugin</RootNamespace>
     <AssemblyName>RevitCortex.Plugin</AssemblyName>
   </PropertyGroup>
