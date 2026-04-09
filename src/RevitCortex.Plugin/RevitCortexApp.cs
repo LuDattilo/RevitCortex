@@ -4,6 +4,7 @@ using Autodesk.Revit.UI;
 using RevitCortex.Core.Session;
 using RevitCortex.Plugin.Communication;
 using RevitCortex.Plugin.Discovery;
+using RevitCortex.Plugin.Threading;
 using System;
 using System.Reflection;
 
@@ -29,6 +30,12 @@ public class RevitCortexApp : IExternalApplication
             {
                 _router.RegisterToolsFromAssembly(toolsAssembly);
             }
+
+            // Create thread dispatcher for Revit main thread execution
+            var executionHandler = new ToolExecutionHandler();
+            var externalEvent = ExternalEvent.Create(executionHandler);
+            var dispatcher = new RevitThreadDispatcher(executionHandler, externalEvent);
+            _router.SetDispatcher(dispatcher);
 
             _socketService = new SocketService(_router);
             _socketService.Start();

@@ -7,6 +7,7 @@ using RevitCortex.Core.Discovery;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Plugin.Threading;
 
 namespace RevitCortex.Plugin;
 
@@ -15,6 +16,7 @@ public class CortexRouter
     private readonly Dictionary<string, ICortexTool> _tools = new();
     private readonly CortexSession _session;
     private readonly IDocumentAnalyzer _analyzer;
+    private RevitThreadDispatcher? _dispatcher;
 
     public CortexRouter(CortexSession session, IDocumentAnalyzer analyzer)
     {
@@ -54,7 +56,15 @@ public class CortexRouter
                 $"Tool '{toolName}' is not available for this document",
                 suggestion: "This tool requires specific document features (e.g., worksets, phases)");
 
-        return tool.Execute(input, _session);
+        if (_dispatcher != null)
+            return _dispatcher.Execute(tool, input, _session);
+        else
+            return tool.Execute(input, _session);
+    }
+
+    public void SetDispatcher(RevitThreadDispatcher dispatcher)
+    {
+        _dispatcher = dispatcher;
     }
 
     public void OnDocumentChanged(object document)
