@@ -1,0 +1,622 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Architecture;
+using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Results;
+using RevitCortex.Core.Session;
+using RevitCortex.Core.Tools;
+
+namespace RevitCortex.Tools.Elements;
+
+/// <summary>
+/// Smart element query tool — supports category, element-class, family-symbol,
+/// view-visibility and bounding-box filters, all combinable via logical AND.
+/// Mirrors the fork's AIElementFilterEventHandler filtering logic.
+/// </summary>
+public class AIElementFilterTool : ICortexTool
+{
+    public string Name => "ai_element_filter";
+    public string Category => "Elements";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+
+    // ── Revit internal-unit conversion factor: 1 foot = 304.8 mm ──────────
+    private const double MmPerFoot = 304.8;
+
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+        // The fork wraps parameters in a "data" object — support both layouts
+        var data = input["data"] as JObject ?? input;
+
+        var doc = session.Store.Get<object>("activeDocument") as Document;
+        if (doc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "No active document in session");
+
+        // ── Parse inputs ───────────────────────────────────────────────────
+        var filterCategory     = data["filterCategory"]?.ToString();
+        var filterElementType  = data["filterElementType"]?.ToString();
+        var filterFamilySymId  = data["filterFamilySymbolId"]?.Value<int>() ?? -1;
+        var includeTypes       = data["includeTypes"]?.Value<bool>() ?? false;
+        var includeInstances   = data["includeInstances"]?.Value<bool>() ?? true;
+        var filterVisibleInView = data["filterVisibleInCurrentView"]?.Value<bool>() ?? false;
+        var maxElements        = data["maxElements"]?.Value<int>() ?? 100;
+
+        // Bounding box (coordinates in mm, matching the fork's convention)
+        var bbMinToken = data["boundingBoxMin"];
+        var bbMaxToken = data["boundingBoxMax"];
+        XYZ? bbMin = ParseXYZ(bbMinToken);
+        XYZ? bbMax = ParseXYZ(bbMaxToken);
+
+        // ── Validate ───────────────────────────────────────────────────────
+        if (!includeTypes && !includeInstances)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "At least one of includeTypes or includeInstances must be true");
+
+        if (string.IsNullOrWhiteSpace(filterCategory) &&
+            string.IsNullOrWhiteSpace(filterElementType) &&
+            filterFamilySymId <= 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "Specify at least one filter: filterCategory, filterElementType, or filterFamilySymbolId",
+                suggestion: "Use OST_* codes for filterCategory, e.g. OST_Walls, OST_Doors");
+
+        if ((bbMin == null) != (bbMax == null))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "Both boundingBoxMin and boundingBoxMax must be provided together");
+
+        if (bbMin != null && bbMax != null)
+        {
+            if (bbMin.X > bbMax.X || bbMin.Y > bbMax.Y || bbMin.Z > bbMax.Z)
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    "boundingBoxMin coordinates must be less than or equal to boundingBoxMax");
+        }
+
+        if (includeTypes && !includeInstances && filterFamilySymId > 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "filterFamilySymbolId cannot be combined with includeTypes-only mode");
+
+        if (includeTypes && !includeInstances && filterVisibleInView)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "filterVisibleInCurrentView cannot be combined with includeTypes-only mode");
+
+        try
+        {
+            // ── Collect elements ───────────────────────────────────────────
+            var elements = new List<Element>();
+
+            if (includeInstances && includeTypes)
+            {
+                elements.AddRange(CollectByKind(doc, isElementType: false,
+                    filterCategory, filterElementType, filterFamilySymId,
+                    filterVisibleInView, bbMin, bbMax));
+                elements.AddRange(CollectByKind(doc, isElementType: true,
+                    filterCategory, filterElementType, filterFamilySymId: -1,
+                    filterVisibleInView: false, bbMin, bbMax));
+            }
+            else if (includeInstances)
+            {
+                elements.AddRange(CollectByKind(doc, isElementType: false,
+                    filterCategory, filterElementType, filterFamilySymId,
+                    filterVisibleInView, bbMin, bbMax));
+            }
+            else // includeTypes only
+            {
+                elements.AddRange(CollectByKind(doc, isElementType: true,
+                    filterCategory, filterElementType, filterFamilySymId: -1,
+                    filterVisibleInView: false, bbMin, bbMax));
+            }
+
+            int totalCount = elements.Count;
+
+            // Apply limit
+            string limitNote = string.Empty;
+            if (maxElements > 0 && elements.Count > maxElements)
+            {
+                elements = elements.Take(maxElements).ToList();
+                limitNote = $" (limited to {maxElements} of {totalCount} matches)";
+            }
+
+            // ── Build rich element info ────────────────────────────────────
+            var results = BuildElementInfoList(doc, elements);
+
+            // Cache result IDs for follow-up operations
+            var ids = elements.Select(GetElementIdLong).ToArray();
+            session.Store.Set("lastFilterResults", ids);
+
+            return CortexResult<object>.Ok(new
+            {
+                message = $"Found {totalCount} element(s), returning {results.Count}{limitNote}",
+                totalCount,
+                returnedCount = results.Count,
+                elements = results
+            });
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown,
+                $"Filter failed: {ex.Message}");
+        }
+    }
+
+    // ── Collection ─────────────────────────────────────────────────────────
+
+    private static List<Element> CollectByKind(
+        Document doc,
+        bool isElementType,
+        string? filterCategory,
+        string? filterElementType,
+        int filterFamilySymId,
+        bool filterVisibleInView,
+        XYZ? bbMin,
+        XYZ? bbMax)
+    {
+        // Choose base collector (view-constrained or whole-model)
+        FilteredElementCollector collector =
+            (!isElementType && filterVisibleInView && doc.ActiveView != null)
+                ? new FilteredElementCollector(doc, doc.ActiveView.Id)
+                : new FilteredElementCollector(doc);
+
+        collector = isElementType
+            ? collector.WhereElementIsElementType()
+            : collector.WhereElementIsNotElementType();
+
+        var filters = new List<ElementFilter>();
+
+        // 1. Category filter
+        if (!string.IsNullOrWhiteSpace(filterCategory))
+        {
+            if (!Enum.TryParse<BuiltInCategory>(filterCategory, ignoreCase: true, out var bic))
+                throw new ArgumentException(
+                    $"'{filterCategory}' is not a valid BuiltInCategory. Use OST_* codes.");
+            filters.Add(new ElementCategoryFilter(bic));
+        }
+
+        // 2. Element-class filter
+        if (!string.IsNullOrWhiteSpace(filterElementType))
+        {
+            var resolvedType = ResolveRevitType(filterElementType!)
+                ?? throw new ArgumentException(
+                    $"Cannot resolve Revit API type '{filterElementType}'.");
+            filters.Add(new ElementClassFilter(resolvedType));
+        }
+
+        // 3. Family-symbol filter (instances only)
+        if (!isElementType && filterFamilySymId > 0)
+        {
+#if REVIT2024_OR_GREATER
+            var symId = new ElementId((long)filterFamilySymId);
+#else
+            var symId = new ElementId(filterFamilySymId);
+#endif
+            var symElem = doc.GetElement(symId);
+            if (symElem is FamilySymbol symbol)
+            {
+                filters.Add(new FamilyInstanceFilter(doc, symId));
+            }
+            // If not a valid FamilySymbol, skip silently (matches fork behaviour)
+        }
+
+        // 4. Bounding-box spatial filter
+        if (bbMin != null && bbMax != null)
+        {
+            var outline = new Outline(bbMin, bbMax);
+            filters.Add(new BoundingBoxIntersectsFilter(outline));
+        }
+
+        // Apply combined filter
+        if (filters.Count == 1)
+            collector = collector.WherePasses(filters[0]);
+        else if (filters.Count > 1)
+            collector = collector.WherePasses(new LogicalAndFilter(filters));
+
+        return collector.ToElements().ToList();
+    }
+
+    // ── Element info builders ──────────────────────────────────────────────
+
+    private static List<object> BuildElementInfoList(Document doc, IList<Element> elements)
+    {
+        var list = new List<object>();
+        foreach (var elem in elements)
+        {
+            if (elem == null) continue;
+            object? info = elem switch
+            {
+                ElementType et                                              => BuildTypeInfo(doc, et),
+                Level or Grid                                              => BuildPositioningInfo(doc, elem),
+                SpatialElement                                             => BuildSpatialInfo(doc, elem),
+                View                                                       => BuildViewInfo(doc, elem),
+                TextNote or Dimension or IndependentTag
+                    or AnnotationSymbol or SpotDimension                   => BuildAnnotationInfo(doc, elem),
+                Group or RevitLinkInstance                                 => BuildGroupOrLinkInfo(doc, elem),
+                _ when elem.Category?.HasMaterialQuantities == true        => BuildInstanceInfo(doc, elem),
+                _                                                          => BuildBasicInfo(doc, elem)
+            };
+            if (info != null) list.Add(info);
+        }
+        return list;
+    }
+
+    private static object? BuildInstanceInfo(Document doc, Element elem)
+    {
+        try
+        {
+            var typeElem = doc.GetElement(elem.GetTypeId());
+            var bb = GetBoundingBox(elem);
+            var roomId = elem is FamilyInstance fi ? GetElementIdLong(fi.Room) : (long?)-1;
+
+            return new
+            {
+                elementId     = GetElementIdLong(elem),
+                uniqueId      = elem.UniqueId,
+                name          = elem.Name,
+                familyName    = elem.get_Parameter(BuiltInParameter.ELEM_FAMILY_PARAM)?.AsValueString(),
+                category      = elem.Category?.Name,
+                builtInCategory = GetBuiltInCategoryName(elem),
+                typeId        = GetElementIdLong(typeElem),
+                typeName      = typeElem?.Name,
+                level         = GetLevelInfo(doc, elem),
+                roomId,
+                boundingBox   = bb,
+                elementKind   = "instance"
+            };
+        }
+        catch { return null; }
+    }
+
+    private static object? BuildTypeInfo(Document doc, ElementType et)
+    {
+        try
+        {
+            return new
+            {
+                elementId       = GetElementIdLong(et),
+                uniqueId        = et.UniqueId,
+                name            = et.Name,
+                familyName      = et.FamilyName,
+                category        = et.Category?.Name,
+                builtInCategory = GetBuiltInCategoryName(et),
+                dimensionParams = GetDimensionParameters(et),
+                elementKind     = "type"
+            };
+        }
+        catch { return null; }
+    }
+
+    private static object? BuildPositioningInfo(Document doc, Element elem)
+    {
+        try
+        {
+            double? elevation = null;
+            object? gridLine = null;
+
+            if (elem is Level lvl)
+                elevation = lvl.Elevation * MmPerFoot;
+            else if (elem is Grid grid && grid.Curve != null)
+            {
+                var s = grid.Curve.GetEndPoint(0);
+                var e = grid.Curve.GetEndPoint(1);
+                gridLine = new
+                {
+                    start = new { x = s.X * MmPerFoot, y = s.Y * MmPerFoot, z = s.Z * MmPerFoot },
+                    end   = new { x = e.X * MmPerFoot, y = e.Y * MmPerFoot, z = e.Z * MmPerFoot }
+                };
+            }
+
+            return new
+            {
+                elementId       = GetElementIdLong(elem),
+                uniqueId        = elem.UniqueId,
+                name            = elem.Name,
+                category        = elem.Category?.Name,
+                builtInCategory = GetBuiltInCategoryName(elem),
+                elementClass    = elem.GetType().Name,
+                elevation,
+                gridLine,
+                level           = GetLevelInfo(doc, elem),
+                boundingBox     = GetBoundingBox(elem),
+                elementKind     = "positioning"
+            };
+        }
+        catch { return null; }
+    }
+
+    private static object? BuildSpatialInfo(Document doc, Element elem)
+    {
+        try
+        {
+            string? number = null;
+            double? volume = null;
+            double? area   = null;
+            double? perimeter = null;
+
+            if (elem is Room room)
+            {
+                number = room.Number;
+                volume = room.Volume * Math.Pow(MmPerFoot, 3);
+            }
+            else if (elem is Area ar)
+                number = ar.Number;
+
+            var areaParam = elem.get_Parameter(BuiltInParameter.ROOM_AREA);
+            if (areaParam?.HasValue == true)
+                area = areaParam.AsDouble() * Math.Pow(MmPerFoot, 2);
+
+            var perimParam = elem.get_Parameter(BuiltInParameter.ROOM_PERIMETER);
+            if (perimParam?.HasValue == true)
+                perimeter = perimParam.AsDouble() * MmPerFoot;
+
+            return new
+            {
+                elementId       = GetElementIdLong(elem),
+                uniqueId        = elem.UniqueId,
+                name            = elem.Name,
+                category        = elem.Category?.Name,
+                builtInCategory = GetBuiltInCategoryName(elem),
+                elementClass    = elem.GetType().Name,
+                number,
+                areaMm2         = area,
+                perimeterMm     = perimeter,
+                volumeMm3       = volume,
+                level           = GetLevelInfo(doc, elem),
+                boundingBox     = GetBoundingBox(elem),
+                elementKind     = "spatial"
+            };
+        }
+        catch { return null; }
+    }
+
+    private static object? BuildViewInfo(Document doc, Element elem)
+    {
+        try
+        {
+            var view = (View)elem;
+
+            object? assocLevel = null;
+            if (view is ViewPlan vp && vp.GenLevel is Level level)
+                assocLevel = new { elementId = GetElementIdLong(level), level.Name, elevationMm = level.Elevation * MmPerFoot };
+
+            return new
+            {
+                elementId       = GetElementIdLong(elem),
+                uniqueId        = elem.UniqueId,
+                name            = elem.Name,
+                category        = elem.Category?.Name,
+                builtInCategory = GetBuiltInCategoryName(elem),
+                viewType        = view.ViewType.ToString(),
+                scale           = view.Scale,
+                isTemplate      = view.IsTemplate,
+                detailLevel     = view.DetailLevel.ToString(),
+                associatedLevel = assocLevel,
+                boundingBox     = GetBoundingBox(elem),
+                elementKind     = "view"
+            };
+        }
+        catch { return null; }
+    }
+
+    private static object? BuildAnnotationInfo(Document doc, Element elem)
+    {
+        try
+        {
+            string? ownerView = null;
+            if (elem.OwnerViewId != ElementId.InvalidElementId)
+                ownerView = (doc.GetElement(elem.OwnerViewId) as View)?.Name;
+
+            object? position = null;
+            string? textContent = null;
+            string? dimensionValue = null;
+
+            if (elem is TextNote tn)
+            {
+                textContent = tn.Text;
+                position = XyzToMm(tn.Coord);
+            }
+            else if (elem is Dimension dim)
+            {
+                dimensionValue = dim.Value?.ToString();
+                position = XyzToMm(dim.Origin);
+            }
+            else if (elem is AnnotationSymbol annSym && annSym.Location is LocationPoint lp)
+                position = XyzToMm(lp.Point);
+
+            return new
+            {
+                elementId       = GetElementIdLong(elem),
+                uniqueId        = elem.UniqueId,
+                name            = elem.Name,
+                category        = elem.Category?.Name,
+                builtInCategory = GetBuiltInCategoryName(elem),
+                elementClass    = elem.GetType().Name,
+                ownerView,
+                position,
+                textContent,
+                dimensionValue,
+                boundingBox     = GetBoundingBox(elem),
+                elementKind     = "annotation"
+            };
+        }
+        catch { return null; }
+    }
+
+    private static object? BuildGroupOrLinkInfo(Document doc, Element elem)
+    {
+        try
+        {
+            int? memberCount = null;
+            string? groupType = null;
+            string? linkPath = null;
+            string? linkStatus = null;
+            object? position = null;
+
+            if (elem is Group grp)
+            {
+                memberCount = grp.GetMemberIds()?.Count;
+                groupType   = grp.GroupType?.Name;
+            }
+            else if (elem is RevitLinkInstance link)
+            {
+                var lt = doc.GetElement(link.GetTypeId()) as RevitLinkType;
+                if (lt != null)
+                {
+                    linkPath   = ModelPathUtils.ConvertModelPathToUserVisiblePath(
+                                     lt.GetExternalFileReference().GetAbsolutePath());
+                    linkStatus = lt.GetLinkedFileStatus().ToString();
+                }
+                else
+                    linkStatus = LinkedFileStatus.Invalid.ToString();
+
+                if (link.Location is LocationPoint llp)
+                    position = XyzToMm(llp.Point);
+            }
+
+            return new
+            {
+                elementId       = GetElementIdLong(elem),
+                uniqueId        = elem.UniqueId,
+                name            = elem.Name,
+                category        = elem.Category?.Name,
+                builtInCategory = GetBuiltInCategoryName(elem),
+                elementClass    = elem.GetType().Name,
+                memberCount,
+                groupType,
+                linkPath,
+                linkStatus,
+                position,
+                boundingBox     = GetBoundingBox(elem),
+                elementKind     = "groupOrLink"
+            };
+        }
+        catch { return null; }
+    }
+
+    private static object? BuildBasicInfo(Document doc, Element elem)
+    {
+        try
+        {
+            return new
+            {
+                elementId       = GetElementIdLong(elem),
+                uniqueId        = elem.UniqueId,
+                name            = elem.Name,
+                category        = elem.Category?.Name,
+                builtInCategory = GetBuiltInCategoryName(elem),
+                boundingBox     = GetBoundingBox(elem),
+                elementKind     = "basic"
+            };
+        }
+        catch { return null; }
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    private static long GetElementIdLong(Element? elem)
+    {
+        if (elem == null) return -1;
+#if REVIT2024_OR_GREATER
+        return elem.Id.Value;
+#else
+        return elem.Id.IntegerValue;
+#endif
+    }
+
+    private static string? GetBuiltInCategoryName(Element elem)
+    {
+        if (elem.Category == null) return null;
+#if REVIT2024_OR_GREATER
+        return Enum.GetName(typeof(BuiltInCategory), (BuiltInCategory)(int)elem.Category.Id.Value);
+#else
+        return Enum.GetName(typeof(BuiltInCategory), (BuiltInCategory)elem.Category.Id.IntegerValue);
+#endif
+    }
+
+    private static object? GetLevelInfo(Document doc, Element elem)
+    {
+        var levelIdParam = elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
+                        ?? elem.get_Parameter(BuiltInParameter.LEVEL_PARAM)
+                        ?? elem.get_Parameter(BuiltInParameter.SCHEDULE_LEVEL_PARAM);
+
+        if (levelIdParam?.HasValue != true) return null;
+
+        var levelId = levelIdParam.AsElementId();
+        if (levelId == ElementId.InvalidElementId) return null;
+
+        var level = doc.GetElement(levelId) as Level;
+        if (level == null) return null;
+
+        return new { elementId = GetElementIdLong(level), level.Name, elevationMm = level.Elevation * MmPerFoot };
+    }
+
+    private static object? GetBoundingBox(Element elem)
+    {
+        try
+        {
+            var bb = elem.get_BoundingBox(null);
+            if (bb == null) return null;
+            return new
+            {
+                min = new { x = bb.Min.X * MmPerFoot, y = bb.Min.Y * MmPerFoot, z = bb.Min.Z * MmPerFoot },
+                max = new { x = bb.Max.X * MmPerFoot, y = bb.Max.Y * MmPerFoot, z = bb.Max.Z * MmPerFoot }
+            };
+        }
+        catch { return null; }
+    }
+
+    private static object XyzToMm(XYZ p)
+        => new { x = p.X * MmPerFoot, y = p.Y * MmPerFoot, z = p.Z * MmPerFoot };
+
+    /// <summary>
+    /// Returns dimensional parameters (doubles only) for type elements, matching
+    /// the fork's GetDimensionParameters helper.
+    /// </summary>
+    private static List<object> GetDimensionParameters(Element elem)
+    {
+        var list = new List<object>();
+        foreach (Parameter p in elem.Parameters)
+        {
+            if (p.StorageType != StorageType.Double || !p.HasValue) continue;
+            list.Add(new
+            {
+                name  = p.Definition?.Name ?? "Unknown",
+                valueMm = p.AsDouble() * MmPerFoot,
+                isReadOnly = p.IsReadOnly
+            });
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// Parses a JSON token representing a {x, y, z} point in mm into Revit's
+    /// internal foot-based XYZ. Returns null if the token is null/missing.
+    /// </summary>
+    private static XYZ? ParseXYZ(JToken? token)
+    {
+        if (token == null || token.Type == JTokenType.Null) return null;
+        var x = token["x"]?.Value<double>() ?? 0;
+        var y = token["y"]?.Value<double>() ?? 0;
+        var z = token["z"]?.Value<double>() ?? 0;
+        return new XYZ(x / MmPerFoot, y / MmPerFoot, z / MmPerFoot);
+    }
+
+    /// <summary>
+    /// Attempts to resolve a short or fully-qualified Revit API type name.
+    /// Mirrors the fork's multi-attempt approach.
+    /// </summary>
+    private static Type? ResolveRevitType(string typeName)
+    {
+        string[] candidates =
+        [
+            typeName,
+            $"Autodesk.Revit.DB.{typeName}, RevitAPI",
+            $"{typeName}, RevitAPI"
+        ];
+        foreach (var candidate in candidates)
+        {
+            var t = Type.GetType(candidate);
+            if (t != null) return t;
+        }
+        return null;
+    }
+}
