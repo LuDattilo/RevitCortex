@@ -11,6 +11,19 @@ import { registerDeleteElementTool } from "./delete_element.js";
 import { registerOperateElementTool } from "./operate_element.js";
 import { registerChangeElementTypeTool } from "./change_element_type.js";
 import { registerModifyElementTool } from "./modify_element.js";
+import { registerCopyElementsTool } from "./copy_elements.js";
+import { registerMeasureBetweenElementsTool } from "./measure_between_elements.js";
+import { registerRenumberElementsTool } from "./renumber_elements.js";
+import { registerFindUntaggedElementsTool } from "./find_untagged_elements.js";
+import { registerFindUndimensionedElementsTool } from "./find_undimensioned_elements.js";
+import { registerExportElementsDataTool } from "./export_elements_data.js";
+import { registerMatchElementPropertiesTool } from "./match_element_properties.js";
+import { registerCreateLineBasedElementTool } from "./create_line_based_element.js";
+import { registerCreatePointBasedElementTool } from "./create_point_based_element.js";
+import { registerCreateSurfaceBasedElementTool } from "./create_surface_based_element.js";
+import { registerSetElementPhaseTool } from "./set_element_phase.js";
+import { registerSetElementWorksetTool } from "./set_element_workset.js";
+import { registerColorElementsTool } from "./color_elements.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -26,6 +39,19 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "operate_element", register: registerOperateElementTool },
   { name: "change_element_type", register: registerChangeElementTypeTool },
   { name: "modify_element", register: registerModifyElementTool },
+  { name: "copy_elements", register: registerCopyElementsTool },
+  { name: "measure_between_elements", register: registerMeasureBetweenElementsTool },
+  { name: "renumber_elements", register: registerRenumberElementsTool },
+  { name: "find_untagged_elements", register: registerFindUntaggedElementsTool },
+  { name: "find_undimensioned_elements", register: registerFindUndimensionedElementsTool },
+  { name: "export_elements_data", register: registerExportElementsDataTool },
+  { name: "match_element_properties", register: registerMatchElementPropertiesTool },
+  { name: "create_line_based_element", register: registerCreateLineBasedElementTool },
+  { name: "create_point_based_element", register: registerCreatePointBasedElementTool },
+  { name: "create_surface_based_element", register: registerCreateSurfaceBasedElementTool },
+  { name: "set_element_phase", register: registerSetElementPhaseTool },
+  { name: "set_element_workset", register: registerSetElementWorksetTool },
+  { name: "color_elements", register: registerColorElementsTool },
 ];
 
 export function registerTools(server: McpServer): void {
