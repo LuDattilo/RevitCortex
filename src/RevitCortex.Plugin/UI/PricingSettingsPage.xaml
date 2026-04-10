@@ -1,0 +1,102 @@
+<Page x:Class="RevitCortex.Plugin.UI.PricingSettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d"
+      d:DesignHeight="450" d:DesignWidth="550">
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,15">
+            <TextBlock Text="Token Pricing" FontSize="22" FontWeight="SemiBold" Foreground="#333"/>
+            <TextBlock Text="Configure cost per million tokens for each model" Foreground="#666" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- Pricing Table -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,0,20,0">
+                <!-- Info box -->
+                <Border Background="#E0F7FA" BorderBrush="#80DEEA" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,15">
+                    <TextBlock Text="Prices are in USD per million tokens. These values are used to estimate costs in usage reports."
+                               Foreground="#006064" FontSize="12" TextWrapping="Wrap"/>
+                </Border>
+
+                <!-- Table header -->
+                <Grid Margin="0,0,0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="130"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Model" FontSize="13" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock Grid.Column="1" Text="Input $/MTok" FontSize="13" FontWeight="SemiBold" Foreground="#333" HorizontalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" Text="Output $/MTok" FontSize="13" FontWeight="SemiBold" Foreground="#333" HorizontalAlignment="Center"/>
+                </Grid>
+                <Separator Background="#E0E0E0" Margin="0,2,0,8"/>
+
+                <!-- Sonnet -->
+                <Grid Margin="0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="130"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="claude-sonnet-4-6" FontSize="13" Foreground="#333"
+                               FontFamily="Consolas" VerticalAlignment="Center"/>
+                    <TextBox x:Name="SonnetInputPrice" Grid.Column="1" Width="100" Padding="6,4" FontSize="13"
+                             HorizontalAlignment="Center" HorizontalContentAlignment="Right" BorderBrush="#E0E0E0"/>
+                    <TextBox x:Name="SonnetOutputPrice" Grid.Column="2" Width="100" Padding="6,4" FontSize="13"
+                             HorizontalAlignment="Center" HorizontalContentAlignment="Right" BorderBrush="#E0E0E0"/>
+                </Grid>
+                <Separator Background="#F0F0F0" Margin="0,4"/>
+
+                <!-- Haiku -->
+                <Grid Margin="0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="130"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="claude-haiku-4-5" FontSize="13" Foreground="#333"
+                               FontFamily="Consolas" VerticalAlignment="Center"/>
+                    <TextBox x:Name="HaikuInputPrice" Grid.Column="1" Width="100" Padding="6,4" FontSize="13"
+                             HorizontalAlignment="Center" HorizontalContentAlignment="Right" BorderBrush="#E0E0E0"/>
+                    <TextBox x:Name="HaikuOutputPrice" Grid.Column="2" Width="100" Padding="6,4" FontSize="13"
+                             HorizontalAlignment="Center" HorizontalContentAlignment="Right" BorderBrush="#E0E0E0"/>
+                </Grid>
+                <Separator Background="#F0F0F0" Margin="0,4"/>
+
+                <!-- Opus -->
+                <Grid Margin="0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="130"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="claude-opus-4-6" FontSize="13" Foreground="#333"
+                               FontFamily="Consolas" VerticalAlignment="Center"/>
+                    <TextBox x:Name="OpusInputPrice" Grid.Column="1" Width="100" Padding="6,4" FontSize="13"
+                             HorizontalAlignment="Center" HorizontalContentAlignment="Right" BorderBrush="#E0E0E0"/>
+                    <TextBox x:Name="OpusOutputPrice" Grid.Column="2" Width="100" Padding="6,4" FontSize="13"
+                             HorizontalAlignment="Center" HorizontalContentAlignment="Right" BorderBrush="#E0E0E0"/>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="Reset Defaults" Padding="15,8" Margin="0,0,10,0" FontSize="13"
+                    Background="#F5F5F5" Foreground="#333" BorderBrush="#E0E0E0"
+                    Click="ResetDefaults_Click" Cursor="Hand"/>
+            <Button Content="Save" Padding="20,8" FontSize="13"
+                    Background="#00838F" Foreground="White" BorderBrush="#006064"
+                    Click="Save_Click" Cursor="Hand"/>
+        </StackPanel>
+    </Grid>
+</Page>
