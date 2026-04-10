@@ -40,6 +40,13 @@ import { registerGetAvailableFamilyTypesTool } from "./get_available_family_type
 import { registerListFamilySizesTool } from "./list_family_sizes.js";
 import { registerLinesPerViewCountTool } from "./lines_per_view_count.js";
 import { registerGetRoomOpeningsTool } from "./get_room_openings.js";
+import { registerCreateDimensionsTool } from "./create_dimensions.js";
+import { registerCreateTextNoteTool } from "./create_text_note.js";
+import { registerCreateColorLegendTool } from "./create_color_legend.js";
+import { registerImportTableTool } from "./import_table.js";
+import { registerAddSharedParameterTool } from "./add_shared_parameter.js";
+import { registerManageProjectParametersTool } from "./manage_project_parameters.js";
+import { registerAddPrefixSuffixTool } from "./add_prefix_suffix.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -84,6 +91,13 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "list_family_sizes", register: registerListFamilySizesTool },
   { name: "lines_per_view_count", register: registerLinesPerViewCountTool },
   { name: "get_room_openings", register: registerGetRoomOpeningsTool },
+  { name: "create_dimensions", register: registerCreateDimensionsTool },
+  { name: "create_text_note", register: registerCreateTextNoteTool },
+  { name: "create_color_legend", register: registerCreateColorLegendTool },
+  { name: "import_table", register: registerImportTableTool },
+  { name: "add_shared_parameter", register: registerAddSharedParameterTool },
+  { name: "manage_project_parameters", register: registerManageProjectParametersTool },
+  { name: "add_prefix_suffix", register: registerAddPrefixSuffixTool },
 ];
 
 export function registerTools(server: McpServer): void {
