@@ -88,6 +88,16 @@ import { registerRenameViewsTool } from "./rename_views.js";
 import { registerManageLinksTool } from "./manage_links.js";
 import { registerSendCodeToRevitTool } from "./send_code_to_revit.js";
 import { registerWipeEmptyTagsTool } from "./wipe_empty_tags.js";
+import { registerAnalyzeModelStatisticsTool } from "./analyze_model_statistics.js";
+import { registerCheckModelHealthTool } from "./check_model_health.js";
+import { registerAuditFamiliesTool } from "./audit_families.js";
+import { registerPurgeUnusedTool } from "./purge_unused.js";
+import { registerCadLinkCleanupTool } from "./cad_link_cleanup.js";
+import { registerClashDetectionTool } from "./clash_detection.js";
+import { registerExportRoomDataTool } from "./export_room_data.js";
+import { registerExportScheduleTool } from "./export_schedule.js";
+import { registerDeleteScheduleTool } from "./delete_schedule.js";
+import { registerDuplicateScheduleTool } from "./duplicate_schedule.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -180,6 +190,16 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "manage_links", register: registerManageLinksTool },
   { name: "send_code_to_revit", register: registerSendCodeToRevitTool },
   { name: "wipe_empty_tags", register: registerWipeEmptyTagsTool },
+  { name: "analyze_model_statistics", register: registerAnalyzeModelStatisticsTool },
+  { name: "check_model_health", register: registerCheckModelHealthTool },
+  { name: "audit_families", register: registerAuditFamiliesTool },
+  { name: "purge_unused", register: registerPurgeUnusedTool },
+  { name: "cad_link_cleanup", register: registerCadLinkCleanupTool },
+  { name: "clash_detection", register: registerClashDetectionTool },
+  { name: "export_room_data", register: registerExportRoomDataTool },
+  { name: "export_schedule", register: registerExportScheduleTool },
+  { name: "delete_schedule", register: registerDeleteScheduleTool },
+  { name: "duplicate_schedule", register: registerDuplicateScheduleTool },
 ];
 
 export function registerTools(server: McpServer): void {
