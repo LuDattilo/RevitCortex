@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <Configurations>Debug R23;Debug R24;Debug R25;Debug R26;Release R23;Release R24;Release R25;Release R26</Configurations>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -12,5 +13,6 @@
   <ItemGroup>
     <ProjectReference Include="..\RevitCortex.Core\RevitCortex.Core.csproj" />
     <ProjectReference Include="..\RevitCortex.Plugin\RevitCortex.Plugin.csproj" />
+    <ProjectReference Include="..\RevitCortex.Tools\RevitCortex.Tools.csproj" />
   </ItemGroup>
 </Project>

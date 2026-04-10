@@ -58,7 +58,11 @@ public class GetScheduleDataTool : ICortexTool
 #endif
                 name     = s.Name,
                 category = s.Definition.CategoryId != ElementId.InvalidElementId
+#if REVIT2024_OR_GREATER
+                    ? ((BuiltInCategory)s.Definition.CategoryId.Value).ToString()
+#else
                     ? ((BuiltInCategory)s.Definition.CategoryId.IntegerValue).ToString()
+#endif
                     : "None"
             })
             .ToList();

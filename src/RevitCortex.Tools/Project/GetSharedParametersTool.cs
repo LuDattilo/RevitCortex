@@ -55,10 +55,11 @@ public class GetSharedParametersTool : ICortexTool
 
 #if REVIT2024_OR_GREATER
                 var paramType = definition.GetDataType().TypeId ?? "";
+                var paramGroup = definition.GetGroupTypeId()?.TypeId ?? "";
 #else
                 var paramType = definition.ParameterType.ToString();
-#endif
                 var paramGroup = definition.ParameterGroup.ToString();
+#endif
 
                 parameters.Add(new
                 {
