@@ -105,6 +105,13 @@ import { registerExportSharedParameterFileTool } from "./export_shared_parameter
 import { registerCreateStructuralFramingSystemTool } from "./create_structural_framing_system.js";
 import { registerSyncCsvParametersTool } from "./sync_csv_parameters.js";
 import { registerBatchExportTool } from "./batch_export.js";
+import { registerExportToExcelTool } from "./export_to_excel.js";
+import { registerImportFromExcelTool } from "./import_from_excel.js";
+import { registerWorkflowClashReviewTool } from "./workflow_clash_review.js";
+import { registerWorkflowRoomDocumentationTool } from "./workflow_room_documentation.js";
+import { registerWorkflowSheetSetTool } from "./workflow_sheet_set.js";
+import { registerWorkflowModelAuditTool } from "./workflow_model_audit.js";
+import { registerWorkflowDataRoundtripTool } from "./workflow_data_roundtrip.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -214,6 +221,13 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "create_structural_framing_system", register: registerCreateStructuralFramingSystemTool },
   { name: "sync_csv_parameters", register: registerSyncCsvParametersTool },
   { name: "batch_export", register: registerBatchExportTool },
+  { name: "export_to_excel", register: registerExportToExcelTool },
+  { name: "import_from_excel", register: registerImportFromExcelTool },
+  { name: "workflow_clash_review", register: registerWorkflowClashReviewTool },
+  { name: "workflow_room_documentation", register: registerWorkflowRoomDocumentationTool },
+  { name: "workflow_sheet_set", register: registerWorkflowSheetSetTool },
+  { name: "workflow_model_audit", register: registerWorkflowModelAuditTool },
+  { name: "workflow_data_roundtrip", register: registerWorkflowDataRoundtripTool },
 ];
 
 export function registerTools(server: McpServer): void {
