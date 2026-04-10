@@ -40,9 +40,9 @@ public class CadLinkCleanupTool : ICortexTool
                     Id = i.Id,
                     Name = i.Name,
                     IsLinked = i.IsLinked,
-                    ViewSpecific = i.ViewSpecificId != ElementId.InvalidElementId,
-                    ViewName = i.ViewSpecificId != ElementId.InvalidElementId
-                        ? (doc.GetElement(i.ViewSpecificId) as View)?.Name
+                    ViewSpecific = i.OwnerViewId != ElementId.InvalidElementId,
+                    ViewName = i.OwnerViewId != ElementId.InvalidElementId
+                        ? (doc.GetElement(i.OwnerViewId) as View)?.Name
                         : null
                 })
                 .ToList();

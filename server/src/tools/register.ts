@@ -98,6 +98,13 @@ import { registerExportRoomDataTool } from "./export_room_data.js";
 import { registerExportScheduleTool } from "./export_schedule.js";
 import { registerDeleteScheduleTool } from "./delete_schedule.js";
 import { registerDuplicateScheduleTool } from "./duplicate_schedule.js";
+import { registerModifyScheduleTool } from "./modify_schedule.js";
+import { registerCreatePresetScheduleTool } from "./create_preset_schedule.js";
+import { registerExportFamiliesTool } from "./export_families.js";
+import { registerExportSharedParameterFileTool } from "./export_shared_parameter_file.js";
+import { registerCreateStructuralFramingSystemTool } from "./create_structural_framing_system.js";
+import { registerSyncCsvParametersTool } from "./sync_csv_parameters.js";
+import { registerBatchExportTool } from "./batch_export.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -200,6 +207,13 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "export_schedule", register: registerExportScheduleTool },
   { name: "delete_schedule", register: registerDeleteScheduleTool },
   { name: "duplicate_schedule", register: registerDuplicateScheduleTool },
+  { name: "modify_schedule", register: registerModifyScheduleTool },
+  { name: "create_preset_schedule", register: registerCreatePresetScheduleTool },
+  { name: "export_families", register: registerExportFamiliesTool },
+  { name: "export_shared_parameter_file", register: registerExportSharedParameterFileTool },
+  { name: "create_structural_framing_system", register: registerCreateStructuralFramingSystemTool },
+  { name: "sync_csv_parameters", register: registerSyncCsvParametersTool },
+  { name: "batch_export", register: registerBatchExportTool },
 ];
 
 export function registerTools(server: McpServer): void {

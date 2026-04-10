@@ -1,0 +1,157 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Results;
+using RevitCortex.Core.Session;
+using RevitCortex.Core.Tools;
+
+namespace RevitCortex.Tools.Project;
+
+/// <summary>
+/// Modifies an existing schedule: add/remove fields, set/clear filters, set/clear sorting, rename, display options.
+/// </summary>
+public class ModifyScheduleTool : ICortexTool
+{
+    public string Name => "modify_schedule";
+    public string Category => "Project";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+        var doc = session.Store.Get<object>("activeDocument") as Document;
+        if (doc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
+
+        var scheduleId = input["scheduleId"]?.Value<long>();
+        var scheduleName = input["scheduleName"]?.Value<string>();
+        var action = input["action"]?.Value<string>() ?? "add_field";
+
+        try
+        {
+            ViewSchedule? schedule = null;
+            if (scheduleId.HasValue && scheduleId.Value > 0)
+            {
+#if REVIT2024_OR_GREATER
+                schedule = doc.GetElement(new ElementId(scheduleId.Value)) as ViewSchedule;
+#else
+                schedule = doc.GetElement(new ElementId((int)scheduleId.Value)) as ViewSchedule;
+#endif
+            }
+            else if (!string.IsNullOrEmpty(scheduleName))
+            {
+                schedule = new FilteredElementCollector(doc).OfClass(typeof(ViewSchedule)).Cast<ViewSchedule>()
+                    .FirstOrDefault(s => s.Name.Equals(scheduleName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (schedule == null)
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "Schedule not found");
+
+            using var tx = new Transaction(doc, "RevitCortex: Modify Schedule");
+            tx.Start();
+
+            var result = action.ToLowerInvariant() switch
+            {
+                "add_field" => AddFields(schedule, input),
+                "remove_field" => RemoveFields(schedule, input),
+                "set_sorting" => SetSorting(schedule, input),
+                "clear_sorting" => ClearSorting(schedule),
+                "rename" => RenameSchedule(schedule, input),
+                _ => (object)new { error = $"Unknown action: {action}" }
+            };
+
+            tx.Commit();
+            return CortexResult<object>.Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
+        }
+    }
+
+    private static object AddFields(ViewSchedule schedule, JObject input)
+    {
+        var fieldNames = input["fieldNames"]?.ToObject<List<string>>() ?? new List<string>();
+        var def = schedule.Definition;
+        var schedulableFields = def.GetSchedulableFields();
+        int added = 0;
+
+        foreach (var name in fieldNames)
+        {
+            var field = schedulableFields.FirstOrDefault(f => f.GetName(schedule.Document).Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (field != null)
+            {
+                def.AddField(field);
+                added++;
+            }
+        }
+        return new { action = "add_field", addedCount = added };
+    }
+
+    private static object RemoveFields(ViewSchedule schedule, JObject input)
+    {
+        var fieldNames = input["fieldNames"]?.ToObject<List<string>>() ?? new List<string>();
+        var def = schedule.Definition;
+        int removed = 0;
+
+        for (int i = def.GetFieldCount() - 1; i >= 0; i--)
+        {
+            var field = def.GetField(i);
+            if (fieldNames.Any(n => field.GetName().Equals(n, StringComparison.OrdinalIgnoreCase)))
+            {
+                def.RemoveField(i);
+                removed++;
+            }
+        }
+        return new { action = "remove_field", removedCount = removed };
+    }
+
+    private static object SetSorting(ViewSchedule schedule, JObject input)
+    {
+        var sortFields = input["sortFields"]?.ToObject<List<JObject>>() ?? new List<JObject>();
+        var def = schedule.Definition;
+
+        // Clear existing
+        def.ClearSortGroupFields();
+
+        int set = 0;
+        foreach (var sf in sortFields)
+        {
+            var fieldName = sf["fieldName"]?.Value<string>();
+            var sortOrder = sf["sortOrder"]?.Value<string>() ?? "ascending";
+            if (string.IsNullOrEmpty(fieldName)) continue;
+
+            for (int i = 0; i < def.GetFieldCount(); i++)
+            {
+                var field = def.GetField(i);
+                if (field.GetName().Equals(fieldName, StringComparison.OrdinalIgnoreCase))
+                {
+                    var sgf = new ScheduleSortGroupField(field.FieldId,
+                        sortOrder.Equals("descending", StringComparison.OrdinalIgnoreCase)
+                            ? ScheduleSortOrder.Descending : ScheduleSortOrder.Ascending);
+                    def.AddSortGroupField(sgf);
+                    set++;
+                    break;
+                }
+            }
+        }
+        return new { action = "set_sorting", sortFieldCount = set };
+    }
+
+    private static object ClearSorting(ViewSchedule schedule)
+    {
+        schedule.Definition.ClearSortGroupFields();
+        return new { action = "clear_sorting" };
+    }
+
+    private static object RenameSchedule(ViewSchedule schedule, JObject input)
+    {
+        var newName = input["newName"]?.Value<string>();
+        if (string.IsNullOrEmpty(newName)) return new { error = "newName required" };
+        var oldName = schedule.Name;
+        schedule.Name = newName;
+        return new { action = "rename", oldName, newName };
+    }
+}
