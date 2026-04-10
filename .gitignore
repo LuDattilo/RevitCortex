@@ -6,3 +6,6 @@ obj/
 node_modules/
 server/build/
 *.nupkg
+release/
+publish/
+*.zip
