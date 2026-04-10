@@ -44,4 +44,4 @@ $dllCount = (Get-ChildItem "$TargetDir\*.dll").Count
 Write-Host "`n=== Deploy complete ===" -ForegroundColor Green
 Write-Host "$dllCount DLLs deployed to $TargetDir"
 Write-Host ".addin manifest copied to $AddInsDir\RevitCortex.addin"
-Write-Host "`nRestart Revit 2025 to load the plugin."
+Write-Host "`nRestart Revit $RevitVersion to load the plugin."

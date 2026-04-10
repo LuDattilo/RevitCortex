@@ -104,7 +104,7 @@ return CortexResult<object>.Fail(
     suggestion: "Check the element ID or ensure the correct document is open");
 ```
 
-Error codes: `ElementNotFound` (100), `PermissionDenied` (200), `TransactionFailed` (300), `InvalidInput` (400), `Timeout` (500), `Unknown` (900).
+Error codes: `ElementNotFound` (100), `PermissionDenied` (200), `TransactionFailed` (300), `InvalidInput` (400), `Timeout` (500), `Cancelled` (600), `Unknown` (900).
 
 ### ICortexTool
 
@@ -149,32 +149,103 @@ When DocumentAnalyzer scans a document:
 2. It calls `capabilities.EnableTool("tool_name")` for each dynamic tool whose prerequisites are met.
 3. CortexRouter only exposes tools where `!IsDynamic || capabilities.IsToolEnabled(tool.Name)`.
 
-## Fork Reference
+## Token Optimization
 
-The original MCP server lives at:
+`tool-schemas.txt` in the project root contains compact one-line-per-tool signatures. Regenerate after adding/modifying tool schemas:
 
+```bash
+node server/generate-tool-schemas.mjs
 ```
-C:\Users\luigi.dattilo\Desktop\ClaudeCode\mcp-servers-for-revit
+
+## Confirmation Dialogs for Destructive Operations
+
+Destructive tools (delete, purge, rename, modify parameters, etc.) show a native Revit TaskDialog before executing. This is implemented via `CortexSession.RequestConfirmation(action, count)`.
+
+When the user cancels, tools return a `CortexResult.Fail` with `CortexErrorCode.Cancelled`:
+```json
+{"success": false, "error": {"code": "Cancelled", "message": "Operation cancelled by user"}}
 ```
 
-This is **read-only reference material**. Tools are rewritten from scratch using the new architecture -- never copy code directly.
+**Tools with confirmation:** delete_element, delete_selection, delete_material, purge_unused, wipe_empty_tags, set_element_parameters, set_compound_structure, batch_rename, override_graphics, set_element_phase, set_element_workset, change_element_type, load_family.
 
-### Migration Guidance
+When adding new destructive tools, always call `session.RequestConfirmation("action_verb", elementCount)` before the Transaction.
 
-When porting a tool from the original server:
-1. Create a new class in `RevitCortex.Tools/` implementing `ICortexTool`.
-2. Replace raw string returns with `CortexResult<object>.Ok(...)` / `.Fail(...)`.
-3. Replace direct `Document` access with `CortexSession` (the Plugin layer injects the document).
-4. Set `IsDynamic = true` if the tool only applies to certain document types.
-5. Add Zod schema in `server/src/schemas/` and register in `server/src/tools/`.
+## UI Components
 
-## Revit Locale Detection
+The plugin includes a Revit ribbon panel and dockable chat panel:
 
-Revit localizes category and parameter names based on installation language. Detect the active locale from tool responses (parameter names reveal the language) rather than assuming one language.
+- **Commands/** -- IExternalCommand classes: ToggleConnection, ToggleCortexPanel, OpenSettings
+- **UI/CortexPanel** -- WPF dockable chat panel with prompt chips, chat export, status indicator
+- **UI/CortexChatClient** -- Anthropic API client (tool use loop, thinking, retry on 429/529)
+- **UI/SettingsWindow** -- General settings, API key, tools enable/disable
+- **UI/IconFactory** -- Generates ribbon icons programmatically (no PNG files)
+- **UI/ConfirmationHelper** -- TaskDialog for destructive operations
 
-**Always prefer OST_\* codes** (e.g., `OST_StructuralFraming`, `OST_Walls`) for category references -- these are language-independent and work in any locale.
+The server is **off by default** -- user must click "Cortex Switch" in the ribbon to start it.
 
-### Common OST Codes
+Settings are stored in `~/.revitcortex/settings.json` (port, log level, model, disabled tools).
+
+## Deploy
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy.ps1
+```
+
+Deploys Plugin + Tools to `C:\ProgramData\Autodesk\Revit\Addins\2025\RevitCortex\`. Restart Revit after deploy.
+
+## IMPORTANT: Detect Revit Language First
+
+Revit localizes category and parameter names based on installation language (EN, IT, FR, DE, etc.). **Do NOT assume the language.** At the start of every session, call `get_element_parameters` on any element (or `get_project_info`) and check the parameter names in the response:
+
+- If you see "Level", "Comments", "Type Name" -- English
+- If you see "Livello", "Commenti", "Nome del tipo" -- Italiano
+- If you see "Niveau", "Commentaires", "Nom du type" -- Francais
+- If you see "Ebene", "Kommentare", "Typname" -- Deutsch
+
+Then use the corresponding column from the locale mapping tables below for ALL subsequent tool calls.
+
+## Tool-Specific Corrections
+
+### `ai_element_filter`
+- **REQUIRED:** `data` wrapper object -- do NOT pass filter params at root level
+- Example: `{"data": {"filterCategory": "OST_StructuralFraming", "includeInstances": true, "maxElements": 5}}`
+
+### `filter_by_parameter_value`
+- When filtering on type parameters (e.g., type name), set `parameterType: "type"`
+- Default `parameterType: "both"` may NOT resolve type-level string parameters correctly
+- Instance-level type name parameter often has `hasValue: false` -- always use `parameterType: "type"` for type name filtering
+
+### `color_elements`
+- Uses **localized display category names** (depends on Revit language)
+- Only works on views that **contain visible elements** of that category
+- Will fail on DrawingSheet/Cover Sheet views -- switch to a FloorPlan or 3D view first
+
+### `get_element_parameters`
+- `elementIds` must be an array of numbers: `[606873]` not `"[606873]"`
+- Type parameters are prefixed with `[Type]` in the response
+
+### `create_view`
+- Can timeout when executed in parallel with other write operations
+- Best to run alone or with minimal concurrent writes
+
+### `operate_element`
+- **REQUIRED:** `data` wrapper object
+- Example: `{"data": {"elementIds": [123], "action": "select"}}`
+
+### `send_code_to_revit`
+- Document variable is `document` (not `doc`, `Doc`, or `uidoc`)
+- For UIDocument: `new UIDocument(document)`
+- ElementId uses `.Value` on R2024+ and `.IntegerValue` on R2023
+
+## Handling User Input Situations
+
+When a tool requires user selection or interaction that cannot be automated:
+1. **Never block** -- if the user needs to select elements, instruct them and wait for the next message
+2. **Use `get_selected_elements`** -- if the user says "selected elements", call this first. If empty, ask them to select
+3. **Cancelled operations** -- if a tool returns `cancelled: true`, acknowledge it and ask if they want to retry
+4. **dryRun pattern** -- for destructive operations, run with `dryRun: true` first to preview the results, then with `dryRun: false` to execute. The confirmation dialog will ask the user
+
+## OST Category Codes (language-independent)
 
 | Code | Elements |
 |------|----------|
@@ -187,3 +258,51 @@ Revit localizes category and parameter names based on installation language. Det
 | `OST_Windows` | Windows |
 | `OST_Rooms` | Rooms |
 | `OST_GenericModel` | Generic models |
+| `OST_Ceilings` | Ceilings |
+| `OST_Roofs` | Roofs |
+| `OST_Stairs` | Stairs |
+| `OST_Railings` | Railings |
+| `OST_CurtainWallPanels` | Curtain panels |
+| `OST_CurtainWallMullions` | Mullions |
+
+## Revit Locale Mappings
+
+### Category Display Names
+
+| English | Italiano | Francais | Deutsch |
+|---------|----------|----------|---------|
+| Structural Framing | Telaio strutturale | Ossature | Tragwerk |
+| Structural Columns | Pilastri strutturali | Poteaux porteurs | Stutzen |
+| Walls | Muri | Murs | Wande |
+| Floors | Pavimenti | Sols | Geschossdecken |
+| Doors | Porte | Portes | Turen |
+| Windows | Finestre | Fenetres | Fenster |
+| Rooms | Vani | Pieces | Raume |
+| Generic Models | Modelli generici | Modeles generiques | Allgemeine Modelle |
+| Sheets | Tavole | Feuilles | Planlisten |
+| Levels | Livelli | Niveaux | Ebenen |
+| Grids | Griglie | Quadrillages | Raster |
+| Materials | Materiali | Materiaux | Materialien |
+
+### Parameter Names
+
+| English | Italiano | Francais | Deutsch |
+|---------|----------|----------|---------|
+| Type Name | Nome del tipo | Nom du type | Typname |
+| Family Name | Nome famiglia | Nom de famille | Familienname |
+| Family and Type | Famiglia e tipo | Famille et type | Familie und Typ |
+| Level | Livello | Niveau | Ebene |
+| Comments | Commenti | Commentaires | Kommentare |
+| Mark | Contrassegno | Repere | Kennzeichen |
+| Phase Created | Fase di creazione | Phase de creation | Erstellungsphase |
+| Length | Lunghezza | Longueur | Lange |
+| Volume | Volume | Volume | Volumen |
+| Area | Area | Superficie | Flache |
+| Description | Descrizione | Description | Beschreibung |
+
+## Performance Notes
+
+- **Read operations**: Safe to run 5+ in parallel
+- **Write operations**: Max 3-4 in parallel to avoid timeouts
+- **Heavy queries** (analyze_model_statistics, purge_unused): Run individually or max 2 concurrent
+- **create_view 3D**: Particularly heavy -- avoid running with other writes
