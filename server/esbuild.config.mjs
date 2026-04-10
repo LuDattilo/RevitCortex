@@ -21,6 +21,7 @@ await build({
     "fs", "path", "os", "url", "module", "crypto", "events", "stream",
     "util", "net", "tls", "http", "https", "zlib", "buffer",
     "string_decoder", "child_process", "worker_threads", "node:*",
+    "sql.js",
   ],
   sourcemap: false,
   minify: false,

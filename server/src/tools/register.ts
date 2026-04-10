@@ -112,6 +112,9 @@ import { registerWorkflowRoomDocumentationTool } from "./workflow_room_documenta
 import { registerWorkflowSheetSetTool } from "./workflow_sheet_set.js";
 import { registerWorkflowModelAuditTool } from "./workflow_model_audit.js";
 import { registerWorkflowDataRoundtripTool } from "./workflow_data_roundtrip.js";
+import { registerStoreProjectDataTool } from "./store_project_data.js";
+import { registerStoreRoomDataTool } from "./store_room_data.js";
+import { registerQueryStoredDataTool } from "./query_stored_data.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -228,6 +231,9 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "workflow_sheet_set", register: registerWorkflowSheetSetTool },
   { name: "workflow_model_audit", register: registerWorkflowModelAuditTool },
   { name: "workflow_data_roundtrip", register: registerWorkflowDataRoundtripTool },
+  { name: "store_project_data", register: registerStoreProjectDataTool },
+  { name: "store_room_data", register: registerStoreRoomDataTool },
+  { name: "query_stored_data", register: registerQueryStoredDataTool },
 ];
 
 export function registerTools(server: McpServer): void {
