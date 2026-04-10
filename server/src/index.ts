@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerTools } from "./tools/register.js";
 import { getDatabase } from "./database/db.js";
+import { getUsageDatabase } from "./database/usageDb.js";
 import { logInfo, logError } from "./logging/logger.js";
 
 const server = new McpServer({
@@ -11,6 +12,7 @@ const server = new McpServer({
 
 async function main(): Promise<void> {
   await getDatabase();
+  await getUsageDatabase();
   logInfo("Database initialized");
   registerTools(server);
   const transport = new StdioServerTransport();

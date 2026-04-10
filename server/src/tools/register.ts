@@ -115,6 +115,14 @@ import { registerWorkflowDataRoundtripTool } from "./workflow_data_roundtrip.js"
 import { registerStoreProjectDataTool } from "./store_project_data.js";
 import { registerStoreRoomDataTool } from "./store_room_data.js";
 import { registerQueryStoredDataTool } from "./query_stored_data.js";
+import { registerAnalyzeJournalTool } from "./analyze_journal.js";
+import { registerCreateMaterialTool } from "./create_material.js";
+import { registerDuplicateMaterialTool } from "./duplicate_material.js";
+import { registerDeleteMaterialTool } from "./delete_material.js";
+import { registerGetCompoundStructureTool } from "./get_compound_structure.js";
+import { registerSetCompoundStructureTool } from "./set_compound_structure.js";
+import { registerDuplicateSystemTypeTool } from "./duplicate_system_type.js";
+import { registerReportTokenUsageTool } from "./report_token_usage.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -234,6 +242,14 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "store_project_data", register: registerStoreProjectDataTool },
   { name: "store_room_data", register: registerStoreRoomDataTool },
   { name: "query_stored_data", register: registerQueryStoredDataTool },
+  { name: "analyze_journal", register: registerAnalyzeJournalTool },
+  { name: "create_material", register: registerCreateMaterialTool },
+  { name: "duplicate_material", register: registerDuplicateMaterialTool },
+  { name: "delete_material", register: registerDeleteMaterialTool },
+  { name: "get_compound_structure", register: registerGetCompoundStructureTool },
+  { name: "set_compound_structure", register: registerSetCompoundStructureTool },
+  { name: "duplicate_system_type", register: registerDuplicateSystemTypeTool },
+  { name: "report_token_usage", register: registerReportTokenUsageTool },
 ];
 
 export function registerTools(server: McpServer): void {
