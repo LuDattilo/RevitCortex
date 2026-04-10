@@ -19,7 +19,7 @@ public class GetWorksetsTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => true;
-
+    public string Description => "Lists worksets with open/close status and ownership info. Only available for workshared documents (IsDynamic = true).";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

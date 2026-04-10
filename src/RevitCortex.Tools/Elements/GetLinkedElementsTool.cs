@@ -20,7 +20,7 @@ public class GetLinkedElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Returns elements from Revit linked models, with optional filtering by link name, categories (OST_* codes) and parameter extraction. Mirrors the fork's GetLinkedElementsEventHandler logic.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

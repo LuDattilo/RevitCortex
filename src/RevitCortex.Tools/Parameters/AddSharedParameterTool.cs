@@ -21,7 +21,7 @@ public class AddSharedParameterTool : ICortexTool
     public string Category => "Parameters";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Adds a shared parameter to project categories from the shared parameter file. Creates the group/definition if it doesn't exist.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

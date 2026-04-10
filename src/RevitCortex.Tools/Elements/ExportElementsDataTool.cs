@@ -22,7 +22,7 @@ public class ExportElementsDataTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Exports element data as JSON or CSV. Supports category filtering (OST_* codes), explicit or auto-discovered parameter columns, and value-based row filtering. Mirrors the fork's ExportElementsDataEventHandler.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

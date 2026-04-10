@@ -19,7 +19,7 @@ public class ExportRoomDataTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Exports room data from the current project (name, number, level, area, volume, etc.).";
     private const double SqFtToSqM = 0.092903;
     private const double CuFtToCuM = 0.0283168;
     private const double FtToMm = 304.8;

@@ -21,7 +21,7 @@ public class OperateElementTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Performs UI operations on elements: select, selectionbox, setcolor, settransparency, hide, temphide, isolate, unhide, resetisolate, delete. Input uses a \"data\" wrapper to match the fork's OperateElementEventHandler schema.";
     // Supported action names (lowercase canonical form)
     private static readonly HashSet<string> KnownActions = new(StringComparer.OrdinalIgnoreCase)
     {

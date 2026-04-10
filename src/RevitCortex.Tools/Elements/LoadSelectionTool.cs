@@ -18,7 +18,7 @@ public class LoadSelectionTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Lists saved selections or loads a named selection, optionally selecting elements in view.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

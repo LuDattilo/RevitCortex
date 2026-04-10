@@ -20,7 +20,7 @@ public class CreateColorLegendTool : ICortexTool
     public string Category => "Annotations";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Colors elements by parameter value and optionally creates a drafting legend view. Supports auto, gradient, and custom color schemes.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

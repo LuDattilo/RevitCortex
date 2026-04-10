@@ -12,7 +12,7 @@ namespace RevitCortex.Plugin.Communication;
 public class SocketService
 {
     private TcpListener? _listener;
-    private bool _isRunning;
+    private volatile bool _isRunning;
     private Thread? _listenerThread;
     private readonly CortexRouter _router;
     private readonly int _port;

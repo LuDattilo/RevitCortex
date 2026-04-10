@@ -18,7 +18,7 @@ public class GetScheduleDataTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Lists all schedules (if no scheduleId) or retrieves headers/rows for a specific schedule.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

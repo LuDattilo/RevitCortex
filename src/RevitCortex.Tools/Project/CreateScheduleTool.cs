@@ -19,7 +19,7 @@ public class CreateScheduleTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Creates a schedule view with specified category, fields, filters, and sort options.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

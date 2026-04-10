@@ -18,7 +18,7 @@ public class SectionBoxFromSelectionTool : ICortexTool
     public string Category => "Views";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Creates a 3D section box from selected elements' combined bounding box.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)

@@ -19,7 +19,7 @@ public class CheckModelHealthTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Comprehensive BIM model health audit returning score (0-100), grade (A-F), and detailed breakdown with actionable recommendations.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

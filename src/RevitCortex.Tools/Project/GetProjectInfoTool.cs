@@ -19,7 +19,7 @@ public class GetProjectInfoTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Returns comprehensive project metadata: name, address, author, phases, worksets, Revit links, and levels.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

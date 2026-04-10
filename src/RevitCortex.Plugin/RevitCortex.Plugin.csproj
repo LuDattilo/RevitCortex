@@ -5,6 +5,7 @@
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
     <RootNamespace>RevitCortex.Plugin</RootNamespace>
     <AssemblyName>RevitCortex.Plugin</AssemblyName>
   </PropertyGroup>

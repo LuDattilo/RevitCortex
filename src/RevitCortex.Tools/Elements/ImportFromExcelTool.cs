@@ -21,7 +21,7 @@ public class ImportFromExcelTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Imports data from Excel (.xlsx) into Revit element parameters. Requires an ElementId column to match elements.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

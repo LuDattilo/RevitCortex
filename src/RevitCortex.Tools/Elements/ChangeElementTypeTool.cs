@@ -15,7 +15,7 @@ public class ChangeElementTypeTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Change Element Type";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var elementIds = input["elementIds"]?.ToObject<long[]>();
@@ -50,6 +50,9 @@ public class ChangeElementTypeTool : ICortexTool
             var results = new List<object>();
             int successCount = 0;
             int failCount = 0;
+
+            if (!session.RequestConfirmation("change type for", elementIds.Length))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
             using var tx = new Transaction(doc, "RevitCortex: Change Element Type");
             tx.Start();

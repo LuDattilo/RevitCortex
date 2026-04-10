@@ -20,7 +20,7 @@ public class SetElementPhaseTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => true;
-
+    public string Description => "Sets the created and/or demolished phase on one or more elements. IsDynamic = true — only available when the document has phases. Mirrors the fork's SetElementPhaseEventHandler logic.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var requests = input["requests"]?.ToObject<List<SetPhaseRequest>>();
@@ -37,6 +37,9 @@ public class SetElementPhaseTool : ICortexTool
         var results = new List<object>();
         var successCount = 0;
         var failCount = 0;
+
+        if (!session.RequestConfirmation("change phase for", requests.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Element Phase");
         tx.Start();

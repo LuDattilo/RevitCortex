@@ -18,7 +18,7 @@ public class CreateViewTool : ICortexTool
     public string Category => "Views";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Creates a new view (floor plan, ceiling plan, section, elevation, 3D).";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)

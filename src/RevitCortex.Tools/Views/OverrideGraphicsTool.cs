@@ -18,7 +18,7 @@ public class OverrideGraphicsTool : ICortexTool
     public string Category => "Views";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Sets or resets graphic overrides (color, transparency, halftone, line weight) for elements in a view.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -47,6 +47,9 @@ public class OverrideGraphicsTool : ICortexTool
 
             if (view == null)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "Could not resolve view");
+
+            if (!session.RequestConfirmation("modify graphics for", elementIds.Count))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
             using var tx = new Transaction(doc, "RevitCortex: Override Graphics");
             tx.Start();

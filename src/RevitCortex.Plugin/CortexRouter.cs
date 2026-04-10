@@ -17,6 +17,7 @@ public class CortexRouter
     private readonly CortexSession _session;
     private readonly IDocumentAnalyzer _analyzer;
     private RevitThreadDispatcher? _dispatcher;
+    private readonly HashSet<string> _disabledTools = new();
 
     public CortexRouter(CortexSession session, IDocumentAnalyzer analyzer)
     {
@@ -34,8 +35,16 @@ public class CortexRouter
 
         foreach (var type in toolTypes)
         {
-            var tool = (ICortexTool)Activator.CreateInstance(type)!;
-            _tools[tool.Name] = tool;
+            try
+            {
+                var tool = (ICortexTool)Activator.CreateInstance(type)!;
+                _tools[tool.Name] = tool;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(
+                    $"[RevitCortex] Failed to register tool {type.Name}: {ex.Message}");
+            }
         }
     }
 
@@ -45,6 +54,11 @@ public class CortexRouter
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Tool '{toolName}' not found",
                 suggestion: $"Available tools: {string.Join(", ", GetAvailableToolNames())}");
+
+        if (_disabledTools.Contains(toolName))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                $"Tool '{toolName}' is disabled",
+                suggestion: "Enable it in RevitCortex Settings > Tools");
 
         if (tool.RequiresDocument && _session.Store.Get<object>("activeDocument") == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
@@ -67,19 +81,19 @@ public class CortexRouter
         _dispatcher = dispatcher;
     }
 
-    public void OnDocumentChanged(object document)
+    public void OnDocumentChanged(object document, string? locale = null)
     {
         var caps = new DocumentCapabilities();
         _analyzer.Analyze(document, caps);
 
-        var locale = _session.Store.Get<string>("detectedLocale") ?? "en";
-        _session.Reinitialize(caps, locale);
+        _session.Reinitialize(caps, locale ?? "en");
         _session.Store.Set("activeDocument", document);
     }
 
     public IReadOnlyList<string> GetAvailableToolNames()
     {
         return _tools.Values
+            .Where(t => !_disabledTools.Contains(t.Name))
             .Where(t => !t.IsDynamic || _session.Capabilities.IsToolEnabled(t.Name))
             .Select(t => t.Name)
             .OrderBy(n => n)
@@ -87,4 +101,25 @@ public class CortexRouter
     }
 
     public int TotalToolCount => _tools.Count;
+
+    /// <summary>
+    /// Returns all registered tools with their name, category, description, and enabled state.
+    /// </summary>
+    public IReadOnlyList<(string Name, string Category, string Description, bool IsEnabled)> GetAllToolInfo()
+    {
+        return _tools.Values
+            .OrderBy(t => t.Category)
+            .ThenBy(t => t.Name)
+            .Select(t => (t.Name, t.Category, t.Description, !_disabledTools.Contains(t.Name)))
+            .ToList();
+    }
+
+    public void SetDisabledTools(IEnumerable<string> toolNames)
+    {
+        _disabledTools.Clear();
+        foreach (var name in toolNames)
+            _disabledTools.Add(name);
+    }
+
+    public IReadOnlyCollection<string> DisabledTools => _disabledTools;
 }

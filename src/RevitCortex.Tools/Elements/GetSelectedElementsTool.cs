@@ -20,7 +20,7 @@ public class GetSelectedElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Returns the currently selected elements in the Revit UI. Mirrors the fork's GetSelectedElementsEventHandler logic.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

@@ -19,7 +19,7 @@ public class GetCurrentViewElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Returns elements visible in the current active view, with optional category and field filtering. Mirrors the fork's GetCurrentViewElementsEventHandler logic.";
     private const double MmPerFoot = 304.8;
 
     // Default model categories when none specified

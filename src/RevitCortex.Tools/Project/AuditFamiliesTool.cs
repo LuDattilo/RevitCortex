@@ -19,7 +19,7 @@ public class AuditFamiliesTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Comprehensive family audit with health scores, unused detection, in-place identification, and instance counts. Merges audit_families and check_family_health.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

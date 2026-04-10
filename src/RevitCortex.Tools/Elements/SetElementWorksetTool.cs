@@ -20,7 +20,7 @@ public class SetElementWorksetTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => true;
-
+    public string Description => "Moves one or more elements to a named user workset. IsDynamic = true — only available when the document is workshared. Mirrors the fork's SetElementWorksetEventHandler logic.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var requests = input["requests"]?.ToObject<List<SetWorksetRequest>>();
@@ -41,6 +41,9 @@ public class SetElementWorksetTool : ICortexTool
         var results = new List<object>();
         var successCount = 0;
         var failCount = 0;
+
+        if (!session.RequestConfirmation("change workset for", requests.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Element Workset");
         tx.Start();

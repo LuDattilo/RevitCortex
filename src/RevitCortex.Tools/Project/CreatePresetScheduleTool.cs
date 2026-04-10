@@ -19,7 +19,7 @@ public class CreatePresetScheduleTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Creates preset schedules: door_by_room, window_by_room, room_finish, material_takeoff, sheet_list, view_list.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

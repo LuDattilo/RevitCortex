@@ -20,7 +20,7 @@ public class AddPrefixSuffixTool : ICortexTool
     public string Category => "Parameters";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Adds a prefix and/or suffix to a parameter value on matching elements. Supports dry-run preview mode.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -59,6 +59,9 @@ public class AddPrefixSuffixTool : ICortexTool
             Transaction? tx = null;
             if (!dryRun)
             {
+                if (!session.RequestConfirmation("modify parameters on", elements.Count))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 tx = new Transaction(doc, "RevitCortex: Add Prefix/Suffix");
                 tx.Start();
             }

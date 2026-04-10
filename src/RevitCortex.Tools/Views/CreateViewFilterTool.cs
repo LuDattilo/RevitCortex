@@ -19,7 +19,7 @@ public class CreateViewFilterTool : ICortexTool
     public string Category => "Views";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Creates, applies, or lists view filters with optional parameter rules and graphic overrides.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -177,20 +177,40 @@ public class CreateViewFilterTool : ICortexTool
         {
             case "equals":
                 return storageType == StorageType.String
+#if REVIT2026_OR_GREATER
+                    ? ParameterFilterRuleFactory.CreateEqualsRule(paramId, value)
+#else
                     ? ParameterFilterRuleFactory.CreateEqualsRule(paramId, value, false)
+#endif
                     : int.TryParse(value, out var intVal)
                         ? ParameterFilterRuleFactory.CreateEqualsRule(paramId, intVal)
                         : null;
             case "not_equals":
                 return storageType == StorageType.String
+#if REVIT2026_OR_GREATER
+                    ? ParameterFilterRuleFactory.CreateNotEqualsRule(paramId, value)
+#else
                     ? ParameterFilterRuleFactory.CreateNotEqualsRule(paramId, value, false)
+#endif
                     : null;
             case "contains":
+#if REVIT2026_OR_GREATER
+                return ParameterFilterRuleFactory.CreateContainsRule(paramId, value);
+#else
                 return ParameterFilterRuleFactory.CreateContainsRule(paramId, value, false);
+#endif
             case "begins_with":
+#if REVIT2026_OR_GREATER
+                return ParameterFilterRuleFactory.CreateBeginsWithRule(paramId, value);
+#else
                 return ParameterFilterRuleFactory.CreateBeginsWithRule(paramId, value, false);
+#endif
             case "ends_with":
+#if REVIT2026_OR_GREATER
+                return ParameterFilterRuleFactory.CreateEndsWithRule(paramId, value);
+#else
                 return ParameterFilterRuleFactory.CreateEndsWithRule(paramId, value, false);
+#endif
             case "greater_than":
                 return double.TryParse(value, out var dblVal)
                     ? ParameterFilterRuleFactory.CreateGreaterRule(paramId, dblVal, 1e-6)

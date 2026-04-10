@@ -18,7 +18,7 @@ public class ApplyViewTemplateTool : ICortexTool
     public string Category => "Views";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Lists, applies, or removes view templates from views.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

@@ -18,7 +18,7 @@ public class RenameViewsTool : ICortexTool
     public string Category => "Views";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Renames views using find/replace, prefix, or suffix with optional view type filtering.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -50,12 +50,17 @@ public class RenameViewsTool : ICortexTool
 
             var results = new List<object>();
 
+            var viewList = views.ToList();
+
             if (!dryRun)
             {
+                if (!session.RequestConfirmation("rename", viewList.Count))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Rename Views");
                 tx.Start();
 
-                foreach (var view in views.ToList())
+                foreach (var view in viewList)
                 {
                     var oldName = view.Name;
                     var newName = ApplyRename(oldName, operation, prefix, suffix, findText, replaceText);
@@ -76,7 +81,7 @@ public class RenameViewsTool : ICortexTool
             }
             else
             {
-                foreach (var view in views.ToList())
+                foreach (var view in viewList)
                 {
                     var oldName = view.Name;
                     var newName = ApplyRename(oldName, operation, prefix, suffix, findText, replaceText);

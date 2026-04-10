@@ -20,7 +20,7 @@ public class ExportScheduleTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Exports a schedule view to CSV/TSV format or returns data as structured JSON.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

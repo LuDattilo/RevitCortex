@@ -18,7 +18,7 @@ public class WorkflowClashReviewTool : ICortexTool
     public string Category => "Workflows";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Detects clashes between two categories and optionally creates a section box view.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)

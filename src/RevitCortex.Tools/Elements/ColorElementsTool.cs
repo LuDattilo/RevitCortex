@@ -21,7 +21,7 @@ public class ColorElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Colors elements in the active view by grouping them on a parameter value. Supports OST_* category codes or localized display names. Color strategies: customColors array → gradient (blue→red) → random. Mirrors the fork's ColorSplashEventHandler logic.";
     private static readonly Random Rng = new Random();
 
     public CortexResult<object> Execute(JObject input, CortexSession session)

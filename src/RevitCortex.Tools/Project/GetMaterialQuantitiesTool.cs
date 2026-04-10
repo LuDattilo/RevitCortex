@@ -20,7 +20,7 @@ public class GetMaterialQuantitiesTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Calculates total area and volume of materials across selected or all elements. Heavy query — can take time on large models.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

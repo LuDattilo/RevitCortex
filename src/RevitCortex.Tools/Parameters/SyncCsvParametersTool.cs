@@ -18,7 +18,7 @@ public class SyncCsvParametersTool : ICortexTool
     public string Category => "Parameters";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Syncs element parameters from structured data (import from CSV/JSON array).";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

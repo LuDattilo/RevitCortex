@@ -20,7 +20,7 @@ public class ManageProjectParametersTool : ICortexTool
     public string Category => "Parameters";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Lists, creates, deletes, or modifies project parameters.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -36,7 +36,7 @@ public class ManageProjectParametersTool : ICortexTool
             {
                 "list"   => ListParameters(doc),
                 "create" => CreateParameter(doc, input),
-                "delete" => DeleteParameter(doc, input),
+                "delete" => DeleteParameter(doc, input, session),
                 "modify" => ModifyParameter(doc, input),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}",
@@ -125,7 +125,7 @@ public class ManageProjectParametersTool : ICortexTool
             var tempSharedFile = app.OpenSharedParameterFile();
             var group = tempSharedFile.Groups.Create("RevitCortex_Temp");
 
-#if REVIT2024_OR_GREATER
+#if REVIT2023_OR_GREATER
             var specTypeId = ResolveSpecTypeId(dataType);
             var options = new ExternalDefinitionCreationOptions(parameterName, specTypeId);
 #else
@@ -181,7 +181,7 @@ public class ManageProjectParametersTool : ICortexTool
         }
     }
 
-    private static CortexResult<object> DeleteParameter(Document doc, JObject input)
+    private static CortexResult<object> DeleteParameter(Document doc, JObject input, CortexSession session)
     {
         var parameterName = input["parameterName"]?.Value<string>();
         if (string.IsNullOrEmpty(parameterName))
@@ -204,6 +204,9 @@ public class ManageProjectParametersTool : ICortexTool
         if (targetDef == null)
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
                 $"Parameter '{parameterName}' not found in project bindings");
+
+        if (!session.RequestConfirmation("delete project parameter", 1))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Delete Project Parameter");
         tx.Start();
@@ -282,7 +285,7 @@ public class ManageProjectParametersTool : ICortexTool
         });
     }
 
-#if REVIT2024_OR_GREATER
+#if REVIT2023_OR_GREATER
     private static ForgeTypeId ResolveSpecTypeId(string dataType)
     {
         return dataType.ToLowerInvariant() switch

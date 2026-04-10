@@ -21,7 +21,7 @@ public class AIElementFilterTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Smart element query tool — supports category, element-class, family-symbol, view-visibility and bounding-box filters, all combinable via logical AND. Mirrors the fork's AIElementFilterEventHandler filtering logic.";
     // ── Revit internal-unit conversion factor: 1 foot = 304.8 mm ──────────
     private const double MmPerFoot = 304.8;
 

@@ -18,7 +18,7 @@ public class AnalyzeModelStatisticsTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Analyzes model complexity with element counts, category breakdown, and level distribution.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

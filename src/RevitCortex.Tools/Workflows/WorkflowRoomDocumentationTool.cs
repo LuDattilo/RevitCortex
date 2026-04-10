@@ -19,7 +19,7 @@ public class WorkflowRoomDocumentationTool : ICortexTool
     public string Category => "Workflows";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Auto-generates room documentation: callout views and optional sections from rooms.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)

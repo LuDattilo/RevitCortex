@@ -18,7 +18,7 @@ public class CreateTextNoteTool : ICortexTool
     public string Category => "Annotations";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Creates one or more text notes in the active or specified view.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)

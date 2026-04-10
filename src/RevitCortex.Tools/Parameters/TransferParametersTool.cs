@@ -18,7 +18,7 @@ public class TransferParametersTool : ICortexTool
     public string Category => "Parameters";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Copies parameter values from a source element to target elements.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -72,6 +72,9 @@ public class TransferParametersTool : ICortexTool
 
             if (!dryRun)
             {
+                if (!session.RequestConfirmation("transfer parameters to", targetIds.Count))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Transfer Parameters");
                 tx.Start();
                 results = TransferToTargets(doc, targetIds, sourceValues, includeType);

@@ -18,7 +18,7 @@ public class CreatePlaceholderSheetsTool : ICortexTool
     public string Category => "Sheets";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Creates, lists, converts, or deletes placeholder sheets.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

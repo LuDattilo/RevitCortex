@@ -19,7 +19,7 @@ public class FindUndimensionedElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "QA/audit tool — finds elements in specified categories that have no dimension reference in the target view. Mirrors the fork's FindUndimensionedElementsEventHandler logic.";
     private static readonly List<BuiltInCategory> DefaultCategories = new List<BuiltInCategory>
     {
         BuiltInCategory.OST_Walls,

@@ -19,7 +19,7 @@ public class LinesPerViewCountTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Scans all views and counts detail/model lines per view, returning views exceeding a threshold sorted by line count. Useful for performance auditing.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

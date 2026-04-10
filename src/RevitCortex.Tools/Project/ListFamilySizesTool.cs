@@ -19,7 +19,7 @@ public class ListFamilySizesTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Lists families with type and instance counts, sorted by instance count, type count, or name. Useful for identifying bloated/unused families.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

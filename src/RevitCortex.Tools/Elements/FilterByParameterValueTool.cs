@@ -22,7 +22,7 @@ public class FilterByParameterValueTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Filters elements by parameter value conditions with flexible matching (equals, contains, greater_than, etc.). Supports scope filtering (whole model, active view, selection) and instance/type parameter lookup.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

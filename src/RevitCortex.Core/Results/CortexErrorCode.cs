@@ -8,5 +8,6 @@ public enum CortexErrorCode
     TransactionFailed = 300,
     InvalidInput = 400,
     Timeout = 500,
+    Cancelled = 600,
     Unknown = 900
 }

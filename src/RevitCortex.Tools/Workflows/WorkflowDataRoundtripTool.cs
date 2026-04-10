@@ -22,7 +22,7 @@ public class WorkflowDataRoundtripTool : ICortexTool
     public string Category => "Workflows";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Exports element parameters to Excel for external editing, then re-imports. Step 1 (export): Creates an Excel file with element data. Step 2 (import): User edits externally, then uses import_from_excel to re-import.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

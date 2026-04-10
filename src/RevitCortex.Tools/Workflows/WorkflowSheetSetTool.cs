@@ -18,7 +18,7 @@ public class WorkflowSheetSetTool : ICortexTool
     public string Category => "Workflows";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Auto-creates sheets with title blocks from a sheet definition list.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

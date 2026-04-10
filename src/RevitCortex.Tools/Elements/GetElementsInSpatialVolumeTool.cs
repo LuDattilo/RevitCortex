@@ -21,7 +21,7 @@ public class GetElementsInSpatialVolumeTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Returns elements contained within a spatial volume: room bounding box, area bounding box, or a custom axis-aligned bounding box defined in mm. Mirrors the fork's GetElementsInSpatialVolumeEventHandler logic.";
     // 1 foot = 304.8 mm — used for MM<->feet conversions
     private const double MmPerFoot = 304.8;
 

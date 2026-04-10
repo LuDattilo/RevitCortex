@@ -20,7 +20,7 @@ public class GetRoomOpeningsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Retrieves doors/windows by room with dimensions and room association data. Phase-aware lookup via FromRoom/ToRoom with type-level caching.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

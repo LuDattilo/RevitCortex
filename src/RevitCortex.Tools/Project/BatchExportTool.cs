@@ -20,7 +20,7 @@ public class BatchExportTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Exports multiple views/sheets to DWG, DXF, DGN, or image formats. PDF export requires Revit 2023+ PDF export API.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

@@ -20,7 +20,7 @@ public class MatchElementPropertiesTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Copies parameter values from a source element to one or more target elements. Matches parameters by name, respects read-only state, and handles all StorageTypes. Mirrors the fork's MatchElementPropertiesEventHandler.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var sourceElementId = input["sourceElementId"]?.Value<long?>();

@@ -20,7 +20,7 @@ public class DeleteElementTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Deletes one or more elements from the model. Defaults to dryRun=true for safety — preview what would be deleted before committing. Mirrors the fork's DeleteElementEventHandler logic.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         // Parse inputs
@@ -100,6 +100,9 @@ public class DeleteElementTool : ICortexTool
                 context: invalidIds.Count > 0
                     ? new Dictionary<string, object> { ["invalidIds"] = invalidIds }
                     : null);
+
+        if (!session.RequestConfirmation("delete", validElements.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         try
         {

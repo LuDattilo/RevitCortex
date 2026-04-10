@@ -19,7 +19,7 @@ public class GetSharedParametersTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Lists all project parameters (shared and project-specific) with their bindings, parameter types, and applicable categories.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

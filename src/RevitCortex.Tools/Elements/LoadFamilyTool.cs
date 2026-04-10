@@ -18,7 +18,7 @@ public class LoadFamilyTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Loads a .rfa family, lists loaded families, or duplicates a family type.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -31,7 +31,7 @@ public class LoadFamilyTool : ICortexTool
         {
             return action.ToLowerInvariant() switch
             {
-                "load" => LoadFamily(doc, input),
+                "load" => LoadFamily(doc, input, session),
                 "list" => ListFamilies(doc, input),
                 "duplicate_type" => DuplicateType(doc, input),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
@@ -44,11 +44,14 @@ public class LoadFamilyTool : ICortexTool
         }
     }
 
-    private static CortexResult<object> LoadFamily(Document doc, JObject input)
+    private static CortexResult<object> LoadFamily(Document doc, JObject input, CortexSession session)
     {
         var familyPath = input["familyPath"]?.Value<string>();
         if (string.IsNullOrEmpty(familyPath))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "familyPath is required for load");
+
+        if (!session.RequestConfirmation("load family", 1))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Load Family");
         tx.Start();

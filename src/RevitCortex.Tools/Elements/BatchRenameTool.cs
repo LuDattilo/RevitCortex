@@ -19,7 +19,7 @@ public class BatchRenameTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Batch renames elements (views, sheets, levels, grids, rooms) using find/replace, prefix, suffix, or regex.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -36,7 +36,7 @@ public class BatchRenameTool : ICortexTool
 
         try
         {
-            IEnumerable<Element> elements;
+            List<Element> elements;
 
             if (elementIds.Count > 0)
             {
@@ -49,11 +49,12 @@ public class BatchRenameTool : ICortexTool
                         return doc.GetElement(new ElementId((int)id));
 #endif
                     })
-                    .Where(e => e != null)!;
+                    .Where(e => e != null)
+                    .ToList()!;
             }
             else if (!string.IsNullOrEmpty(targetCategory))
             {
-                elements = targetCategory.ToLowerInvariant() switch
+                elements = (targetCategory.ToLowerInvariant() switch
                 {
                     "views" => new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>()
                         .Where(v => !v.IsTemplate).Cast<Element>(),
@@ -63,7 +64,7 @@ public class BatchRenameTool : ICortexTool
                     "rooms" => new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Rooms)
                         .WhereElementIsNotElementType().Cast<Element>(),
                     _ => Enumerable.Empty<Element>()
-                };
+                }).ToList();
             }
             else
             {
@@ -75,6 +76,9 @@ public class BatchRenameTool : ICortexTool
 
             if (!dryRun)
             {
+                if (!session.RequestConfirmation("rename", elements.Count))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Batch Rename");
                 tx.Start();
 

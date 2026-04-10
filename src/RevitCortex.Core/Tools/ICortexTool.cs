@@ -18,6 +18,9 @@ public interface ICortexTool
     /// <summary>If true, tool is only visible when DocumentCapabilities enables it.</summary>
     bool IsDynamic { get; }
 
+    /// <summary>Human-readable description shown in the Settings UI.</summary>
+    string Description { get; }
+
     /// <summary>Execute the tool with the given input and session context.</summary>
     CortexResult<object> Execute(JObject input, CortexSession session);
 }

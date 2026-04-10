@@ -19,7 +19,7 @@ public class GetWarningsTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Retrieves all warnings/errors in the model with optional severity and description filtering. Useful for model health auditing.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

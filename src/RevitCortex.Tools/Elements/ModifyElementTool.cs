@@ -15,7 +15,7 @@ public class ModifyElementTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Modify Element";
     // 1 foot = 304.8 mm
     private const double MmPerFoot = 304.8;
 

@@ -18,7 +18,7 @@ public class BatchCreateSheetsTool : ICortexTool
     public string Category => "Sheets";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Creates multiple sheets at once with title blocks and optional view placement.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

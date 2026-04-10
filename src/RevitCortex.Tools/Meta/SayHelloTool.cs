@@ -11,7 +11,7 @@ public class SayHelloTool : ICortexTool
     public string Category => "Meta";
     public bool RequiresDocument => false;
     public bool IsDynamic => false;
-
+    public string Description => "Say Hello";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var message = input["message"]?.ToString() ?? "Hello from RevitCortex!";

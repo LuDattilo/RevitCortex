@@ -19,7 +19,7 @@ public class ImportTableTool : ICortexTool
     public string Category => "Annotations";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Imports a CSV/TSV file as a formatted table of text notes in a drafting or legend view.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)

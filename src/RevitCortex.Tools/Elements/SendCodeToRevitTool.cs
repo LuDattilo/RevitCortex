@@ -21,7 +21,7 @@ public class SendCodeToRevitTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Executes custom C# code snippets in the Revit context. Uses Roslyn scripting when available, otherwise evaluates simple expressions.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

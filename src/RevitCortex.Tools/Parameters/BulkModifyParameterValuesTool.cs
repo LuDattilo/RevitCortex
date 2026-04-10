@@ -18,7 +18,7 @@ public class BulkModifyParameterValuesTool : ICortexTool
     public string Category => "Parameters";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Bulk set, prefix, suffix, find/replace, or clear parameter values on elements.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -67,19 +67,23 @@ public class BulkModifyParameterValuesTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "elementIds or categoryName required");
             }
 
+            var elementList = elements.ToList();
             var modified = new List<object>();
             var skipped = 0;
 
             if (!dryRun)
             {
+                if (!session.RequestConfirmation("modify parameters on", elementList.Count))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Bulk Modify Parameters");
                 tx.Start();
-                ProcessElements(elements, parameterName, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped);
+                ProcessElements(elementList, parameterName, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped);
                 tx.Commit();
             }
             else
             {
-                ProcessElements(elements, parameterName, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped, true);
+                ProcessElements(elementList, parameterName, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped, true);
             }
 
             return CortexResult<object>.Ok(new

@@ -19,7 +19,7 @@ public class ListSchedulableFieldsTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Discovers all available schedulable fields for a given category by creating a temporary schedule. Requires a transaction (creates + deletes temp element).";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

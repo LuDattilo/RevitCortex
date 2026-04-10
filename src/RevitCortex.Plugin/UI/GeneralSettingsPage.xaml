@@ -1,0 +1,114 @@
+<Page x:Class="RevitCortex.Plugin.UI.GeneralSettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d"
+      d:DesignHeight="450" d:DesignWidth="550">
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,15">
+            <TextBlock Text="General Settings" FontSize="22" FontWeight="SemiBold" Foreground="#333"/>
+            <TextBlock Text="Configure server and plugin options" Foreground="#666" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- Form -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="0,0,20,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Port -->
+                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                    <TextBlock Text="Server Port" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock Text="TCP port (requires restart)" FontSize="11" Foreground="#666" Margin="0,3,0,0"/>
+                </StackPanel>
+                <TextBox x:Name="PortTextBox" Grid.Row="0" Grid.Column="1"
+                         Margin="15,10,0,10" Padding="8,6" FontSize="14"
+                         VerticalAlignment="Center" Width="120" HorizontalAlignment="Left"
+                         BorderBrush="#E0E0E0"/>
+
+                <Separator Grid.Row="1" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
+
+                <!-- Log Level -->
+                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                    <TextBlock Text="Log Level" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock Text="Verbosity of plugin logging" FontSize="11" Foreground="#666" Margin="0,3,0,0"/>
+                </StackPanel>
+                <ComboBox x:Name="LogLevelComboBox" Grid.Row="2" Grid.Column="1"
+                          Margin="15,10,0,10" Padding="8,6" FontSize="14"
+                          VerticalAlignment="Center" Width="160" HorizontalAlignment="Left"
+                          BorderBrush="#E0E0E0">
+                    <ComboBoxItem Content="Debug"/>
+                    <ComboBoxItem Content="Info"/>
+                    <ComboBoxItem Content="Warning"/>
+                    <ComboBoxItem Content="Error"/>
+                </ComboBox>
+
+                <Separator Grid.Row="3" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
+
+                <!-- Claude Model -->
+                <StackPanel Grid.Row="4" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                    <TextBlock Text="Chat Model" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock Text="Claude model for built-in chat" FontSize="11" Foreground="#666" Margin="0,3,0,0"/>
+                </StackPanel>
+                <ComboBox x:Name="ModelComboBox" Grid.Row="4" Grid.Column="1"
+                          Margin="15,10,0,10" Padding="8,6" FontSize="14"
+                          VerticalAlignment="Center" Width="260" HorizontalAlignment="Left"
+                          BorderBrush="#E0E0E0" IsEditable="True">
+                    <ComboBoxItem Content="claude-sonnet-4-6"/>
+                    <ComboBoxItem Content="claude-haiku-4-5-20251001"/>
+                    <ComboBoxItem Content="claude-opus-4-6"/>
+                </ComboBox>
+
+                <Separator Grid.Row="5" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
+
+                <!-- Plugin Version -->
+                <StackPanel Grid.Row="6" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                    <TextBlock Text="Plugin Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                </StackPanel>
+                <TextBlock x:Name="PluginVersionText" Grid.Row="6" Grid.Column="1"
+                           Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
+
+                <Separator Grid.Row="7" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
+
+                <!-- Revit Version -->
+                <StackPanel Grid.Row="8" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                    <TextBlock Text="Revit Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                </StackPanel>
+                <TextBlock x:Name="RevitVersionText" Grid.Row="8" Grid.Column="1"
+                           Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="Reset Defaults" Padding="15,8" Margin="0,0,10,0" FontSize="13"
+                    Background="#F5F5F5" Foreground="#333" BorderBrush="#E0E0E0"
+                    Click="ResetDefaults_Click" Cursor="Hand"/>
+            <Button Content="Save" Padding="20,8" FontSize="13"
+                    Background="#00838F" Foreground="White" BorderBrush="#006064"
+                    Click="Save_Click" Cursor="Hand"/>
+        </StackPanel>
+    </Grid>
+</Page>

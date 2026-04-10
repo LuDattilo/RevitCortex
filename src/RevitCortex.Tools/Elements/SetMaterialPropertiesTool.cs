@@ -10,7 +10,9 @@ using RevitCortex.Core.Tools;
 namespace RevitCortex.Tools.Elements;
 
 /// <summary>
-/// Sets identity and product information on Revit materials.
+/// Sets identity, appearance, and product information on Revit materials.
+/// Supports color, transparency, shininess, smoothness, class, category,
+/// and identity parameters (description, manufacturer, model, URL, etc.).
 /// </summary>
 public class SetMaterialPropertiesTool : ICortexTool
 {
@@ -18,6 +20,7 @@ public class SetMaterialPropertiesTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
+    public string Description => "Sets identity, appearance (color, transparency, shininess, smoothness), class, and product information on Revit materials.";
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
@@ -37,6 +40,9 @@ public class SetMaterialPropertiesTool : ICortexTool
 
             if (!dryRun)
             {
+                if (!session.RequestConfirmation("modify material properties", requests.Count))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Set Material Properties");
                 tx.Start();
 
@@ -54,17 +60,55 @@ public class SetMaterialPropertiesTool : ICortexTool
                         continue;
                     }
 
-                    SetIfPresent(req, "name", v => mat.Name = v);
-                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_DESCRIPTION, req, "description");
-                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_MANUFACTURER, req, "manufacturer");
-                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_MODEL, req, "model");
-                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_URL, req, "url");
-                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_COST, req, "cost");
-                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_MARK, req, "mark");
-                    SetParamIfPresent(mat, BuiltInParameter.KEYNOTE_PARAM, req, "keynote");
-                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS, req, "comments");
+                    var changes = new List<string>();
 
-                    results.Add(new { materialId, name = mat.Name, success = true });
+                    // Identity properties
+                    SetIfPresent(req, "name", v => { mat.Name = v; changes.Add("name"); });
+
+                    // Appearance properties
+                    var colorHex = req["color"]?.Value<string>();
+                    if (!string.IsNullOrEmpty(colorHex))
+                    {
+                        var c = ParseColor(colorHex);
+                        if (c != null) { mat.Color = c; changes.Add("color"); }
+                    }
+
+                    var transparency = req["transparency"]?.Value<int?>();
+                    if (transparency.HasValue)
+                    {
+                        mat.Transparency = Math.Clamp(transparency.Value, 0, 100);
+                        changes.Add("transparency");
+                    }
+
+                    var shininess = req["shininess"]?.Value<int?>();
+                    if (shininess.HasValue)
+                    {
+                        mat.Shininess = Math.Clamp(shininess.Value, 0, 128);
+                        changes.Add("shininess");
+                    }
+
+                    var smoothness = req["smoothness"]?.Value<int?>();
+                    if (smoothness.HasValue)
+                    {
+                        mat.Smoothness = Math.Clamp(smoothness.Value, 0, 100);
+                        changes.Add("smoothness");
+                    }
+
+                    // Class and category
+                    SetIfPresent(req, "materialClass", v => { mat.MaterialClass = v; changes.Add("materialClass"); });
+                    SetIfPresent(req, "materialCategory", v => { mat.MaterialCategory = v; changes.Add("materialCategory"); });
+
+                    // Built-in parameters
+                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_DESCRIPTION, req, "description", changes);
+                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_MANUFACTURER, req, "manufacturer", changes);
+                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_MODEL, req, "model", changes);
+                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_URL, req, "url", changes);
+                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_COST, req, "cost", changes);
+                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_MARK, req, "mark", changes);
+                    SetParamIfPresent(mat, BuiltInParameter.KEYNOTE_PARAM, req, "keynote", changes);
+                    SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS, req, "comments", changes);
+
+                    results.Add(new { materialId, name = mat.Name, success = true, changedProperties = changes });
                 }
 
                 tx.Commit();
@@ -80,8 +124,8 @@ public class SetMaterialPropertiesTool : ICortexTool
                     var mat = doc.GetElement(new ElementId((int)materialId)) as Material;
 #endif
                     results.Add(mat != null
-                        ? new { materialId, name = mat.Name, success = true }
-                        : (object)new { materialId, success = false, reason = "Material not found" });
+                        ? new { materialId, name = mat.Name, success = true, changedProperties = (object?)null }
+                        : (object)new { materialId, success = false, reason = "Material not found", changedProperties = (object?)null });
                 }
             }
 
@@ -99,15 +143,29 @@ public class SetMaterialPropertiesTool : ICortexTool
         if (val != null) try { setter(val); } catch { }
     }
 
-    private static void SetParamIfPresent(Material mat, BuiltInParameter bip, JObject req, string key)
+    private static void SetParamIfPresent(Material mat, BuiltInParameter bip, JObject req, string key, List<string> changes)
     {
         var val = req[key]?.Value<string>();
         if (val == null) return;
         var param = mat.get_Parameter(bip);
         if (param != null && !param.IsReadOnly)
         {
-            if (param.StorageType == StorageType.String) param.Set(val);
-            else if (param.StorageType == StorageType.Double && double.TryParse(val, out var d)) param.Set(d);
+            if (param.StorageType == StorageType.String) { param.Set(val); changes.Add(key); }
+            else if (param.StorageType == StorageType.Double && double.TryParse(val, out var d)) { param.Set(d); changes.Add(key); }
         }
+    }
+
+    private static Color? ParseColor(string hex)
+    {
+        hex = hex.TrimStart('#');
+        if (hex.Length != 6) return null;
+        try
+        {
+            byte r = Convert.ToByte(hex.Substring(0, 2), 16);
+            byte g = Convert.ToByte(hex.Substring(2, 2), 16);
+            byte b = Convert.ToByte(hex.Substring(4, 2), 16);
+            return new Color(r, g, b);
+        }
+        catch { return null; }
     }
 }

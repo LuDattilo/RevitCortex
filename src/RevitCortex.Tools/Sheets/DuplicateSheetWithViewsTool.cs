@@ -19,7 +19,7 @@ public class DuplicateSheetWithViewsTool : ICortexTool
     public string Category => "Sheets";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Duplicates a sheet and its placed views with configurable duplication options. Also copies title block parameters from source sheet.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

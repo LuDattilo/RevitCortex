@@ -17,7 +17,7 @@ public class DeleteScheduleTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Deletes a Revit schedule by ID or name.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -26,11 +26,6 @@ public class DeleteScheduleTool : ICortexTool
 
         var scheduleId = input["scheduleId"]?.Value<long>();
         var scheduleName = input["scheduleName"]?.Value<string>();
-        var confirm = input["confirm"]?.Value<bool>() ?? false;
-
-        if (!confirm)
-            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "Set confirm: true to delete", suggestion: "This prevents accidental deletion");
 
         try
         {
@@ -54,6 +49,9 @@ public class DeleteScheduleTool : ICortexTool
 
             if (schedule == null)
                 return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "Schedule not found");
+
+            if (!session.RequestConfirmation("delete schedule", 1))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
             var name = schedule.Name;
             using var tx = new Transaction(doc, "RevitCortex: Delete Schedule");

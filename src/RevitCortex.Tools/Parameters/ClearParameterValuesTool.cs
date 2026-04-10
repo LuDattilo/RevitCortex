@@ -18,7 +18,7 @@ public class ClearParameterValuesTool : ICortexTool
     public string Category => "Parameters";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Clears parameter values on elements by category, view, or selection scope.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -57,6 +57,9 @@ public class ClearParameterValuesTool : ICortexTool
 
             if (!dryRun)
             {
+                if (!session.RequestConfirmation("clear parameter values on", elements.Count()))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Clear Parameter Values");
                 tx.Start();
 

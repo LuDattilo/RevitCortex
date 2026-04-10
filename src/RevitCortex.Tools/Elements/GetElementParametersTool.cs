@@ -14,7 +14,7 @@ public class GetElementParametersTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Get Element Parameters";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var elementIds = input["elementIds"]?.ToObject<long[]>();

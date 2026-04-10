@@ -22,7 +22,7 @@ public class RenumberElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Renumbers elements by assigning sequential numbers with optional prefix/suffix. Defaults to dryRun=true for safety — preview renaming plan before committing. Supports Rooms, Doors, Windows, Parking, or a custom parameterName. Mirrors the fork's RenumberElementsEventHandler logic.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var elementIdsToken = input["elementIds"];

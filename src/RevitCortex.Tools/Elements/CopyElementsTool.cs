@@ -20,7 +20,7 @@ public class CopyElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Copies elements within the same document, optionally between views. Offsets are in mm and converted to internal units (feet). Mirrors the fork's CopyElementsEventHandler logic.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var elementIdsToken = input["elementIds"];

@@ -18,7 +18,7 @@ public class MeasureBetweenElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Measures the distance between two elements or explicit points (in mm). Supports center_to_center, closest_points, and bounding_box measure types. Mirrors the fork's MeasureBetweenElementsEventHandler logic.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var elementId1 = input["elementId1"]?.Value<long?>() ?? 0;

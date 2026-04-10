@@ -18,7 +18,7 @@ public class ModifyScheduleTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Modifies an existing schedule: add/remove fields, set/clear filters, set/clear sorting, rename, display options.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

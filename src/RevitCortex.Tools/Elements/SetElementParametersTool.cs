@@ -14,7 +14,7 @@ public class SetElementParametersTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Set Element Parameters";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var requests = input["requests"]?.ToObject<List<SetParameterRequest>>();
@@ -31,6 +31,9 @@ public class SetElementParametersTool : ICortexTool
         var results = new List<object>();
         var successCount = 0;
         var failCount = 0;
+
+        if (!session.RequestConfirmation("modify parameters on", requests.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Parameters");
         tx.Start();

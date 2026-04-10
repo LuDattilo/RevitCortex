@@ -19,7 +19,7 @@ public class DuplicateSheetWithContentTool : ICortexTool
     public string Category => "Sheets";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Duplicates a sheet including all annotations and detail items. Views can optionally be duplicated with detailing.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

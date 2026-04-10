@@ -18,7 +18,7 @@ public class PurgeUnusedTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Finds and removes unused families, types, and materials.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -64,6 +64,10 @@ public class PurgeUnusedTool : ICortexTool
 
             if (!dryRun)
             {
+                var purgeableCount = unusedTypes.Count + unusedMaterials.Count;
+                if (!session.RequestConfirmation("purge", purgeableCount))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Purge Unused");
                 tx.Start();
                 int deletedTypes = 0, deletedMaterials = 0;

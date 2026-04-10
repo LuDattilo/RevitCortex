@@ -18,7 +18,7 @@ public class WipeEmptyTagsTool : ICortexTool
     public string Category => "Annotations";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Finds and removes tags that have empty text or reference deleted/invalid elements.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -120,6 +120,9 @@ public class WipeEmptyTagsTool : ICortexTool
 
             if (!dryRun && emptyTags.Count > 0)
             {
+                if (!session.RequestConfirmation("delete empty tags from", emptyTags.Count))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Wipe Empty Tags");
                 tx.Start();
                 int deleted = 0;

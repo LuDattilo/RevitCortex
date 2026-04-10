@@ -18,7 +18,7 @@ public class RenameFamiliesTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Renames loaded families with find/replace, prefix, or suffix.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -50,12 +50,17 @@ public class RenameFamiliesTool : ICortexTool
 
             var results = new List<object>();
 
+            var familyList = families.ToList();
+
             if (!dryRun)
             {
+                if (!session.RequestConfirmation("rename", familyList.Count))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Rename Families");
                 tx.Start();
 
-                foreach (var fam in families.ToList())
+                foreach (var fam in familyList)
                 {
                     var oldName = fam.Name;
                     var newName = ApplyRename(oldName, operation, prefix, suffix, findText, replaceText);
@@ -89,7 +94,7 @@ public class RenameFamiliesTool : ICortexTool
             }
             else
             {
-                foreach (var fam in families.ToList())
+                foreach (var fam in familyList)
                 {
                     var oldName = fam.Name;
                     var newName = ApplyRename(oldName, operation, prefix, suffix, findText, replaceText);

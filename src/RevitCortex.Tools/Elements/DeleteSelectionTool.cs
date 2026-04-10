@@ -17,7 +17,7 @@ public class DeleteSelectionTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-
+    public string Description => "Deletes a named saved selection filter.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -38,6 +38,9 @@ public class DeleteSelectionTool : ICortexTool
             if (filter == null)
                 return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
                     $"Selection '{name}' not found");
+
+            if (!session.RequestConfirmation("delete", 1))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
             using var tx = new Transaction(doc, "RevitCortex: Delete Selection");
             tx.Start();

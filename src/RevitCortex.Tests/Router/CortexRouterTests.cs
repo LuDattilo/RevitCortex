@@ -84,6 +84,26 @@ public class CortexRouterTests
     }
 
     [Fact]
+    public void OnDocumentChanged_PropagatesLocale()
+    {
+        var router = CreateRouter(out var session);
+
+        router.OnDocumentChanged(new object(), "it");
+
+        Assert.Equal("it", session.DetectedLocale);
+    }
+
+    [Fact]
+    public void OnDocumentChanged_DefaultsToEnglish_WhenLocaleNull()
+    {
+        var router = CreateRouter(out var session);
+
+        router.OnDocumentChanged(new object());
+
+        Assert.Equal("en", session.DetectedLocale);
+    }
+
+    [Fact]
     public void GetAvailableToolNames_ExcludesDisabledDynamicTools()
     {
         var router = CreateRouter(out _);
