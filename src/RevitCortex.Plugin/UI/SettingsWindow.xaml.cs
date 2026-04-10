@@ -8,7 +8,6 @@ public partial class SettingsWindow : Window
     private readonly GeneralSettingsPage _generalPage;
     private readonly ApiKeySettingsPage _apiKeyPage;
     private readonly ToolsSettingsPage _toolsPage;
-    private readonly PricingSettingsPage _pricingPage;
     private readonly UsageReportPage _usagePage;
     private bool _isInitialized;
 
@@ -19,7 +18,6 @@ public partial class SettingsWindow : Window
         _generalPage = new GeneralSettingsPage();
         _apiKeyPage = new ApiKeySettingsPage();
         _toolsPage = new ToolsSettingsPage();
-        _pricingPage = new PricingSettingsPage();
         _usagePage = new UsageReportPage();
 
         ContentFrame.Navigate(_generalPage);
@@ -36,8 +34,6 @@ public partial class SettingsWindow : Window
             ContentFrame.Navigate(_apiKeyPage);
         else if (NavListBox.SelectedItem == ToolsItem)
             ContentFrame.Navigate(_toolsPage);
-        else if (NavListBox.SelectedItem == PricingItem)
-            ContentFrame.Navigate(_pricingPage);
         else if (NavListBox.SelectedItem == UsageItem)
             ContentFrame.Navigate(_usagePage);
     }

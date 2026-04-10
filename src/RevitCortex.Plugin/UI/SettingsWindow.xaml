@@ -26,9 +26,6 @@
                     <ListBoxItem x:Name="ToolsItem" Padding="10,8">
                         <TextBlock Text="Tools" FontSize="14"/>
                     </ListBoxItem>
-                    <ListBoxItem x:Name="PricingItem" Padding="10,8">
-                        <TextBlock Text="Pricing" FontSize="14"/>
-                    </ListBoxItem>
                     <ListBoxItem x:Name="UsageItem" Padding="10,8">
                         <TextBlock Text="Usage" FontSize="14"/>
                     </ListBoxItem>
