@@ -1,0 +1,215 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Results;
+using RevitCortex.Core.Session;
+using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
+
+namespace RevitCortex.Tools.Views;
+
+/// <summary>
+/// Creates, applies, or lists view filters with optional parameter rules and graphic overrides.
+/// </summary>
+public class CreateViewFilterTool : ICortexTool
+{
+    public string Name => "create_view_filter";
+    public string Category => "Views";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+        var doc = session.Store.Get<object>("activeDocument") as Document;
+        if (doc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
+
+        var action = input["action"]?.Value<string>() ?? "create";
+
+        try
+        {
+            return action.ToLowerInvariant() switch
+            {
+                "list" => ListFilters(doc),
+                "create" => CreateFilter(doc, input),
+                "apply" => ApplyFilter(doc, input),
+                _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"Unknown action: {action}", suggestion: "Use: list, create, apply")
+            };
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
+        }
+    }
+
+    private static CortexResult<object> ListFilters(Document doc)
+    {
+        var filters = new FilteredElementCollector(doc)
+            .OfClass(typeof(ParameterFilterElement))
+            .Cast<ParameterFilterElement>()
+            .Select(f => new
+            {
+                id = GetIdLong(f.Id),
+                name = f.Name,
+                categoryCount = f.GetCategories().Count
+            }).ToList();
+        return CortexResult<object>.Ok(new { filterCount = filters.Count, filters });
+    }
+
+    private static CortexResult<object> CreateFilter(Document doc, JObject input)
+    {
+        var filterName = input["filterName"]?.Value<string>();
+        if (string.IsNullOrEmpty(filterName))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "filterName is required");
+
+        var categories = input["categoryNames"]?.ToObject<List<string>>() ?? new List<string>();
+        if (categories.Count == 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "categoryNames is required");
+
+        var catIds = new List<ElementId>();
+        foreach (var catName in categories)
+        {
+            var catId = CategoryResolver.ResolveToId(doc, catName);
+            if (catId != null) catIds.Add(catId);
+        }
+
+        if (catIds.Count == 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No valid categories resolved");
+
+        using var tx = new Transaction(doc, "RevitCortex: Create View Filter");
+        tx.Start();
+
+        var filter = ParameterFilterElement.Create(doc, filterName, catIds);
+
+        // Optional parameter rule
+        var parameterName = input["parameterName"]?.Value<string>();
+        var filterRule = input["filterRule"]?.Value<string>();
+        var filterValue = input["filterValue"]?.Value<string>();
+
+        if (!string.IsNullOrEmpty(parameterName) && !string.IsNullOrEmpty(filterRule))
+        {
+            // Find parameter among the first category's elements
+            var testElem = new FilteredElementCollector(doc)
+                .OfCategoryId(catIds[0])
+                .WhereElementIsNotElementType()
+                .FirstOrDefault();
+
+            if (testElem != null)
+            {
+                var param = testElem.LookupParameter(parameterName);
+                if (param != null)
+                {
+                    var rule = CreateRule(param.Id, filterRule, filterValue ?? "", param.StorageType);
+                    if (rule != null)
+                    {
+                        var elemFilter = new ElementParameterFilter(rule);
+                        filter.SetElementFilter(elemFilter);
+                    }
+                }
+            }
+        }
+
+        tx.Commit();
+
+        return CortexResult<object>.Ok(new
+        {
+            filterId = GetIdLong(filter.Id),
+            filterName = filter.Name,
+            categoryCount = catIds.Count
+        });
+    }
+
+    private static CortexResult<object> ApplyFilter(Document doc, JObject input)
+    {
+        var filterId = input["filterId"]?.Value<long>() ?? 0;
+        var viewId = input["viewId"]?.Value<long>() ?? 0;
+        var isVisible = input["isVisible"]?.Value<bool>() ?? true;
+
+        if (filterId <= 0 || viewId <= 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "filterId and viewId are required");
+
+#if REVIT2024_OR_GREATER
+        var filter = doc.GetElement(new ElementId(filterId)) as ParameterFilterElement;
+        var view = doc.GetElement(new ElementId(viewId)) as View;
+#else
+        var filter = doc.GetElement(new ElementId((int)filterId)) as ParameterFilterElement;
+        var view = doc.GetElement(new ElementId((int)viewId)) as View;
+#endif
+        if (filter == null) return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "Filter not found");
+        if (view == null) return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "View not found");
+
+        using var tx = new Transaction(doc, "RevitCortex: Apply View Filter");
+        tx.Start();
+
+        view.AddFilter(filter.Id);
+        view.SetFilterVisibility(filter.Id, isVisible);
+
+        // Apply color overrides if specified
+        var r = input["overrideR"]?.Value<int?>();
+        var g = input["overrideG"]?.Value<int?>();
+        var b = input["overrideB"]?.Value<int?>();
+        if (r.HasValue && g.HasValue && b.HasValue)
+        {
+            var overrides = new OverrideGraphicSettings();
+            var color = new Color((byte)r.Value, (byte)g.Value, (byte)b.Value);
+            overrides.SetProjectionLineColor(color);
+            overrides.SetSurfaceForegroundPatternColor(color);
+            view.SetFilterOverrides(filter.Id, overrides);
+        }
+
+        tx.Commit();
+
+        return CortexResult<object>.Ok(new
+        {
+            applied = true,
+            filterName = filter.Name,
+            viewName = view.Name,
+            isVisible
+        });
+    }
+
+    private static FilterRule? CreateRule(ElementId paramId, string rule, string value, StorageType storageType)
+    {
+        switch (rule.ToLowerInvariant())
+        {
+            case "equals":
+                return storageType == StorageType.String
+                    ? ParameterFilterRuleFactory.CreateEqualsRule(paramId, value, false)
+                    : int.TryParse(value, out var intVal)
+                        ? ParameterFilterRuleFactory.CreateEqualsRule(paramId, intVal)
+                        : null;
+            case "not_equals":
+                return storageType == StorageType.String
+                    ? ParameterFilterRuleFactory.CreateNotEqualsRule(paramId, value, false)
+                    : null;
+            case "contains":
+                return ParameterFilterRuleFactory.CreateContainsRule(paramId, value, false);
+            case "begins_with":
+                return ParameterFilterRuleFactory.CreateBeginsWithRule(paramId, value, false);
+            case "ends_with":
+                return ParameterFilterRuleFactory.CreateEndsWithRule(paramId, value, false);
+            case "greater_than":
+                return double.TryParse(value, out var dblVal)
+                    ? ParameterFilterRuleFactory.CreateGreaterRule(paramId, dblVal, 1e-6)
+                    : null;
+            case "less_than":
+                return double.TryParse(value, out var dblVal2)
+                    ? ParameterFilterRuleFactory.CreateLessRule(paramId, dblVal2, 1e-6)
+                    : null;
+            default:
+                return null;
+        }
+    }
+
+    private static long GetIdLong(ElementId id)
+    {
+#if REVIT2024_OR_GREATER
+        return id.Value;
+#else
+        return id.IntegerValue;
+#endif
+    }
+}

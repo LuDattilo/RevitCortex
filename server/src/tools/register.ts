@@ -61,6 +61,22 @@ import { registerTagWallsTool } from "./tag_walls.js";
 import { registerSaveSelectionTool } from "./save_selection.js";
 import { registerLoadSelectionTool } from "./load_selection.js";
 import { registerDeleteSelectionTool } from "./delete_selection.js";
+import { registerApplyViewTemplateTool } from "./apply_view_template.js";
+import { registerBatchModifyViewRangeTool } from "./batch_modify_view_range.js";
+import { registerCreateViewTool } from "./create_view.js";
+import { registerDuplicateViewTool } from "./duplicate_view.js";
+import { registerCreateViewFilterTool } from "./create_view_filter.js";
+import { registerOverrideGraphicsTool } from "./override_graphics.js";
+import { registerPlaceViewportTool } from "./place_viewport.js";
+import { registerSectionBoxFromSelectionTool } from "./section_box_from_selection.js";
+import { registerManageUnplacedViewsTool } from "./manage_unplaced_views.js";
+import { registerManageViewTemplatesTool } from "./manage_view_templates.js";
+import { registerCreateViewsFromRoomsTool } from "./create_views_from_rooms.js";
+import { registerAlignViewportsTool } from "./align_viewports.js";
+import { registerBatchCreateSheetsTool } from "./batch_create_sheets.js";
+import { registerCreatePlaceholderSheetsTool } from "./create_placeholder_sheets.js";
+import { registerDuplicateSheetWithContentTool } from "./duplicate_sheet_with_content.js";
+import { registerDuplicateSheetWithViewsTool } from "./duplicate_sheet_with_views.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -126,6 +142,22 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "save_selection", register: registerSaveSelectionTool },
   { name: "load_selection", register: registerLoadSelectionTool },
   { name: "delete_selection", register: registerDeleteSelectionTool },
+  { name: "apply_view_template", register: registerApplyViewTemplateTool },
+  { name: "batch_modify_view_range", register: registerBatchModifyViewRangeTool },
+  { name: "create_view", register: registerCreateViewTool },
+  { name: "duplicate_view", register: registerDuplicateViewTool },
+  { name: "create_view_filter", register: registerCreateViewFilterTool },
+  { name: "override_graphics", register: registerOverrideGraphicsTool },
+  { name: "place_viewport", register: registerPlaceViewportTool },
+  { name: "section_box_from_selection", register: registerSectionBoxFromSelectionTool },
+  { name: "manage_unplaced_views", register: registerManageUnplacedViewsTool },
+  { name: "manage_view_templates", register: registerManageViewTemplatesTool },
+  { name: "create_views_from_rooms", register: registerCreateViewsFromRoomsTool },
+  { name: "align_viewports", register: registerAlignViewportsTool },
+  { name: "batch_create_sheets", register: registerBatchCreateSheetsTool },
+  { name: "create_placeholder_sheets", register: registerCreatePlaceholderSheetsTool },
+  { name: "duplicate_sheet_with_content", register: registerDuplicateSheetWithContentTool },
+  { name: "duplicate_sheet_with_views", register: registerDuplicateSheetWithViewsTool },
 ];
 
 export function registerTools(server: McpServer): void {
