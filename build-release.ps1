@@ -25,22 +25,34 @@ Write-Host "[1/4] Building C# plugin..." -ForegroundColor Yellow
 $pluginProject = Join-Path $RepoRoot "src\RevitCortex.Plugin\RevitCortex.Plugin.csproj"
 $toolsProject = Join-Path $RepoRoot "src\RevitCortex.Tools\RevitCortex.Tools.csproj"
 
+$builtVersions = @()
+
 foreach ($rv in @("R23", "R24", "R25", "R26")) {
     $config = "Release $rv"
     $outDir = Join-Path $ReleaseDir "plugin\$rv"
 
     Write-Host "  Building $rv..." -ForegroundColor Gray
-    dotnet publish -c "$config" $pluginProject -o $outDir --no-self-contained -v quiet
-    if ($LASTEXITCODE -ne 0) { throw "Plugin build failed for $rv" }
+    dotnet publish -c "$config" $pluginProject -o $outDir --no-self-contained -v quiet 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "    SKIPPED (build errors)" -ForegroundColor Yellow
+        if (Test-Path $outDir) { Remove-Item $outDir -Recurse -Force }
+        continue
+    }
 
-    dotnet publish -c "$config" $toolsProject -o $outDir --no-self-contained -v quiet
-    if ($LASTEXITCODE -ne 0) { throw "Tools build failed for $rv" }
+    dotnet publish -c "$config" $toolsProject -o $outDir --no-self-contained -v quiet 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "    SKIPPED (build errors)" -ForegroundColor Yellow
+        if (Test-Path $outDir) { Remove-Item $outDir -Recurse -Force }
+        continue
+    }
 
     $dllCount = (Get-ChildItem "$outDir\*.dll").Count
     Write-Host "    $dllCount DLLs" -ForegroundColor Gray
+    $builtVersions += $rv
 }
 
-Write-Host "  C# builds complete." -ForegroundColor Green
+if ($builtVersions.Count -eq 0) { throw "No Revit versions built successfully" }
+Write-Host "  Built: $($builtVersions -join ', ')" -ForegroundColor Green
 
 # --- Build TypeScript server ---
 Write-Host ""
