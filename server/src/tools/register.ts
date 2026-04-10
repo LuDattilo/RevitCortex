@@ -77,6 +77,17 @@ import { registerBatchCreateSheetsTool } from "./batch_create_sheets.js";
 import { registerCreatePlaceholderSheetsTool } from "./create_placeholder_sheets.js";
 import { registerDuplicateSheetWithContentTool } from "./duplicate_sheet_with_content.js";
 import { registerDuplicateSheetWithViewsTool } from "./duplicate_sheet_with_views.js";
+import { registerBulkModifyParameterValuesTool } from "./bulk_modify_parameter_values.js";
+import { registerClearParameterValuesTool } from "./clear_parameter_values.js";
+import { registerTransferParametersTool } from "./transfer_parameters.js";
+import { registerSetMaterialPropertiesTool } from "./set_material_properties.js";
+import { registerBatchRenameTool } from "./batch_rename.js";
+import { registerLoadFamilyTool } from "./load_family.js";
+import { registerRenameFamiliesTool } from "./rename_families.js";
+import { registerRenameViewsTool } from "./rename_views.js";
+import { registerManageLinksTool } from "./manage_links.js";
+import { registerSendCodeToRevitTool } from "./send_code_to_revit.js";
+import { registerWipeEmptyTagsTool } from "./wipe_empty_tags.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -158,6 +169,17 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "create_placeholder_sheets", register: registerCreatePlaceholderSheetsTool },
   { name: "duplicate_sheet_with_content", register: registerDuplicateSheetWithContentTool },
   { name: "duplicate_sheet_with_views", register: registerDuplicateSheetWithViewsTool },
+  { name: "bulk_modify_parameter_values", register: registerBulkModifyParameterValuesTool },
+  { name: "clear_parameter_values", register: registerClearParameterValuesTool },
+  { name: "transfer_parameters", register: registerTransferParametersTool },
+  { name: "set_material_properties", register: registerSetMaterialPropertiesTool },
+  { name: "batch_rename", register: registerBatchRenameTool },
+  { name: "load_family", register: registerLoadFamilyTool },
+  { name: "rename_families", register: registerRenameFamiliesTool },
+  { name: "rename_views", register: registerRenameViewsTool },
+  { name: "manage_links", register: registerManageLinksTool },
+  { name: "send_code_to_revit", register: registerSendCodeToRevitTool },
+  { name: "wipe_empty_tags", register: registerWipeEmptyTagsTool },
 ];
 
 export function registerTools(server: McpServer): void {
