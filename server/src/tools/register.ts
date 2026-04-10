@@ -24,6 +24,22 @@ import { registerCreateSurfaceBasedElementTool } from "./create_surface_based_el
 import { registerSetElementPhaseTool } from "./set_element_phase.js";
 import { registerSetElementWorksetTool } from "./set_element_workset.js";
 import { registerColorElementsTool } from "./color_elements.js";
+import { registerGetProjectInfoTool } from "./get_project_info.js";
+import { registerGetPhasesTool } from "./get_phases.js";
+import { registerGetWorksetsTool } from "./get_worksets.js";
+import { registerGetWarningsTool } from "./get_warnings.js";
+import { registerGetCurrentViewInfoTool } from "./get_current_view_info.js";
+import { registerFilterByParameterValueTool } from "./filter_by_parameter_value.js";
+import { registerGetMaterialsTool } from "./get_materials.js";
+import { registerGetMaterialPropertiesTool } from "./get_material_properties.js";
+import { registerGetMaterialQuantitiesTool } from "./get_material_quantities.js";
+import { registerGetScheduleDataTool } from "./get_schedule_data.js";
+import { registerGetSharedParametersTool } from "./get_shared_parameters.js";
+import { registerListSchedulableFieldsTool } from "./list_schedulable_fields.js";
+import { registerGetAvailableFamilyTypesTool } from "./get_available_family_types.js";
+import { registerListFamilySizesTool } from "./list_family_sizes.js";
+import { registerLinesPerViewCountTool } from "./lines_per_view_count.js";
+import { registerGetRoomOpeningsTool } from "./get_room_openings.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -52,6 +68,22 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "set_element_phase", register: registerSetElementPhaseTool },
   { name: "set_element_workset", register: registerSetElementWorksetTool },
   { name: "color_elements", register: registerColorElementsTool },
+  { name: "get_project_info", register: registerGetProjectInfoTool },
+  { name: "get_phases", register: registerGetPhasesTool },
+  { name: "get_worksets", register: registerGetWorksetsTool },
+  { name: "get_warnings", register: registerGetWarningsTool },
+  { name: "get_current_view_info", register: registerGetCurrentViewInfoTool },
+  { name: "filter_by_parameter_value", register: registerFilterByParameterValueTool },
+  { name: "get_materials", register: registerGetMaterialsTool },
+  { name: "get_material_properties", register: registerGetMaterialPropertiesTool },
+  { name: "get_material_quantities", register: registerGetMaterialQuantitiesTool },
+  { name: "get_schedule_data", register: registerGetScheduleDataTool },
+  { name: "get_shared_parameters", register: registerGetSharedParametersTool },
+  { name: "list_schedulable_fields", register: registerListSchedulableFieldsTool },
+  { name: "get_available_family_types", register: registerGetAvailableFamilyTypesTool },
+  { name: "list_family_sizes", register: registerListFamilySizesTool },
+  { name: "lines_per_view_count", register: registerLinesPerViewCountTool },
+  { name: "get_room_openings", register: registerGetRoomOpeningsTool },
 ];
 
 export function registerTools(server: McpServer): void {
