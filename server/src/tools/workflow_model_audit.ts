@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WorkflowModelAuditInput } from "../schemas/excel-workflows.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerWorkflowModelAuditTool(server: McpServer): void {
   server.tool("workflow_model_audit", "Comprehensive model audit: health score, warnings, family analysis, and recommendations", WorkflowModelAuditInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerWorkflowModelAuditTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("workflow_model_audit", args);
       });
-      logToolCall({ tool: "workflow_model_audit", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("workflow_model_audit", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "workflow_model_audit", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("workflow_model_audit", error, Date.now() - start);
     }
   });
 }

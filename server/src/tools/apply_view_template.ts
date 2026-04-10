@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ApplyViewTemplateInput } from "../schemas/views.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerApplyViewTemplateTool(server: McpServer): void {
   server.tool("apply_view_template", "List, apply, or remove view templates from views", ApplyViewTemplateInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerApplyViewTemplateTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("apply_view_template", args);
       });
-      logToolCall({ tool: "apply_view_template", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("apply_view_template", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "apply_view_template", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("apply_view_template", error, Date.now() - start);
     }
   });
 }

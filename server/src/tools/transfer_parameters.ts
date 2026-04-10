@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { TransferParametersInput } from "../schemas/bulk-operations.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerTransferParametersTool(server: McpServer): void {
   server.tool("transfer_parameters", "Copy parameter values from source to target elements", TransferParametersInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerTransferParametersTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("transfer_parameters", args);
       });
-      logToolCall({ tool: "transfer_parameters", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("transfer_parameters", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "transfer_parameters", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("transfer_parameters", error, Date.now() - start);
     }
   });
 }

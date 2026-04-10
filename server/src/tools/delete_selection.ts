@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { DeleteSelectionInput } from "../schemas/creation.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerDeleteSelectionTool(server: McpServer): void {
   server.tool("delete_selection", "Delete a saved selection filter", DeleteSelectionInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerDeleteSelectionTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("delete_selection", args);
       });
-      logToolCall({ tool: "delete_selection", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("delete_selection", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "delete_selection", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("delete_selection", error, Date.now() - start);
     }
   });
 }

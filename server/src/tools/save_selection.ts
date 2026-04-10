@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SaveSelectionInput } from "../schemas/creation.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerSaveSelectionTool(server: McpServer): void {
   server.tool("save_selection", "Save element selection as named filter", SaveSelectionInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerSaveSelectionTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("save_selection", args);
       });
-      logToolCall({ tool: "save_selection", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("save_selection", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "save_selection", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("save_selection", error, Date.now() - start);
     }
   });
 }

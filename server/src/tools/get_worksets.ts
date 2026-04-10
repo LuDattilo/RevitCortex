@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { GetWorksetsInput } from "../schemas/project.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerGetWorksetsTool(server: McpServer): void {
   server.tool(
@@ -14,14 +14,9 @@ export function registerGetWorksetsTool(server: McpServer): void {
         const result = await withRevitConnection(async (client) => {
           return await client.sendCommand("get_worksets", args);
         });
-        logToolCall({ tool: "get_worksets", success: true, durationMs: Date.now() - start });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResponse("get_worksets", result, Date.now() - start, args);
       } catch (error) {
-        logToolCall({ tool: "get_worksets", success: false, durationMs: Date.now() - start });
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        };
+        return toolError("get_worksets", error, Date.now() - start);
       }
     }
   );

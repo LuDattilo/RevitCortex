@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CreateStructuralFramingSystemInput } from "../schemas/schedules.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerCreateStructuralFramingSystemTool(server: McpServer): void {
   server.tool("create_structural_framing_system", "Create a beam system on a level with spacing", CreateStructuralFramingSystemInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerCreateStructuralFramingSystemTool(server: McpServer): vo
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("create_structural_framing_system", args);
       });
-      logToolCall({ tool: "create_structural_framing_system", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("create_structural_framing_system", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "create_structural_framing_system", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("create_structural_framing_system", error, Date.now() - start);
     }
   });
 }

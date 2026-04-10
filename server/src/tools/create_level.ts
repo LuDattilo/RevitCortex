@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CreateLevelInput } from "../schemas/creation.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerCreateLevelTool(server: McpServer): void {
   server.tool("create_level", "Create a new level with optional floor/ceiling plans", CreateLevelInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerCreateLevelTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("create_level", args);
       });
-      logToolCall({ tool: "create_level", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("create_level", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "create_level", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("create_level", error, Date.now() - start);
     }
   });
 }

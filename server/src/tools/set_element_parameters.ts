@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SetElementParametersInput } from "../schemas/elements.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerSetElementParametersTool(server: McpServer): void {
   server.tool(
@@ -14,14 +14,9 @@ export function registerSetElementParametersTool(server: McpServer): void {
         const result = await withRevitConnection(async (client) => {
           return await client.sendCommand("set_element_parameters", args);
         });
-        logToolCall({ tool: "set_element_parameters", success: true, durationMs: Date.now() - start });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResponse("set_element_parameters", result, Date.now() - start, args);
       } catch (error) {
-        logToolCall({ tool: "set_element_parameters", success: false, durationMs: Date.now() - start });
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        };
+        return toolError("set_element_parameters", error, Date.now() - start);
       }
     }
   );

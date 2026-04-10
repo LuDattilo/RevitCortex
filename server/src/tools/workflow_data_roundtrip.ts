@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WorkflowDataRoundtripInput } from "../schemas/excel-workflows.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerWorkflowDataRoundtripTool(server: McpServer): void {
   server.tool("workflow_data_roundtrip", "Export writable parameters to Excel for external editing, then re-import with import_from_excel", WorkflowDataRoundtripInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerWorkflowDataRoundtripTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("workflow_data_roundtrip", args);
       });
-      logToolCall({ tool: "workflow_data_roundtrip", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("workflow_data_roundtrip", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "workflow_data_roundtrip", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("workflow_data_roundtrip", error, Date.now() - start);
     }
   });
 }

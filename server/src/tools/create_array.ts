@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CreateArrayInput } from "../schemas/creation.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerCreateArrayTool(server: McpServer): void {
   server.tool("create_array", "Create linear or radial arrays of elements", CreateArrayInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerCreateArrayTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("create_array", args);
       });
-      logToolCall({ tool: "create_array", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("create_array", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "create_array", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("create_array", error, Date.now() - start);
     }
   });
 }

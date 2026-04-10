@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AIElementFilterInput } from "../schemas/elements.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerAIElementFilterTool(server: McpServer): void {
   server.tool(
@@ -14,14 +14,9 @@ export function registerAIElementFilterTool(server: McpServer): void {
         const result = await withRevitConnection(async (client) => {
           return await client.sendCommand("ai_element_filter", args);
         });
-        logToolCall({ tool: "ai_element_filter", success: true, durationMs: Date.now() - start });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResponse("ai_element_filter", result, Date.now() - start, args);
       } catch (error) {
-        logToolCall({ tool: "ai_element_filter", success: false, durationMs: Date.now() - start });
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        };
+        return toolError("ai_element_filter", error, Date.now() - start);
       }
     }
   );

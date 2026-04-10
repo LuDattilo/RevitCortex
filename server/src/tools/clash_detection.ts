@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ClashDetectionInput } from "../schemas/audit.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerClashDetectionTool(server: McpServer): void {
   server.tool("clash_detection", "Detect geometric intersections between element sets", ClashDetectionInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerClashDetectionTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("clash_detection", args);
       });
-      logToolCall({ tool: "clash_detection", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("clash_detection", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "clash_detection", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("clash_detection", error, Date.now() - start);
     }
   });
 }

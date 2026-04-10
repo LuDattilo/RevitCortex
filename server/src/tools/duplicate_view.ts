@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { DuplicateViewInput } from "../schemas/views.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerDuplicateViewTool(server: McpServer): void {
   server.tool("duplicate_view", "Duplicate views with configurable options", DuplicateViewInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerDuplicateViewTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("duplicate_view", args);
       });
-      logToolCall({ tool: "duplicate_view", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("duplicate_view", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "duplicate_view", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("duplicate_view", error, Date.now() - start);
     }
   });
 }

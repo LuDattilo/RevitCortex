@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 const GetSharedParametersInput = z.object({
   categoryFilter: z
@@ -21,14 +21,9 @@ export function registerGetSharedParametersTool(server: McpServer): void {
         const result = await withRevitConnection(async (client) => {
           return await client.sendCommand("get_shared_parameters", args);
         });
-        logToolCall({ tool: "get_shared_parameters", success: true, durationMs: Date.now() - start });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResponse("get_shared_parameters", result, Date.now() - start, args);
       } catch (error) {
-        logToolCall({ tool: "get_shared_parameters", success: false, durationMs: Date.now() - start });
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        };
+        return toolError("get_shared_parameters", error, Date.now() - start);
       }
     }
   );

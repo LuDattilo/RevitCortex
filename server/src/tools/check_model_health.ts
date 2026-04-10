@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CheckModelHealthInput } from "../schemas/audit.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerCheckModelHealthTool(server: McpServer): void {
   server.tool("check_model_health", "Comprehensive BIM model health audit with score and recommendations", CheckModelHealthInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerCheckModelHealthTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("check_model_health", args);
       });
-      logToolCall({ tool: "check_model_health", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("check_model_health", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "check_model_health", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("check_model_health", error, Date.now() - start);
     }
   });
 }

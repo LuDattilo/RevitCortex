@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BatchRenameInput } from "../schemas/bulk-operations.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerBatchRenameTool(server: McpServer): void {
   server.tool("batch_rename", "Batch rename views, sheets, levels, grids, or rooms", BatchRenameInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerBatchRenameTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("batch_rename", args);
       });
-      logToolCall({ tool: "batch_rename", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("batch_rename", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "batch_rename", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("batch_rename", error, Date.now() - start);
     }
   });
 }

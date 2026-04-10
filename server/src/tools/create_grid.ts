@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CreateGridInput } from "../schemas/creation.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerCreateGridTool(server: McpServer): void {
   server.tool("create_grid", "Create a grid system with configurable spacing and labels", CreateGridInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerCreateGridTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("create_grid", args);
       });
-      logToolCall({ tool: "create_grid", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("create_grid", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "create_grid", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("create_grid", error, Date.now() - start);
     }
   });
 }

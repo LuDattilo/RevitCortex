@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CreateViewFilterInput } from "../schemas/views.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerCreateViewFilterTool(server: McpServer): void {
   server.tool("create_view_filter", "Create, apply, or list parameter-based view filters", CreateViewFilterInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerCreateViewFilterTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("create_view_filter", args);
       });
-      logToolCall({ tool: "create_view_filter", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("create_view_filter", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "create_view_filter", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("create_view_filter", error, Date.now() - start);
     }
   });
 }

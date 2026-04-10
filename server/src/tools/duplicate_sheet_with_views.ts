@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { DuplicateSheetWithViewsInput } from "../schemas/sheets.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerDuplicateSheetWithViewsTool(server: McpServer): void {
   server.tool("duplicate_sheet_with_views", "Duplicate a sheet with configurable view duplication options", DuplicateSheetWithViewsInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerDuplicateSheetWithViewsTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("duplicate_sheet_with_views", args);
       });
-      logToolCall({ tool: "duplicate_sheet_with_views", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("duplicate_sheet_with_views", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "duplicate_sheet_with_views", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("duplicate_sheet_with_views", error, Date.now() - start);
     }
   });
 }

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CreateRevisionInput } from "../schemas/creation.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerCreateRevisionTool(server: McpServer): void {
   server.tool("create_revision", "List create or assign revisions to sheets", CreateRevisionInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerCreateRevisionTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("create_revision", args);
       });
-      logToolCall({ tool: "create_revision", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("create_revision", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "create_revision", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("create_revision", error, Date.now() - start);
     }
   });
 }

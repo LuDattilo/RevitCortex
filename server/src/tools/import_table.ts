@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ImportTableInput } from "../schemas/annotations.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerImportTableTool(server: McpServer): void {
   server.tool("import_table", "Import CSV/TSV file as a formatted table in a drafting or legend view", ImportTableInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerImportTableTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("import_table", args);
       });
-      logToolCall({ tool: "import_table", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("import_table", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "import_table", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("import_table", error, Date.now() - start);
     }
   });
 }

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CreateSheetInput } from "../schemas/creation.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerCreateSheetTool(server: McpServer): void {
   server.tool("create_sheet", "Create a new sheet with title block", CreateSheetInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerCreateSheetTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("create_sheet", args);
       });
-      logToolCall({ tool: "create_sheet", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("create_sheet", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "create_sheet", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("create_sheet", error, Date.now() - start);
     }
   });
 }

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AuditFamiliesInput } from "../schemas/audit.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerAuditFamiliesTool(server: McpServer): void {
   server.tool("audit_families", "Family audit with health scores, unused detection, and instance counts", AuditFamiliesInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerAuditFamiliesTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("audit_families", args);
       });
-      logToolCall({ tool: "audit_families", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("audit_families", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "audit_families", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("audit_families", error, Date.now() - start);
     }
   });
 }

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 const LinesPerViewCountInput = z.object({
   threshold: z
@@ -39,14 +39,9 @@ export function registerLinesPerViewCountTool(server: McpServer): void {
         const result = await withRevitConnection(async (client) => {
           return await client.sendCommand("lines_per_view_count", args);
         });
-        logToolCall({ tool: "lines_per_view_count", success: true, durationMs: Date.now() - start });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResponse("lines_per_view_count", result, Date.now() - start, args);
       } catch (error) {
-        logToolCall({ tool: "lines_per_view_count", success: false, durationMs: Date.now() - start });
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        };
+        return toolError("lines_per_view_count", error, Date.now() - start);
       }
     }
   );

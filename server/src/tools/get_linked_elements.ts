@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { GetLinkedElementsInput } from "../schemas/elements.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerGetLinkedElementsTool(server: McpServer): void {
   server.tool(
@@ -14,14 +14,9 @@ export function registerGetLinkedElementsTool(server: McpServer): void {
         const result = await withRevitConnection(async (client) => {
           return await client.sendCommand("get_linked_elements", args);
         });
-        logToolCall({ tool: "get_linked_elements", success: true, durationMs: Date.now() - start });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResponse("get_linked_elements", result, Date.now() - start, args);
       } catch (error) {
-        logToolCall({ tool: "get_linked_elements", success: false, durationMs: Date.now() - start });
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        };
+        return toolError("get_linked_elements", error, Date.now() - start);
       }
     }
   );

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { QueryStoredDataInput } from "../schemas/database.js";
 import { getAllProjects, getProjectById, getProjectByName, getRoomsByProjectId, getAllRoomsWithProject, getStats } from "../database/service.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerQueryStoredDataTool(server: McpServer): void {
   server.tool("query_stored_data", "Query projects and rooms stored in the local RevitCortex database", QueryStoredDataInput.shape, async (args) => {
@@ -17,16 +17,14 @@ export function registerQueryStoredDataTool(server: McpServer): void {
           if (!args.project_id) throw new Error("project_id is required for this query type");
           data = getProjectById(args.project_id);
           if (!data) {
-            logToolCall({ tool: "query_stored_data", success: true, durationMs: Date.now() - start });
-            return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: `Project with ID ${args.project_id} not found` }, null, 2) }] };
+            return toolError("query_stored_data", new Error(`Project with ID ${args.project_id} not found`), Date.now() - start);
           }
           break;
         case "project_by_name":
           if (!args.project_name) throw new Error("project_name is required for this query type");
           data = getProjectByName(args.project_name);
           if (!data) {
-            logToolCall({ tool: "query_stored_data", success: true, durationMs: Date.now() - start });
-            return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: `Project "${args.project_name}" not found` }, null, 2) }] };
+            return toolError("query_stored_data", new Error(`Project "${args.project_name}" not found`), Date.now() - start);
           }
           break;
         case "rooms_by_project_id":
@@ -37,8 +35,7 @@ export function registerQueryStoredDataTool(server: McpServer): void {
           if (!args.project_name) throw new Error("project_name is required for this query type");
           const project = getProjectByName(args.project_name);
           if (!project) {
-            logToolCall({ tool: "query_stored_data", success: true, durationMs: Date.now() - start });
-            return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: `Project "${args.project_name}" not found` }, null, 2) }] };
+            return toolError("query_stored_data", new Error(`Project "${args.project_name}" not found`), Date.now() - start);
           }
           data = getRoomsByProjectId(project.id);
           break;
@@ -50,11 +47,9 @@ export function registerQueryStoredDataTool(server: McpServer): void {
           break;
       }
 
-      logToolCall({ tool: "query_stored_data", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, query_type: args.query_type, data }, null, 2) }] };
+      return toolResponse("query_stored_data", { success: true, query_type: args.query_type, data }, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "query_stored_data", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("query_stored_data", error, Date.now() - start);
     }
   });
 }

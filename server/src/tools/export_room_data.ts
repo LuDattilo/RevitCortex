@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ExportRoomDataInput } from "../schemas/audit.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerExportRoomDataTool(server: McpServer): void {
   server.tool("export_room_data", "Export room data with area, volume, and department info", ExportRoomDataInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerExportRoomDataTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("export_room_data", args);
       });
-      logToolCall({ tool: "export_room_data", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("export_room_data", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "export_room_data", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("export_room_data", error, Date.now() - start);
     }
   });
 }

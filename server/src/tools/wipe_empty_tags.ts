@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WipeEmptyTagsInput } from "../schemas/bulk-operations.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerWipeEmptyTagsTool(server: McpServer): void {
   server.tool("wipe_empty_tags", "Find and remove empty or orphaned tags", WipeEmptyTagsInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerWipeEmptyTagsTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("wipe_empty_tags", args);
       });
-      logToolCall({ tool: "wipe_empty_tags", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("wipe_empty_tags", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "wipe_empty_tags", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("wipe_empty_tags", error, Date.now() - start);
     }
   });
 }

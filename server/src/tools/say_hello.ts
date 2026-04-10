@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SayHelloInput } from "../schemas/meta.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerSayHelloTool(server: McpServer): void {
   server.tool(
@@ -14,14 +14,9 @@ export function registerSayHelloTool(server: McpServer): void {
         const result = await withRevitConnection(async (client) => {
           return await client.sendCommand("say_hello", args);
         });
-        logToolCall({ tool: "say_hello", success: true, durationMs: Date.now() - start });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResponse("say_hello", result, Date.now() - start, args);
       } catch (error) {
-        logToolCall({ tool: "say_hello", success: false, durationMs: Date.now() - start });
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        };
+        return toolError("say_hello", error, Date.now() - start);
       }
     }
   );

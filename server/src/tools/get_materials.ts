@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 const GetMaterialsInput = z.object({
   materialClass: z
@@ -25,14 +25,9 @@ export function registerGetMaterialsTool(server: McpServer): void {
         const result = await withRevitConnection(async (client) => {
           return await client.sendCommand("get_materials", args);
         });
-        logToolCall({ tool: "get_materials", success: true, durationMs: Date.now() - start });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResponse("get_materials", result, Date.now() - start, args);
       } catch (error) {
-        logToolCall({ tool: "get_materials", success: false, durationMs: Date.now() - start });
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        };
+        return toolError("get_materials", error, Date.now() - start);
       }
     }
   );

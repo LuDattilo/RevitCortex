@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 const FilterByParameterValueInput = z.object({
   categories: z
@@ -52,14 +52,9 @@ export function registerFilterByParameterValueTool(server: McpServer): void {
         const result = await withRevitConnection(async (client) => {
           return await client.sendCommand("filter_by_parameter_value", args);
         });
-        logToolCall({ tool: "filter_by_parameter_value", success: true, durationMs: Date.now() - start });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResponse("filter_by_parameter_value", result, Date.now() - start, args);
       } catch (error) {
-        logToolCall({ tool: "filter_by_parameter_value", success: false, durationMs: Date.now() - start });
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        };
+        return toolError("filter_by_parameter_value", error, Date.now() - start);
       }
     }
   );

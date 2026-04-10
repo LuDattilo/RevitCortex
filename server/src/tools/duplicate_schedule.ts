@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { DuplicateScheduleInput } from "../schemas/audit.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerDuplicateScheduleTool(server: McpServer): void {
   server.tool("duplicate_schedule", "Duplicate a schedule with a new name", DuplicateScheduleInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerDuplicateScheduleTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("duplicate_schedule", args);
       });
-      logToolCall({ tool: "duplicate_schedule", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("duplicate_schedule", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "duplicate_schedule", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("duplicate_schedule", error, Date.now() - start);
     }
   });
 }

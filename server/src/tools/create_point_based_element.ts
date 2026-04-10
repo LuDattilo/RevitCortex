@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CreatePointBasedElementInput } from "../schemas/elements.js";
 import { withRevitConnection } from "../connection/ConnectionManager.js";
-import { logToolCall } from "../logging/logger.js";
+import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerCreatePointBasedElementTool(server: McpServer): void {
   server.tool("create_point_based_element", "Place point-based family instances (furniture, fixtures, doors, windows)", CreatePointBasedElementInput.shape, async (args) => {
@@ -10,11 +10,9 @@ export function registerCreatePointBasedElementTool(server: McpServer): void {
       const result = await withRevitConnection(async (client) => {
         return await client.sendCommand("create_point_based_element", args);
       });
-      logToolCall({ tool: "create_point_based_element", success: true, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResponse("create_point_based_element", result, Date.now() - start, args);
     } catch (error) {
-      logToolCall({ tool: "create_point_based_element", success: false, durationMs: Date.now() - start });
-      return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+      return toolError("create_point_based_element", error, Date.now() - start);
     }
   });
 }
