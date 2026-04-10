@@ -47,6 +47,20 @@ import { registerImportTableTool } from "./import_table.js";
 import { registerAddSharedParameterTool } from "./add_shared_parameter.js";
 import { registerManageProjectParametersTool } from "./manage_project_parameters.js";
 import { registerAddPrefixSuffixTool } from "./add_prefix_suffix.js";
+import { registerCreateFloorTool } from "./create_floor.js";
+import { registerCreateGridTool } from "./create_grid.js";
+import { registerCreateLevelTool } from "./create_level.js";
+import { registerCreateRoomTool } from "./create_room.js";
+import { registerCreateArrayTool } from "./create_array.js";
+import { registerCreateFilledRegionTool } from "./create_filled_region.js";
+import { registerCreateScheduleTool } from "./create_schedule.js";
+import { registerCreateSheetTool } from "./create_sheet.js";
+import { registerCreateRevisionTool } from "./create_revision.js";
+import { registerTagRoomsTool } from "./tag_rooms.js";
+import { registerTagWallsTool } from "./tag_walls.js";
+import { registerSaveSelectionTool } from "./save_selection.js";
+import { registerLoadSelectionTool } from "./load_selection.js";
+import { registerDeleteSelectionTool } from "./delete_selection.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -98,6 +112,20 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "add_shared_parameter", register: registerAddSharedParameterTool },
   { name: "manage_project_parameters", register: registerManageProjectParametersTool },
   { name: "add_prefix_suffix", register: registerAddPrefixSuffixTool },
+  { name: "create_floor", register: registerCreateFloorTool },
+  { name: "create_grid", register: registerCreateGridTool },
+  { name: "create_level", register: registerCreateLevelTool },
+  { name: "create_room", register: registerCreateRoomTool },
+  { name: "create_array", register: registerCreateArrayTool },
+  { name: "create_filled_region", register: registerCreateFilledRegionTool },
+  { name: "create_schedule", register: registerCreateScheduleTool },
+  { name: "create_sheet", register: registerCreateSheetTool },
+  { name: "create_revision", register: registerCreateRevisionTool },
+  { name: "tag_rooms", register: registerTagRoomsTool },
+  { name: "tag_walls", register: registerTagWallsTool },
+  { name: "save_selection", register: registerSaveSelectionTool },
+  { name: "load_selection", register: registerLoadSelectionTool },
+  { name: "delete_selection", register: registerDeleteSelectionTool },
 ];
 
 export function registerTools(server: McpServer): void {

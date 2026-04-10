@@ -1,0 +1,121 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Architecture;
+using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Results;
+using RevitCortex.Core.Session;
+using RevitCortex.Core.Tools;
+
+namespace RevitCortex.Tools.Elements;
+
+/// <summary>
+/// Creates a floor from boundary points or a room boundary.
+/// </summary>
+public class CreateFloorTool : ICortexTool
+{
+    public string Name => "create_floor";
+    public string Category => "Elements";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+
+    private const double MmPerFoot = 304.8;
+
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+        var doc = session.Store.Get<object>("activeDocument") as Document;
+        if (doc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
+
+        var boundaryPoints = input["boundaryPoints"] as JArray;
+        var roomId = input["roomId"]?.Value<long>() ?? 0;
+        var floorTypeName = input["floorTypeName"]?.Value<string>();
+        var levelElevationMm = input["levelElevation"]?.Value<double?>();
+
+        try
+        {
+            // Resolve floor type
+            var floorType = !string.IsNullOrEmpty(floorTypeName)
+                ? new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>()
+                    .FirstOrDefault(ft => ft.Name.Equals(floorTypeName, StringComparison.OrdinalIgnoreCase))
+                : null;
+            floorType ??= new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>().FirstOrDefault();
+
+            if (floorType == null)
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No floor types available");
+
+            // Build curve loop
+            CurveLoop loop;
+            if (roomId > 0)
+            {
+#if REVIT2024_OR_GREATER
+                var room = doc.GetElement(new ElementId(roomId)) as Room;
+#else
+                var room = doc.GetElement(new ElementId((int)roomId)) as Room;
+#endif
+                if (room == null)
+                    return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, $"Room {roomId} not found");
+
+                var segments = room.GetBoundarySegments(new SpatialElementBoundaryOptions());
+                if (segments == null || segments.Count == 0)
+                    return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "Room has no boundary");
+
+                loop = new CurveLoop();
+                foreach (var seg in segments[0])
+                    loop.Append(seg.GetCurve());
+            }
+            else if (boundaryPoints != null && boundaryPoints.Count >= 3)
+            {
+                loop = new CurveLoop();
+                var points = boundaryPoints.Select(p => new XYZ(
+                    p["x"]!.Value<double>() / MmPerFoot,
+                    p["y"]!.Value<double>() / MmPerFoot,
+                    0)).ToList();
+
+                for (int i = 0; i < points.Count; i++)
+                    loop.Append(Line.CreateBound(points[i], points[(i + 1) % points.Count]));
+            }
+            else
+            {
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    "Provide boundaryPoints (min 3) or roomId");
+            }
+
+            // Resolve level
+            var level = levelElevationMm.HasValue
+                ? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                    .OrderBy(l => Math.Abs(l.Elevation - levelElevationMm.Value / MmPerFoot)).FirstOrDefault()
+                : new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                    .OrderBy(l => l.Elevation).FirstOrDefault();
+
+            if (level == null)
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No levels found");
+
+            using var tx = new Transaction(doc, "RevitCortex: Create Floor");
+            tx.Start();
+            var floor = Floor.Create(doc, new List<CurveLoop> { loop }, floorType.Id, level.Id);
+            tx.Commit();
+
+            return CortexResult<object>.Ok(new
+            {
+                floorId = GetIdLong(floor.Id),
+                floorTypeName = floorType.Name,
+                levelName = level.Name
+            });
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to create floor: {ex.Message}");
+        }
+    }
+
+    private static long GetIdLong(ElementId id)
+    {
+#if REVIT2024_OR_GREATER
+        return id.Value;
+#else
+        return id.IntegerValue;
+#endif
+    }
+}
