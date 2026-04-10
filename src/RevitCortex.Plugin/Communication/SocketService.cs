@@ -65,7 +65,7 @@ public class SocketService
         {
             using var stream = client.GetStream();
             using var reader = new StreamReader(stream, Encoding.UTF8);
-            using var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
+            using var writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true };
 
             string? line;
             while ((line = reader.ReadLine()) != null)

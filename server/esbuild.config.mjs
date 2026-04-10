@@ -1,4 +1,5 @@
 import { build } from "esbuild";
+import { copyFileSync } from "fs";
 
 await build({
   entryPoints: ["src/index.ts"],
@@ -27,4 +28,5 @@ await build({
   minify: false,
 });
 
+copyFileSync("node_modules/sql.js/dist/sql-wasm.wasm", "build/sql-wasm.wasm");
 console.log("Build complete: build/index.js");
