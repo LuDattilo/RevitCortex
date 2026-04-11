@@ -188,7 +188,10 @@ public class OperateElementTool : ICortexTool
                     {
                         var deleted = doc.Delete(elementIds);
                         tx.Commit();
-                        return $"Deleted {deleted.Count} element(s)";
+                        var dependent = deleted.Count - elementIds.Count;
+                        return dependent > 0
+                            ? $"Deleted {deleted.Count} element(s) ({elementIds.Count} requested + {dependent} dependent)"
+                            : $"Deleted {deleted.Count} element(s)";
                     }
                     catch
                     {

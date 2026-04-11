@@ -58,6 +58,11 @@ public class CreateColorLegendTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "Could not resolve target view");
 
+        if (targetView.ViewType == ViewType.DrawingSheet)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "Cannot color elements on a Sheet view. Activate a model view (FloorPlan, Section, or 3D) or pass a targetViewId.",
+                suggestion: "Use list_views to find a suitable model view, then pass its ID as targetViewId.");
+
         try
         {
             // Collect elements by category
@@ -166,15 +171,28 @@ public class CreateColorLegendTool : ICortexTool
         var groups = new Dictionary<string, List<Element>>();
         foreach (var elem in elements)
         {
+            // Try instance parameter first, then fall back to type parameter
             var param = elem.LookupParameter(parameterName);
-            if (param == null) continue;
+            if (param == null || !param.HasValue)
+            {
+                var typeId = elem.GetTypeId();
+                if (typeId != ElementId.InvalidElementId)
+                {
+                    var typeElem = elem.Document.GetElement(typeId);
+                    var typeParam = typeElem?.LookupParameter(parameterName);
+                    if (typeParam != null && typeParam.HasValue)
+                        param = typeParam;
+                }
+            }
+
+            if (param == null || !param.HasValue) continue;
 
             var val = param.StorageType switch
             {
                 StorageType.String  => param.AsString() ?? "",
-                StorageType.Integer => param.AsInteger().ToString(),
-                StorageType.Double  => param.AsDouble().ToString("F2"),
-                StorageType.ElementId => param.AsElementId()?.ToString() ?? "",
+                StorageType.Integer => param.AsValueString() ?? param.AsInteger().ToString(),
+                StorageType.Double  => param.AsValueString() ?? param.AsDouble().ToString("F2"),
+                StorageType.ElementId => ResolveElementIdValue(elem.Document, param),
                 _ => ""
             };
 
@@ -185,6 +203,14 @@ public class CreateColorLegendTool : ICortexTool
             groups[val].Add(elem);
         }
         return groups;
+    }
+
+    private static string ResolveElementIdValue(Document doc, Parameter param)
+    {
+        var id = param.AsElementId();
+        if (id == ElementId.InvalidElementId) return "";
+        var refElem = doc.GetElement(id);
+        return refElem?.Name ?? id.ToString();
     }
 
     private static Dictionary<string, Color> GenerateColors(

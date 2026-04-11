@@ -41,6 +41,22 @@ public class LinesPerViewCountTool : ICortexTool
                 .Where(v => !v.IsTemplate && v.CanBePrinted)
                 .ToList();
 
+            // Safety cap: prevent timeout on very large models
+            const int maxViewScan = 300;
+            bool capped = false;
+            if (views.Count > maxViewScan && threshold == 0)
+            {
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"Model has {views.Count} views. A full scan (threshold=0) would likely time out.",
+                    suggestion: $"Set threshold >= 1 to filter results, or limit the scan scope. " +
+                                $"Recommended: threshold >= 50 for models with 300+ views.");
+            }
+            if (views.Count > maxViewScan)
+            {
+                views = views.Take(maxViewScan).ToList();
+                capped = true;
+            }
+
             var viewStats = new List<(int total, object data)>();
             int totalLines = 0;
             int skippedViews = 0;
@@ -108,6 +124,7 @@ public class LinesPerViewCountTool : ICortexTool
                 viewsAboveThreshold = sorted.Count,
                 returnedCount       = limited.Count,
                 truncated           = sorted.Count > limit,
+                capped,
                 threshold,
                 skippedViews,
                 views = limited

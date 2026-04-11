@@ -36,6 +36,8 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Port -->
@@ -83,20 +85,31 @@
 
                 <Separator Grid.Row="5" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
 
-                <!-- Plugin Version -->
+                <!-- Read-Only Mode -->
                 <StackPanel Grid.Row="6" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
-                    <TextBlock Text="Plugin Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock Text="Read-Only Mode" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock Text="Block all write operations" FontSize="11" Foreground="#666" Margin="0,3,0,0"/>
                 </StackPanel>
-                <TextBlock x:Name="PluginVersionText" Grid.Row="6" Grid.Column="1"
-                           Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
+                <CheckBox x:Name="ReadOnlyCheckBox" Grid.Row="6" Grid.Column="1"
+                          Margin="15,10,0,10" VerticalAlignment="Center"
+                          Content="Enable read-only mode" FontSize="13" Foreground="#333"/>
 
                 <Separator Grid.Row="7" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
 
-                <!-- Revit Version -->
+                <!-- Plugin Version -->
                 <StackPanel Grid.Row="8" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                    <TextBlock Text="Plugin Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                </StackPanel>
+                <TextBlock x:Name="PluginVersionText" Grid.Row="8" Grid.Column="1"
+                           Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
+
+                <Separator Grid.Row="9" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
+
+                <!-- Revit Version -->
+                <StackPanel Grid.Row="10" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
                     <TextBlock Text="Revit Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
                 </StackPanel>
-                <TextBlock x:Name="RevitVersionText" Grid.Row="8" Grid.Column="1"
+                <TextBlock x:Name="RevitVersionText" Grid.Row="10" Grid.Column="1"
                            Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
             </Grid>
         </ScrollViewer>

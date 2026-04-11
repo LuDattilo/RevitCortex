@@ -18,7 +18,7 @@ public class CortexDockablePaneProvider : IDockablePaneProvider
         data.FrameworkElement = _panel;
         data.InitialState = new DockablePaneState
         {
-            DockPosition = DockPosition.Floating
+            DockPosition = DockPosition.Right
         };
         data.VisibleByDefault = false;
     }

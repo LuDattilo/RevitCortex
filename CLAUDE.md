@@ -157,6 +157,119 @@ When DocumentAnalyzer scans a document:
 node server/generate-tool-schemas.mjs
 ```
 
+### Fundamental Rule
+
+> Before calling any tool, ask: **do I already have this information in the current conversation context?** If yes, do not call the tool again.
+
+### Default Parameters to Override
+
+RevitCortex defaults are calibrated for completeness, not efficiency. Override these when appropriate.
+
+**get_project_info**: The **first call** of the session must be complete (all includes = true) to establish model context. Subsequent calls should filter: `{"includeLevels": false, "includeLinks": false, "includePhases": false, "includeWorksets": false}`.
+
+**get_element_parameters**: Leave `includeTypeParameters` at `true` (default) for most workflows. Override to `false` only for counting/statistics tasks where only instance data is needed.
+
+**get_warnings**: Never use default 500 in normal operations. Use `maxWarnings: 10` for quick checks, `maxWarnings: 50` for category analysis.
+
+**export_room_data**: Use `maxResults: 20` unless the full building is needed.
+
+**audit_families**: Always filter by category in daily operations: `{"categoryFilter": "OST_Doors", "includeUnused": false}`.
+
+**bulk_modify_parameter_values**: With `dryRun: true`, read only `modifiedCount` and `skippedCount` from the response, not the full element list. Then execute with `dryRun: false`.
+
+**get_linked_elements**: Specify `categories` and `maxElements` to limit response. The `parameterNames` parameter is **additive**: without it the tool returns only `elementId`, `category`, `name` -- not all parameters. Add `parameterNames` only when specific linked element data is needed.
+
+**lines_per_view_count**: Always use `threshold >= 20` on models with >100 views. The tool has an automatic cap at 300 views.
+
+### Tool Selection Hierarchy
+
+When multiple tools can achieve the same goal, use the most targeted one.
+
+**Model status** (ascending token cost):
+1. `check_model_health` -- score + issues only (~200 tok)
+2. `analyze_model_statistics` with `compact: true` (~400 tok)
+3. `workflow_model_audit` with filters (~800 tok)
+4. `workflow_model_audit` full (~3000 tok)
+
+**Finding elements**:
+- Simple filter (1 parameter, exact value) -> `export_elements_data` with `filterParameterName`/`filterValue`
+- Complex filter (ranges, AND/OR, multi-parameter) -> `ai_element_filter`
+- Current view elements -> `get_current_view_elements` with `fields` and `limit`
+- Elements in a room/volume -> `get_elements_in_spatial_volume` with `categoryFilter` and reduced `maxElementsPerVolume`
+
+**Modifying parameters**:
+- 1 element, 1-3 parameters -> `set_element_parameters`
+- N elements, same parameter/value -> `bulk_modify_parameter_values`
+- N elements, different parameters each -> `sync_csv_parameters`
+- Copy parameters between elements -> `match_element_properties` (always specify `parameterNames`)
+
+**Clash detection**:
+- `clash_detection` -> quick check with count and ID list
+- `workflow_clash_review` -> when a 3D view with automatic section box is needed for visual review
+
+On architectural models, columns are `OST_Columns`, not `OST_StructuralColumns`. Always specify the correct category for the model type.
+
+### Session Patterns
+
+Input token cost grows with every previous response in context. A session with 30 tool calls on a large model can accumulate 300,000+ context tokens from tool responses alone.
+
+**Session A -- Morning Check** (open and close):
+1. `check_model_health`
+2. `get_warnings` with `maxWarnings: 10`
+3. Optional: `clash_detection` on specific discipline pair
+-> Close session, record only relevant numbers.
+
+**Session B -- Parameter Updates** (open and close):
+1. `export_elements_data` with specific filter
+2. `bulk_modify_parameter_values` or `sync_csv_parameters`
+3. Spot check with `get_element_parameters` on 1-2 sample elements
+-> Close session.
+
+**Session C -- Documentation / Export** (open and close):
+1. `workflow_data_roundtrip` or `export_to_excel`
+2. `create_preset_schedule` if needed
+3. `export_schedule` on specific scheduleId
+-> Close session.
+
+**Session D -- Complex BIM Operations** (open during work):
+Use a dedicated session per distinct BIM task. Do not mix QA tasks with authoring in the same long session.
+
+**Dirty context rule**: If the context already has responses with >50 lines of JSON data (export room, schedule, audit families etc.) and you need to start an unrelated task: **open a new conversation**. The cost of restarting is near zero. The cost of dragging 200K token context for every new turn is real.
+
+### Anti-Waste Patterns
+
+**Avoid**: calling `get_project_info` without filters on subsequent calls; `ai_element_filter` with `maxElements: 1000` without need; global `audit_families` to find a single category; reading the full dryRun element list instead of just the counters.
+
+**Correct**: first call complete then filtered; `export_elements_data` with categories/filter/parameterNames/maxElements; `audit_families` with specific `categoryFilter`; dryRun -> read only `modifiedCount`/`skippedCount` -> execute.
+
+**get_compound_structure**: `structuralLayerIndex: -1` on rainscreen or non-structural walls is architecturally correct, not a data error. Do not re-call the tool to verify.
+
+### Tool Behavioral Notes
+
+| Tool | Limitation | Correct Behavior |
+|------|-----------|-----------------|
+| `tag_rooms` / `tag_walls` | Operates only on the active Revit view | Activate the correct view before calling |
+| `color_elements` | Requires a model view (not Sheet) | Verify active view with `get_current_view_info` first |
+| `create_dimensions` | Z must exactly match the level elevation | Use elevation from `get_project_info` levels |
+| `set_element_phase` | Available only on models with phases (`doc.Phases > 0`) | Check `phases` in `get_project_info`, NOT `isWorkshared` -- phases are independent of worksharing |
+| `create_grid` | Label ignored if already exists in model | Use non-conflicting labels; the tool adds a warning in the response |
+| `lines_per_view_count` | Heavy on models with many views | Always use `threshold >= 20`; tool has automatic 300-view cap |
+
+### Token Estimates by Task Type
+
+| Task | Tool calls | Estimated response tokens |
+|------|-----------|--------------------------|
+| Quick morning check | 2-3 | 500-800 |
+| Parameter update 50 elements | 3-4 | 1,000-2,000 |
+| Clash detection 2 disciplines | 2 | 400-600 |
+| Export + re-import data | 3 | 800-1,500 |
+| Create 5 sheets + viewports | 4-6 | 600-1,000 |
+| Family audit specific category | 2 | 400-700 |
+| Full model cleanup | 6-8 | 2,000-4,000 |
+| Full bulk test | 130+ | 55,000+ |
+
+When cumulative session tokens exceed ~15,000, consider opening a new conversation for subsequent tasks.
+
 ## Confirmation Dialogs for Destructive Operations
 
 Destructive tools (delete, purge, rename, modify parameters, etc.) show a native Revit TaskDialog before executing. This is implemented via `CortexSession.RequestConfirmation(action, count)`.

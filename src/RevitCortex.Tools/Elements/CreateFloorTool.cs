@@ -36,10 +36,18 @@ public class CreateFloorTool : ICortexTool
         try
         {
             // Resolve floor type
+            string? floorTypeWarning = null;
             var floorType = !string.IsNullOrEmpty(floorTypeName)
                 ? new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>()
                     .FirstOrDefault(ft => ft.Name.Equals(floorTypeName, StringComparison.OrdinalIgnoreCase))
                 : null;
+            if (floorType == null && !string.IsNullOrEmpty(floorTypeName))
+            {
+                var defaultType = new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>().FirstOrDefault();
+                if (defaultType != null)
+                    floorTypeWarning = $"Floor type '{floorTypeName}' not found. Used default type '{defaultType.Name}'.";
+                floorType = defaultType;
+            }
             floorType ??= new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>().FirstOrDefault();
 
             if (floorType == null)
@@ -82,12 +90,27 @@ public class CreateFloorTool : ICortexTool
                     "Provide boundaryPoints (min 3) or roomId");
             }
 
-            // Resolve level
-            var level = levelElevationMm.HasValue
-                ? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
-                    .OrderBy(l => Math.Abs(l.Elevation - levelElevationMm.Value / MmPerFoot)).FirstOrDefault()
-                : new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
-                    .OrderBy(l => l.Elevation).FirstOrDefault();
+            // Resolve level: use room's level when creating from room, otherwise elevation or lowest
+            Level? level = null;
+            if (roomId > 0)
+            {
+#if REVIT2024_OR_GREATER
+                var roomForLevel = doc.GetElement(new ElementId(roomId)) as Room;
+#else
+                var roomForLevel = doc.GetElement(new ElementId((int)roomId)) as Room;
+#endif
+                if (roomForLevel != null)
+                    level = doc.GetElement(roomForLevel.LevelId) as Level;
+            }
+
+            if (level == null && levelElevationMm.HasValue)
+            {
+                level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                    .OrderBy(l => Math.Abs(l.Elevation - levelElevationMm.Value / MmPerFoot)).FirstOrDefault();
+            }
+
+            level ??= new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                .OrderBy(l => l.Elevation).FirstOrDefault();
 
             if (level == null)
                 return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No levels found");
@@ -97,11 +120,15 @@ public class CreateFloorTool : ICortexTool
             var floor = Floor.Create(doc, new List<CurveLoop> { loop }, floorType.Id, level.Id);
             tx.Commit();
 
+            var warnings = new List<string>();
+            if (floorTypeWarning != null) warnings.Add(floorTypeWarning);
+
             return CortexResult<object>.Ok(new
             {
                 floorId = GetIdLong(floor.Id),
                 floorTypeName = floorType.Name,
-                levelName = level.Name
+                levelName = level.Name,
+                warnings
             });
         }
         catch (Exception ex)

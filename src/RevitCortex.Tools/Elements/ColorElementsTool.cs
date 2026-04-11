@@ -51,6 +51,11 @@ public class ColorElementsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "No active view in the document");
 
+        if (activeView.ViewType == ViewType.DrawingSheet)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "Cannot color elements on a Sheet view. Activate a model view (FloorPlan, Section, or 3D).",
+                suggestion: "Switch to a model view in Revit before calling color_elements.");
+
         if (!activeView.CanUseTemporaryVisibilityModes())
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Cannot modify element overrides in {activeView.ViewType} views. Switch to a 3D or floor plan view.");

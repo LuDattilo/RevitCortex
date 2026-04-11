@@ -52,6 +52,7 @@ public class DocumentAnalyzer : IDocumentAnalyzer
         {
             caps.EnableTool("get_phases");
             caps.EnableTool("get_phase_filter");
+            caps.EnableTool("set_element_phase");
         }
 
         if (caps.HasDesignOptions)
@@ -61,7 +62,15 @@ public class DocumentAnalyzer : IDocumentAnalyzer
 
         if (caps.HasLinkedModels)
         {
-            caps.EnableTool("get_linked_models");
+            caps.EnableTool("get_linked_file_instances");
+            caps.EnableTool("get_link_transform");
+            caps.EnableTool("reload_linked_file_from");
+            caps.EnableTool("add_linked_file");
+            caps.EnableTool("pin_unpin_link_instance");
+            caps.EnableTool("move_link_instance");
+            caps.EnableTool("align_link_to_host");
+            caps.EnableTool("highlight_linked_element");
+            caps.EnableTool("get_selected_linked_elements");
         }
 
         if (caps.PresentCategories.Contains("OST_Rooms"))

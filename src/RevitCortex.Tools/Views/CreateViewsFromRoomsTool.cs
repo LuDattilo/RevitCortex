@@ -166,7 +166,16 @@ public class CreateViewsFromRoomsTool : ICortexTool
 
     private static void TrySetName(View view, string name)
     {
-        try { view.Name = name; } catch { /* duplicate name */ }
+        try { view.Name = name; }
+        catch
+        {
+            // Name already exists — try with suffix
+            for (int i = 2; i <= 20; i++)
+            {
+                try { view.Name = $"{name} ({i})"; return; }
+                catch { }
+            }
+        }
     }
 
     private static long GetIdLong(ElementId id)

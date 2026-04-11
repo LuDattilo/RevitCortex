@@ -48,7 +48,14 @@ public class CreateGridTool : ICortexTool
         try
         {
             var createdGrids = new List<object>();
+            var warnings = new List<string>();
             var z = elevationMm / MmPerFoot;
+
+            // Collect existing grid names for conflict detection
+            var existingNames = new HashSet<string>(
+                new FilteredElementCollector(doc).OfClass(typeof(Grid))
+                    .Cast<Grid>().Select(g => g.Name),
+                StringComparer.OrdinalIgnoreCase);
 
             using var tx = new Transaction(doc, "RevitCortex: Create Grid");
             tx.Start();
@@ -62,8 +69,11 @@ public class CreateGridTool : ICortexTool
                 var line = Line.CreateBound(start, end);
                 var grid = Grid.Create(doc, line);
                 var label = GenerateLabel(xStartLabel, i, xNaming);
-                TrySetName(grid, label);
-                createdGrids.Add(new { id = GetIdLong(grid.Id), axis = "X", name = grid.Name, position = i * xSpacingMm });
+                if (existingNames.Contains(label))
+                    warnings.Add($"Grid label '{label}' already exists, auto-assigned '{grid.Name}'.");
+                else
+                    TrySetName(grid, label);
+                createdGrids.Add(new { id = GetIdLong(grid.Id), axis = "X", name = grid.Name, requestedLabel = label, position = i * xSpacingMm });
             }
 
             // Y grids (horizontal lines, labeled numerically by default)
@@ -75,8 +85,11 @@ public class CreateGridTool : ICortexTool
                 var line = Line.CreateBound(start, end);
                 var grid = Grid.Create(doc, line);
                 var label = GenerateLabel(yStartLabel, i, yNaming);
-                TrySetName(grid, label);
-                createdGrids.Add(new { id = GetIdLong(grid.Id), axis = "Y", name = grid.Name, position = i * ySpacingMm });
+                if (existingNames.Contains(label))
+                    warnings.Add($"Grid label '{label}' already exists, auto-assigned '{grid.Name}'.");
+                else
+                    TrySetName(grid, label);
+                createdGrids.Add(new { id = GetIdLong(grid.Id), axis = "Y", name = grid.Name, requestedLabel = label, position = i * ySpacingMm });
             }
 
             tx.Commit();
@@ -84,7 +97,8 @@ public class CreateGridTool : ICortexTool
             return CortexResult<object>.Ok(new
             {
                 createdCount = createdGrids.Count,
-                grids = createdGrids
+                grids = createdGrids,
+                warnings
             });
         }
         catch (Exception ex)
@@ -111,10 +125,10 @@ public class CreateGridTool : ICortexTool
         return (index + 1).ToString();
     }
 
-    private static void TrySetName(Grid grid, string name)
+    private static bool TrySetName(Grid grid, string name)
     {
-        try { grid.Name = name; }
-        catch { /* duplicate name, keep auto-generated */ }
+        try { grid.Name = name; return true; }
+        catch { return false; }
     }
 
     private static long GetIdLong(ElementId id)

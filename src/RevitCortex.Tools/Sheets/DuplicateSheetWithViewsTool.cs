@@ -108,6 +108,7 @@ public class DuplicateSheetWithViewsTool : ICortexTool
                 }
 
                 int viewportCount = 0;
+                var newViewportIds = new List<long>();
                 foreach (var vpData in viewportData)
                 {
                     var view = vpData.View!;
@@ -119,7 +120,8 @@ public class DuplicateSheetWithViewsTool : ICortexTool
                     {
                         if (Viewport.CanAddViewToSheet(doc, newSheet.Id, vpData.ViewId))
                         {
-                            Viewport.Create(doc, newSheet.Id, vpData.ViewId, vpData.Center);
+                            var vp = Viewport.Create(doc, newSheet.Id, vpData.ViewId, vpData.Center);
+                            newViewportIds.Add(GetIdLong(vp.Id));
                             viewportCount++;
                         }
                     }
@@ -130,7 +132,8 @@ public class DuplicateSheetWithViewsTool : ICortexTool
                         if (newView != null)
                         {
                             try { newView.Name = $"{view.Name} - {newSheet.SheetNumber}"; } catch { }
-                            Viewport.Create(doc, newSheet.Id, newViewId, vpData.Center);
+                            var vp = Viewport.Create(doc, newSheet.Id, newViewId, vpData.Center);
+                            newViewportIds.Add(GetIdLong(vp.Id));
                             viewportCount++;
                         }
                     }
@@ -149,7 +152,8 @@ public class DuplicateSheetWithViewsTool : ICortexTool
                     sheetId = GetIdLong(newSheet.Id),
                     number = newSheet.SheetNumber,
                     name = newSheet.Name,
-                    viewportCount
+                    viewportCount,
+                    viewportIds = newViewportIds
                 });
             }
 

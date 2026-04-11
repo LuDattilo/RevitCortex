@@ -86,6 +86,15 @@ import { registerLoadFamilyTool } from "./load_family.js";
 import { registerRenameFamiliesTool } from "./rename_families.js";
 import { registerRenameViewsTool } from "./rename_views.js";
 import { registerManageLinksTool } from "./manage_links.js";
+import { registerGetLinkedFileInstancesTool } from "./get_linked_file_instances.js";
+import { registerGetLinkTransformTool } from "./get_link_transform.js";
+import { registerReloadLinkedFileFromTool } from "./reload_linked_file_from.js";
+import { registerAddLinkedFileTool } from "./add_linked_file.js";
+import { registerPinUnpinLinkInstanceTool } from "./pin_unpin_link_instance.js";
+import { registerMoveLinkInstanceTool } from "./move_link_instance.js";
+import { registerAlignLinkToHostTool } from "./align_link_to_host.js";
+import { registerHighlightLinkedElementTool } from "./highlight_linked_element.js";
+import { registerGetSelectedLinkedElementsTool } from "./get_selected_linked_elements.js";
 import { registerSendCodeToRevitTool } from "./send_code_to_revit.js";
 import { registerWipeEmptyTagsTool } from "./wipe_empty_tags.js";
 import { registerAnalyzeModelStatisticsTool } from "./analyze_model_statistics.js";
@@ -213,6 +222,15 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "rename_families", register: registerRenameFamiliesTool },
   { name: "rename_views", register: registerRenameViewsTool },
   { name: "manage_links", register: registerManageLinksTool },
+  { name: "get_linked_file_instances", register: registerGetLinkedFileInstancesTool },
+  { name: "get_link_transform", register: registerGetLinkTransformTool },
+  { name: "reload_linked_file_from", register: registerReloadLinkedFileFromTool },
+  { name: "add_linked_file", register: registerAddLinkedFileTool },
+  { name: "pin_unpin_link_instance", register: registerPinUnpinLinkInstanceTool },
+  { name: "move_link_instance", register: registerMoveLinkInstanceTool },
+  { name: "align_link_to_host", register: registerAlignLinkToHostTool },
+  { name: "highlight_linked_element", register: registerHighlightLinkedElementTool },
+  { name: "get_selected_linked_elements", register: registerGetSelectedLinkedElementsTool },
   { name: "send_code_to_revit", register: registerSendCodeToRevitTool },
   { name: "wipe_empty_tags", register: registerWipeEmptyTagsTool },
   { name: "analyze_model_statistics", register: registerAnalyzeModelStatisticsTool },

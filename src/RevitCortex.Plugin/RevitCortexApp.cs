@@ -18,6 +18,7 @@ public class RevitCortexApp : IExternalApplication
     private CortexRouter? _router;
     private CortexSession? _session;
     private UIApplication? _uiApplication;
+    private int _panelHideAttempts = 5;
 
     public static RevitCortexApp? Instance { get; private set; }
     public bool IsServiceRunning => _socketService?.IsRunning ?? false;
@@ -67,8 +68,9 @@ public class RevitCortexApp : IExternalApplication
             var dispatcher = new RevitThreadDispatcher(executionHandler, externalEvent);
             _router.SetDispatcher(dispatcher);
 
-            // Load disabled tools from settings
+            // Load disabled tools and read-only mode from settings
             LoadDisabledTools();
+            LoadReadOnlyMode();
 
             // Create socket service but do NOT start automatically
             _socketService = new SocketService(_router);
@@ -178,6 +180,23 @@ public class RevitCortexApp : IExternalApplication
 
     private void OnIdling(object? sender, Autodesk.Revit.UI.Events.IdlingEventArgs e)
     {
+        // Force-hide chat panel on startup (Revit persists pane state between sessions)
+        // Retry for several Idling cycles because Revit restores pane state asynchronously
+        if (_panelHideAttempts > 0 && sender is UIApplication app)
+        {
+            _panelHideAttempts--;
+            try
+            {
+                var pane = app.GetDockablePane(UI.CortexDockablePaneProvider.PaneId);
+                if (pane != null && pane.IsShown())
+                {
+                    pane.Hide();
+                    _panelHideAttempts = 0; // Success, stop trying
+                }
+            }
+            catch { }
+        }
+
         if (_uiApplication != null) return;
         _uiApplication = sender as UIApplication;
 
@@ -212,6 +231,31 @@ public class RevitCortexApp : IExternalApplication
             _router.OnDocumentChanged(doc, locale);
             System.Diagnostics.Trace.WriteLine(
                 $"[RevitCortex] Document switched: {doc.Title}, locale: {locale}");
+        }
+    }
+
+    private void LoadReadOnlyMode()
+    {
+        try
+        {
+            string settingsPath = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".revitcortex", "settings.json");
+            if (System.IO.File.Exists(settingsPath))
+            {
+                var json = System.IO.File.ReadAllText(settingsPath);
+                var settings = Newtonsoft.Json.JsonConvert.DeserializeObject<
+                    Newtonsoft.Json.Linq.JObject>(json);
+                var readOnly = settings?["ReadOnlyMode"]?.ToObject<bool>() ?? false;
+                _router!.ReadOnlyMode = readOnly;
+                if (readOnly)
+                    System.Diagnostics.Trace.WriteLine("[RevitCortex] Read-only mode is ON");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[RevitCortex] Could not load read-only setting: {ex.Message}");
         }
     }
 

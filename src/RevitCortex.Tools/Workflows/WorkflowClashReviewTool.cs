@@ -100,12 +100,26 @@ public class WorkflowClashReviewTool : ICortexTool
                 tx.Commit();
             }
 
+            // Build suggestion if a set is empty
+            string? suggestion = null;
+            if (setB.Count == 0 && categoryB!.Contains("Structural"))
+            {
+                suggestion = $"No elements found for '{categoryB}'. " +
+                    "Architectural models may use 'OST_Columns' instead of 'OST_StructuralColumns'. " +
+                    "Try the non-structural variant.";
+            }
+            else if (setA.Count == 0 && categoryA!.Contains("Structural"))
+            {
+                suggestion = $"No elements found for '{categoryA}'. Try the non-structural variant.";
+            }
+
             return CortexResult<object>.Ok(new
             {
                 categoryA, categoryB,
                 setACount = setA.Count, setBCount = setB.Count,
                 clashCount = clashes.Count,
                 sectionBoxViewId,
+                suggestion,
                 clashes
             });
         }

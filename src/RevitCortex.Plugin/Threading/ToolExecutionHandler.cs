@@ -11,6 +11,7 @@ namespace RevitCortex.Plugin.Threading;
 public class ToolExecutionHandler : IExternalEventHandler
 {
     private readonly ManualResetEvent _resetEvent = new ManualResetEvent(false);
+    private volatile int _executionId;
 
     public ICortexTool? PendingTool { get; set; }
     public JObject? PendingInput { get; set; }
@@ -19,30 +20,39 @@ public class ToolExecutionHandler : IExternalEventHandler
 
     public void Execute(UIApplication app)
     {
+        int myId = _executionId;
         try
         {
             if (PendingTool == null || PendingInput == null || PendingSession == null)
             {
-                Result = CortexResult<object>.Fail(
-                    CortexErrorCode.Unknown, "No pending tool execution");
+                if (_executionId == myId)
+                    Result = CortexResult<object>.Fail(
+                        CortexErrorCode.Unknown, "No pending tool execution");
                 return;
             }
 
-            Result = PendingTool.Execute(PendingInput, PendingSession);
+            var result = PendingTool.Execute(PendingInput, PendingSession);
+            // Only store result if this execution is still current (not superseded by timeout)
+            if (_executionId == myId)
+                Result = result;
         }
         catch (Exception ex)
         {
-            Result = CortexResult<object>.Fail(
-                CortexErrorCode.Unknown, $"Unhandled exception: {ex.Message}");
+            if (_executionId == myId)
+                Result = CortexResult<object>.Fail(
+                    CortexErrorCode.Unknown, $"Unhandled exception: {ex.Message}");
         }
         finally
         {
-            _resetEvent.Set();
+            // Only signal if still current — stale executions must not wake up the new waiter
+            if (_executionId == myId)
+                _resetEvent.Set();
         }
     }
 
     public void PrepareExecution(ICortexTool tool, JObject input, CortexSession session)
     {
+        _executionId++;
         PendingTool = tool;
         PendingInput = input;
         PendingSession = session;

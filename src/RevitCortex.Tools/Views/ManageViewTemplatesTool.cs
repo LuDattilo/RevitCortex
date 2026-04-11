@@ -76,8 +76,24 @@ public class ManageViewTemplatesTool : ICortexTool
 #else
             var template = doc.GetElement(new ElementId((int)tid)) as View;
 #endif
-            if (template == null || !template.IsTemplate) continue;
-            var newId = template.Duplicate(ViewDuplicateOption.Duplicate);
+            if (template == null || !template.IsTemplate)
+            {
+                results.Add(new { originalId = tid, success = false,
+                    message = template == null ? "Element not found" : "Not a view template" });
+                continue;
+            }
+
+            ElementId newId;
+            try
+            {
+                newId = template.Duplicate(ViewDuplicateOption.Duplicate);
+            }
+            catch (Autodesk.Revit.Exceptions.InvalidOperationException ex)
+            {
+                results.Add(new { originalId = tid, success = false,
+                    message = $"Cannot duplicate template '{template.Name}': {ex.Message}" });
+                continue;
+            }
             var newView = doc.GetElement(newId) as View;
             if (newView != null)
                 results.Add(new { originalId = tid, newId = GetIdLong(newId), newName = newView.Name });

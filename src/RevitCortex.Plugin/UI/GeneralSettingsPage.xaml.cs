@@ -12,6 +12,7 @@ public partial class GeneralSettingsPage : Page
     private const int DefaultPort = 8080;
     private const string DefaultLogLevel = "Info";
     private const string DefaultModel = "claude-sonnet-4-6";
+    private int _originalPort;
 
     private static string SettingsFilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -34,9 +35,11 @@ public partial class GeneralSettingsPage : Page
                 var settings = JsonConvert.DeserializeObject<CortexSettings>(json);
                 if (settings != null)
                 {
+                    _originalPort = settings.Port;
                     PortTextBox.Text = settings.Port.ToString();
                     SetComboSelection(LogLevelComboBox, settings.LogLevel ?? DefaultLogLevel);
                     SetComboText(ModelComboBox, settings.Model ?? DefaultModel);
+                    ReadOnlyCheckBox.IsChecked = settings.ReadOnlyMode;
                     return;
                 }
             }
@@ -75,6 +78,7 @@ public partial class GeneralSettingsPage : Page
 
     private void SetDefaults()
     {
+        _originalPort = DefaultPort;
         PortTextBox.Text = DefaultPort.ToString();
         SetComboSelection(LogLevelComboBox, DefaultLogLevel);
         SetComboText(ModelComboBox, DefaultModel);
@@ -125,7 +129,8 @@ public partial class GeneralSettingsPage : Page
             {
                 Port = port,
                 LogLevel = logLevel,
-                Model = model
+                Model = model,
+                ReadOnlyMode = ReadOnlyCheckBox.IsChecked == true
             };
 
             string dir = Path.GetDirectoryName(SettingsFilePath)!;
@@ -134,8 +139,16 @@ public partial class GeneralSettingsPage : Page
             File.WriteAllText(SettingsFilePath,
                 JsonConvert.SerializeObject(settings, Formatting.Indented));
 
-            MessageBox.Show("Settings saved. Restart Revit for port changes.",
-                "Saved", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Apply read-only mode immediately (no restart needed)
+            if (RevitCortexApp.Instance?.Router != null)
+                RevitCortexApp.Instance.Router.ReadOnlyMode = settings.ReadOnlyMode;
+
+            if (port != _originalPort)
+            {
+                MessageBox.Show("Settings saved. Restart Revit for port changes.",
+                    "Saved", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _originalPort = port;
+            }
         }
         catch (Exception ex)
         {
@@ -152,4 +165,5 @@ internal class CortexSettings
     public int Port { get; set; } = 8080;
     public string? LogLevel { get; set; } = "Info";
     public string? Model { get; set; } = "claude-sonnet-4-6";
+    public bool ReadOnlyMode { get; set; }
 }
