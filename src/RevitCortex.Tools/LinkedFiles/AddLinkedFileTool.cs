@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.LinkedFiles;
 
@@ -61,8 +62,8 @@ public class AddLinkedFileTool : ICortexTool
 
             return CortexResult<object>.Ok(new
             {
-                linkTypeId = GetIdLong(linkTypeId),
-                instanceId = GetIdLong(instance.Id),
+                linkTypeId = ToolHelpers.GetElementIdValue(linkTypeId),
+                instanceId = ToolHelpers.GetElementIdValue(instance.Id),
                 name = instance.Name,
                 filePath,
                 position = new { x = positionX, y = positionY, z = positionZ }
@@ -72,14 +73,5 @@ public class AddLinkedFileTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to add linked file: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

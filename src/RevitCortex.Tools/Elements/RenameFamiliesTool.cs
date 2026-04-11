@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -69,7 +70,7 @@ public class RenameFamiliesTool : ICortexTool
                     try
                     {
                         fam.Name = newName;
-                        results.Add(new { id = GetIdLong(fam.Id), oldName, newName, success = true });
+                        results.Add(new { id = ToolHelpers.GetElementIdValue(fam.Id), oldName, newName, success = true });
 
                         if (renameTypes)
                         {
@@ -86,7 +87,7 @@ public class RenameFamiliesTool : ICortexTool
                     }
                     catch (Exception ex)
                     {
-                        results.Add(new { id = GetIdLong(fam.Id), oldName, newName, success = false, reason = ex.Message });
+                        results.Add(new { id = ToolHelpers.GetElementIdValue(fam.Id), oldName, newName, success = false, reason = ex.Message });
                     }
                 }
 
@@ -99,7 +100,7 @@ public class RenameFamiliesTool : ICortexTool
                     var oldName = fam.Name;
                     var newName = ApplyRename(oldName, operation, prefix, suffix, findText, replaceText);
                     if (oldName == newName) continue;
-                    results.Add(new { id = GetIdLong(fam.Id), oldName, newName });
+                    results.Add(new { id = ToolHelpers.GetElementIdValue(fam.Id), oldName, newName });
                 }
             }
 
@@ -120,14 +121,5 @@ public class RenameFamiliesTool : ICortexTool
             "find_replace" => name.Replace(find, replace),
             _ => name
         };
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

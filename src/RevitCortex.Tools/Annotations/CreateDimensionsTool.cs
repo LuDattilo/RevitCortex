@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Annotations;
 
@@ -185,7 +186,7 @@ public class CreateDimensionsTool : ICortexTool
         var dim = doc.Create.NewDimension(view, dimLine, refs);
         if (dim != null)
         {
-            createdIds.Add(GetIdLong(dim.Id));
+            createdIds.Add(ToolHelpers.GetElementIdValue(dim.Id));
 
             // Apply dimension type if specified
             var dimensionStyleId = spec["dimensionStyleId"]?.Value<long>() ?? -1;
@@ -231,7 +232,7 @@ public class CreateDimensionsTool : ICortexTool
         var dimLine = Line.CreateBound(p0, p1);
         var dim = doc.Create.NewDimension(view, dimLine, refs);
         if (dim != null)
-            createdIds.Add(GetIdLong(dim.Id));
+            createdIds.Add(ToolHelpers.GetElementIdValue(dim.Id));
     }
 
     private static Reference? GetBestReference(Element elem, View view)
@@ -289,14 +290,5 @@ public class CreateDimensionsTool : ICortexTool
         var y = token["y"]?.Value<double>() ?? 0;
         var z = token["z"]?.Value<double>() ?? 0;
         return new XYZ(x / MmPerFoot, y / MmPerFoot, z / MmPerFoot);
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

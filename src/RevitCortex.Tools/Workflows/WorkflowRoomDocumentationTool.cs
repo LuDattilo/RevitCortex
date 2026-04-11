@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Workflows;
 
@@ -81,7 +82,7 @@ public class WorkflowRoomDocumentationTool : ICortexTool
                             var callout = ViewSection.CreateCallout(doc, parentView.Id, planVft.Id, min, max);
                             try { callout.Name = $"Callout - {roomNumber} {roomName}"; } catch { }
                             callout.Scale = 50;
-                            createdViews.Add(new { id = GetIdLong(callout.Id), name = callout.Name, type = "callout" });
+                            createdViews.Add(new { id = ToolHelpers.GetElementIdValue(callout.Id), name = callout.Name, type = "callout" });
                         }
                         catch { }
                     }
@@ -99,7 +100,7 @@ public class WorkflowRoomDocumentationTool : ICortexTool
                             {
                                 try { sectionView.Name = $"Section {dir.Substring(0, 1).ToUpper()} - {roomNumber} {roomName}"; } catch { }
                                 sectionView.Scale = 50;
-                                createdViews.Add(new { id = GetIdLong(sectionView.Id), name = sectionView.Name, type = $"section_{dir}" });
+                                createdViews.Add(new { id = ToolHelpers.GetElementIdValue(sectionView.Id), name = sectionView.Name, type = $"section_{dir}" });
                             }
                         }
                         catch { }
@@ -145,14 +146,5 @@ public class WorkflowRoomDocumentationTool : ICortexTool
         transform.Origin = center; transform.BasisX = right; transform.BasisY = up; transform.BasisZ = viewDir;
         bb.Transform = transform;
         return ViewSection.CreateSection(doc, vftId, bb);
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

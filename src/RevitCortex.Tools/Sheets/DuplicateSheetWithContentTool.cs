@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Sheets;
 
@@ -131,7 +132,7 @@ public class DuplicateSheetWithContentTool : ICortexTool
 
                 results.Add(new
                 {
-                    sheetId = GetIdLong(newSheet.Id),
+                    sheetId = ToolHelpers.GetElementIdValue(newSheet.Id),
                     number = newSheet.SheetNumber,
                     name = newSheet.Name,
                     viewportCount
@@ -158,14 +159,5 @@ public class DuplicateSheetWithContentTool : ICortexTool
             .OfCategory(BuiltInCategory.OST_TitleBlocks)
             .OfClass(typeof(FamilySymbol))
             .FirstOrDefault()?.Id ?? ElementId.InvalidElementId;
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

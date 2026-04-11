@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -82,7 +83,7 @@ public class CreatePresetScheduleTool : ICortexTool
             tx.Commit();
             return CortexResult<object>.Ok(new
             {
-                scheduleId = GetIdLong(schedule.Id),
+                scheduleId = ToolHelpers.GetElementIdValue(schedule.Id),
                 scheduleName = schedule.Name,
                 preset,
                 fieldCount = schedule.Definition.GetFieldCount()
@@ -113,14 +114,5 @@ public class CreatePresetScheduleTool : ICortexTool
                 try { schedule.Definition.AddField(field); } catch { }
             }
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

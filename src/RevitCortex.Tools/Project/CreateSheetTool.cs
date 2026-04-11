@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -98,7 +99,7 @@ public class CreateSheetTool : ICortexTool
 
             return CortexResult<object>.Ok(new
             {
-                sheetId = GetIdLong(sheet.Id),
+                sheetId = ToolHelpers.GetElementIdValue(sheet.Id),
                 sheetNumber = sheet.SheetNumber,
                 sheetName = sheet.Name
             });
@@ -107,14 +108,5 @@ public class CreateSheetTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to create sheet: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

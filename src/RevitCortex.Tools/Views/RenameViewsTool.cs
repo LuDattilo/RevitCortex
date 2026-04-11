@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Views;
 
@@ -69,11 +70,11 @@ public class RenameViewsTool : ICortexTool
                     try
                     {
                         view.Name = newName;
-                        results.Add(new { id = GetIdLong(view.Id), oldName, newName, success = true });
+                        results.Add(new { id = ToolHelpers.GetElementIdValue(view.Id), oldName, newName, success = true });
                     }
                     catch (Exception ex)
                     {
-                        results.Add(new { id = GetIdLong(view.Id), oldName, newName, success = false, reason = ex.Message });
+                        results.Add(new { id = ToolHelpers.GetElementIdValue(view.Id), oldName, newName, success = false, reason = ex.Message });
                     }
                 }
 
@@ -86,7 +87,7 @@ public class RenameViewsTool : ICortexTool
                     var oldName = view.Name;
                     var newName = ApplyRename(oldName, operation, prefix, suffix, findText, replaceText);
                     if (oldName == newName) continue;
-                    results.Add(new { id = GetIdLong(view.Id), oldName, newName });
+                    results.Add(new { id = ToolHelpers.GetElementIdValue(view.Id), oldName, newName });
                 }
             }
 
@@ -107,14 +108,5 @@ public class RenameViewsTool : ICortexTool
             "find_replace" => name.Replace(find, replace),
             _ => name
         };
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -91,11 +92,11 @@ public class BatchRenameTool : ICortexTool
                     try
                     {
                         SetName(elem, newName);
-                        results.Add(new { id = GetIdLong(elem.Id), oldName, newName, success = true });
+                        results.Add(new { id = ToolHelpers.GetElementIdValue(elem.Id), oldName, newName, success = true });
                     }
                     catch (Exception ex)
                     {
-                        results.Add(new { id = GetIdLong(elem.Id), oldName, newName, success = false, reason = ex.Message });
+                        results.Add(new { id = ToolHelpers.GetElementIdValue(elem.Id), oldName, newName, success = false, reason = ex.Message });
                     }
                 }
 
@@ -108,7 +109,7 @@ public class BatchRenameTool : ICortexTool
                     var oldName = GetName(elem);
                     var newName = ComputeNewName(oldName, prefix, suffix, findText, replaceText);
                     if (oldName == newName) continue;
-                    results.Add(new { id = GetIdLong(elem.Id), oldName, newName });
+                    results.Add(new { id = ToolHelpers.GetElementIdValue(elem.Id), oldName, newName });
                 }
             }
 
@@ -149,14 +150,5 @@ public class BatchRenameTool : ICortexTool
         if (elem is ViewSheet sheet) sheet.Name = name;
         else if (elem is View view) view.Name = name;
         else elem.Name = name;
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

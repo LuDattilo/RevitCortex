@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Views;
 
@@ -67,7 +68,7 @@ public class DuplicateViewTool : ICortexTool
                     results.Add(new
                     {
                         originalViewId = vid,
-                        newViewId = GetIdLong(newId),
+                        newViewId = ToolHelpers.GetElementIdValue(newId),
                         newViewName = newView.Name
                     });
                 }
@@ -80,14 +81,5 @@ public class DuplicateViewTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

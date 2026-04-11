@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Views;
 
@@ -62,7 +63,7 @@ public class PlaceViewportTool : ICortexTool
 
             return CortexResult<object>.Ok(new
             {
-                viewportId = GetIdLong(viewport.Id),
+                viewportId = ToolHelpers.GetElementIdValue(viewport.Id),
                 sheetNumber = sheet.SheetNumber,
                 viewName = view.Name
             });
@@ -71,14 +72,5 @@ public class PlaceViewportTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

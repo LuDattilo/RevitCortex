@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -52,7 +53,7 @@ public class CreateArrayTool : ICortexTool
             {
                 if (doc.GetElement(eid) == null)
                     return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
-                        $"Element {GetIdLong(eid)} not found");
+                        $"Element {ToolHelpers.GetElementIdValue(eid)} not found");
             }
 
             var createdElements = new List<object>();
@@ -79,7 +80,7 @@ public class CreateArrayTool : ICortexTool
                         var elem = doc.GetElement(copiedId);
                         createdElements.Add(new
                         {
-                            id = GetIdLong(copiedId),
+                            id = ToolHelpers.GetElementIdValue(copiedId),
                             name = elem?.Name ?? "",
                             category = elem?.Category?.Name ?? ""
                         });
@@ -102,7 +103,7 @@ public class CreateArrayTool : ICortexTool
                         var elem = doc.GetElement(copiedId);
                         createdElements.Add(new
                         {
-                            id = GetIdLong(copiedId),
+                            id = ToolHelpers.GetElementIdValue(copiedId),
                             name = elem?.Name ?? "",
                             category = elem?.Category?.Name ?? ""
                         });
@@ -124,14 +125,5 @@ public class CreateArrayTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to create array: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

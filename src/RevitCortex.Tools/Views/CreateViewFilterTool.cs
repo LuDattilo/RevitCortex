@@ -52,7 +52,7 @@ public class CreateViewFilterTool : ICortexTool
             .Cast<ParameterFilterElement>()
             .Select(f => new
             {
-                id = GetIdLong(f.Id),
+                id = ToolHelpers.GetElementIdValue(f.Id),
                 name = f.Name,
                 categoryCount = f.GetCategories().Count
             }).ToList();
@@ -116,7 +116,7 @@ public class CreateViewFilterTool : ICortexTool
 
         return CortexResult<object>.Ok(new
         {
-            filterId = GetIdLong(filter.Id),
+            filterId = ToolHelpers.GetElementIdValue(filter.Id),
             filterName = filter.Name,
             categoryCount = catIds.Count
         });
@@ -222,14 +222,5 @@ public class CreateViewFilterTool : ICortexTool
             default:
                 return null;
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

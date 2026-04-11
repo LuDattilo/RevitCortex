@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -70,7 +71,7 @@ public class CreateLevelTool : ICortexTool
                 if (vft != null)
                 {
                     var view = ViewPlan.Create(doc, vft.Id, level.Id);
-                    floorPlanId = GetIdLong(view.Id);
+                    floorPlanId = ToolHelpers.GetElementIdValue(view.Id);
                 }
                 else warnings.Add("Floor plan ViewFamilyType not found");
             }
@@ -82,7 +83,7 @@ public class CreateLevelTool : ICortexTool
                 if (vft != null)
                 {
                     var view = ViewPlan.Create(doc, vft.Id, level.Id);
-                    ceilingPlanId = GetIdLong(view.Id);
+                    ceilingPlanId = ToolHelpers.GetElementIdValue(view.Id);
                 }
                 else warnings.Add("Ceiling plan ViewFamilyType not found");
             }
@@ -91,7 +92,7 @@ public class CreateLevelTool : ICortexTool
 
             return CortexResult<object>.Ok(new
             {
-                levelId = GetIdLong(level.Id),
+                levelId = ToolHelpers.GetElementIdValue(level.Id),
                 name = level.Name,
                 elevationMm,
                 isBuildingStory,
@@ -104,14 +105,5 @@ public class CreateLevelTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to create level: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

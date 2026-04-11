@@ -71,7 +71,7 @@ function getDb(): SqlJsDatabase {
   return db;
 }
 
-export interface UsageRecord {
+interface UsageRecord {
   toolName: string;
   toolCategory: string;
   sessionId: string;
@@ -107,7 +107,7 @@ export function recordUsage(record: UsageRecord): void {
   }
 }
 
-export interface UsageQueryParams {
+interface UsageQueryParams {
   startDate?: string;
   endDate?: string;
   toolName?: string;

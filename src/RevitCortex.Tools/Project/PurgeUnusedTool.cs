@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -43,7 +44,7 @@ public class PurgeUnusedTool : ICortexTool
                 .Where(t => !usedTypeIds.Contains(t.Id))
                 .Where(t => t is FamilySymbol)
                 .Take(maxElements)
-                .Select(t => new { id = GetIdLong(t.Id), name = t.Name, category = t.Category?.Name ?? "Unknown" })
+                .Select(t => new { id = ToolHelpers.GetElementIdValue(t.Id), name = t.Name, category = t.Category?.Name ?? "Unknown" })
                 .ToList();
 
             // Find unused materials
@@ -59,7 +60,7 @@ public class PurgeUnusedTool : ICortexTool
                 .Cast<Material>()
                 .Where(m => !usedMaterialIds.Contains(m.Id))
                 .Take(maxElements)
-                .Select(m => new { id = GetIdLong(m.Id), name = m.Name })
+                .Select(m => new { id = ToolHelpers.GetElementIdValue(m.Id), name = m.Name })
                 .ToList();
 
             if (!dryRun)
@@ -113,14 +114,5 @@ public class PurgeUnusedTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

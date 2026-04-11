@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Views;
 
@@ -76,7 +77,7 @@ public class ManageUnplacedViewsTool : ICortexTool
 
             var result = views.Select(v => new
             {
-                id = GetIdLong(v.Id),
+                id = ToolHelpers.GetElementIdValue(v.Id),
                 name = v.Name,
                 viewType = v.ViewType.ToString()
             }).ToList();
@@ -92,14 +93,5 @@ public class ManageUnplacedViewsTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

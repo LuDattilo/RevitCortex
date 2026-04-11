@@ -322,15 +322,6 @@ public class CreateColorLegendTool : ICortexTool
             yOffset -= rowHeight;
         }
 
-        return GetIdLong(legendView.Id);
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
+        return ToolHelpers.GetElementIdValue(legendView.Id);
     }
 }

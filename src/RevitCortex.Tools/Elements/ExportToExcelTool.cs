@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -123,7 +124,7 @@ public class ExportToExcelTool : ICortexTool
             foreach (var elem in elemList)
             {
                 col = 1;
-                if (includeElementId) { ws.Cell(row, col).Value = GetIdLong(elem.Id); col++; }
+                if (includeElementId) { ws.Cell(row, col).Value = ToolHelpers.GetElementIdValue(elem.Id); col++; }
                 ws.Cell(row, col).Value = elem.Category?.Name ?? ""; col++;
 
                 foreach (var name in instanceParamNames.Items)
@@ -175,15 +176,6 @@ public class ExportToExcelTool : ICortexTool
             StorageType.ElementId => p.AsValueString() ?? p.AsElementId().ToString(),
             _ => ""
         };
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 
     /// <summary>Simple ordered set for maintaining parameter discovery order.</summary>

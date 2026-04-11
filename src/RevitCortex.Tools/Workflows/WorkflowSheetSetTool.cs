@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Workflows;
 
@@ -62,7 +63,7 @@ public class WorkflowSheetSetTool : ICortexTool
                     var sheet = ViewSheet.Create(doc, titleBlock.Id);
                     if (!string.IsNullOrEmpty(number)) sheet.SheetNumber = number;
                     if (!string.IsNullOrEmpty(name)) sheet.Name = name;
-                    results.Add(new { sheetId = GetIdLong(sheet.Id), number = sheet.SheetNumber, name = sheet.Name, success = true });
+                    results.Add(new { sheetId = ToolHelpers.GetElementIdValue(sheet.Id), number = sheet.SheetNumber, name = sheet.Name, success = true });
                 }
                 catch (Exception ex)
                 {
@@ -82,14 +83,5 @@ public class WorkflowSheetSetTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

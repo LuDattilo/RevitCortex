@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Workflows;
 
@@ -92,7 +93,7 @@ public class WorkflowDataRoundtripTool : ICortexTool
             int row = 2;
             foreach (var elem in elemList)
             {
-                ws.Cell(row, 1).Value = GetIdLong(elem.Id);
+                ws.Cell(row, 1).Value = ToolHelpers.GetElementIdValue(elem.Id);
                 ws.Cell(row, 2).Value = elem.Category?.Name ?? "";
                 ws.Cell(row, 3).Value = elem.Name;
 
@@ -125,14 +126,5 @@ public class WorkflowDataRoundtripTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Parameters;
 
@@ -75,7 +76,7 @@ public class ClearParameterValuesTool : ICortexTool
                     if (!string.IsNullOrEmpty(filterValue) && oldValue != filterValue) { skipped++; continue; }
 
                     ClearParam(param);
-                    cleared.Add(new { id = GetIdLong(elem.Id), oldValue });
+                    cleared.Add(new { id = ToolHelpers.GetElementIdValue(elem.Id), oldValue });
                 }
 
                 tx.Commit();
@@ -93,7 +94,7 @@ public class ClearParameterValuesTool : ICortexTool
                     var oldValue = param.StorageType == StorageType.String ? param.AsString() ?? "" : param.AsValueString() ?? "";
                     if (!string.IsNullOrEmpty(filterValue) && oldValue != filterValue) { skipped++; continue; }
 
-                    cleared.Add(new { id = GetIdLong(elem.Id), oldValue });
+                    cleared.Add(new { id = ToolHelpers.GetElementIdValue(elem.Id), oldValue });
                 }
             }
 
@@ -120,14 +121,5 @@ public class ClearParameterValuesTool : ICortexTool
             case StorageType.Double: param.Set(0.0); break;
             case StorageType.ElementId: param.Set(ElementId.InvalidElementId); break;
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

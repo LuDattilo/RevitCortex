@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -187,7 +188,7 @@ public class CreateSurfaceBasedElementTool : ICortexTool
                         return;
                     }
                     if (requestedTypeId > 0)
-                        warnings.Add($"Requested floor typeId {requestedTypeId} not found. Defaulted to '{floorType.Name}' (ID: {GetIdLong(floorType.Id)})");
+                        warnings.Add($"Requested floor typeId {requestedTypeId} not found. Defaulted to '{floorType.Name}' (ID: {ToolHelpers.GetElementIdValue(floorType.Id)})");
                 }
                 break;
 
@@ -205,7 +206,7 @@ public class CreateSurfaceBasedElementTool : ICortexTool
                         return;
                     }
                     if (requestedTypeId > 0)
-                        warnings.Add($"Requested roof typeId {requestedTypeId} not found. Defaulted to '{roofType.Name}' (ID: {GetIdLong(roofType.Id)})");
+                        warnings.Add($"Requested roof typeId {requestedTypeId} not found. Defaulted to '{roofType.Name}' (ID: {ToolHelpers.GetElementIdValue(roofType.Id)})");
                 }
                 break;
 
@@ -223,7 +224,7 @@ public class CreateSurfaceBasedElementTool : ICortexTool
                         return;
                     }
                     if (requestedTypeId > 0)
-                        warnings.Add($"Requested ceiling typeId {requestedTypeId} not found. Defaulted to '{ceilingType.Name}' (ID: {GetIdLong(ceilingType.Id)})");
+                        warnings.Add($"Requested ceiling typeId {requestedTypeId} not found. Defaulted to '{ceilingType.Name}' (ID: {ToolHelpers.GetElementIdValue(ceilingType.Id)})");
                 }
                 break;
 
@@ -246,7 +247,7 @@ public class CreateSurfaceBasedElementTool : ICortexTool
                     {
                         var offsetParam = floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM);
                         offsetParam?.Set(baseOffset);
-                        createdIds.Add(GetIdLong(floor.Id));
+                        createdIds.Add(ToolHelpers.GetElementIdValue(floor.Id));
                     }
                     break;
                 }
@@ -267,7 +268,7 @@ public class CreateSurfaceBasedElementTool : ICortexTool
 
                         var offsetParam = roof.get_Parameter(BuiltInParameter.ROOF_LEVEL_OFFSET_PARAM);
                         offsetParam?.Set(baseOffset);
-                        createdIds.Add(GetIdLong(roof.Id));
+                        createdIds.Add(ToolHelpers.GetElementIdValue(roof.Id));
                     }
                     break;
                 }
@@ -280,7 +281,7 @@ public class CreateSurfaceBasedElementTool : ICortexTool
                     {
                         var offsetParam = ceiling.get_Parameter(BuiltInParameter.CEILING_HEIGHTABOVELEVEL_PARAM);
                         offsetParam?.Set(baseOffset);
-                        createdIds.Add(GetIdLong(ceiling.Id));
+                        createdIds.Add(ToolHelpers.GetElementIdValue(ceiling.Id));
                     }
                     break;
                 }
@@ -312,14 +313,5 @@ public class CreateSurfaceBasedElementTool : ICortexTool
         var y = token["y"]?.Value<double>() ?? 0;
         var z = token["z"]?.Value<double>() ?? 0;
         return new XYZ(x / MmPerFoot, y / MmPerFoot, z / MmPerFoot);
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

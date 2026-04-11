@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Views;
 
@@ -55,7 +56,7 @@ public class ManageViewTemplatesTool : ICortexTool
 
         var result = templates.Select(v => new
         {
-            id = GetIdLong(v.Id), name = v.Name, viewType = v.ViewType.ToString()
+            id = ToolHelpers.GetElementIdValue(v.Id), name = v.Name, viewType = v.ViewType.ToString()
         }).ToList();
         return CortexResult<object>.Ok(new { templateCount = result.Count, templates = result });
     }
@@ -96,7 +97,7 @@ public class ManageViewTemplatesTool : ICortexTool
             }
             var newView = doc.GetElement(newId) as View;
             if (newView != null)
-                results.Add(new { originalId = tid, newId = GetIdLong(newId), newName = newView.Name });
+                results.Add(new { originalId = tid, newId = ToolHelpers.GetElementIdValue(newId), newName = newView.Name });
         }
         tx.Commit();
         return CortexResult<object>.Ok(new { duplicatedCount = results.Count, templates = results });
@@ -144,14 +145,5 @@ public class ManageViewTemplatesTool : ICortexTool
         template.Name = newName;
         tx.Commit();
         return CortexResult<object>.Ok(new { oldName, newName, templateId });
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

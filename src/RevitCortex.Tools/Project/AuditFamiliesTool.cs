@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -55,7 +56,7 @@ public class AuditFamiliesTool : ICortexTool
                 var count = instanceCounts.TryGetValue(f.Id, out var cnt) ? cnt : 0;
                 return new
                 {
-                    id = GetIdLong(f.Id),
+                    id = ToolHelpers.GetElementIdValue(f.Id),
                     name = f.Name,
                     category = f.FamilyCategory?.Name,
                     isInPlace = f.IsInPlace,
@@ -99,14 +100,5 @@ public class AuditFamiliesTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

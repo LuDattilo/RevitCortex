@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Views;
 
@@ -92,7 +93,7 @@ public class SectionBoxFromSelectionTool : ICortexTool
 
             return CortexResult<object>.Ok(new
             {
-                viewId = GetIdLong(targetView.Id),
+                viewId = ToolHelpers.GetElementIdValue(targetView.Id),
                 viewName = targetView.Name,
                 elementCount = elementIds.Count
             });
@@ -101,14 +102,5 @@ public class SectionBoxFromSelectionTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

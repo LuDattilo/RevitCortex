@@ -103,7 +103,7 @@ public class AddPrefixSuffixTool : ICortexTool
                     {
                         preview.Add(new
                         {
-                            elementId = GetIdLong(elem.Id),
+                            elementId = ToolHelpers.GetElementIdValue(elem.Id),
                             currentValue,
                             newValue
                         });
@@ -191,14 +191,5 @@ public class AddPrefixSuffixTool : ICortexTool
         }
 
         return elements;
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

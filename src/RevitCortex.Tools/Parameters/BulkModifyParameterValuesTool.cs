@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Parameters;
 
@@ -133,16 +134,7 @@ public class BulkModifyParameterValuesTool : ICortexTool
                     param.Set(i);
             }
 
-            modified.Add(new { id = GetIdLong(elem.Id), oldValue, newValue });
+            modified.Add(new { id = ToolHelpers.GetElementIdValue(elem.Id), oldValue, newValue });
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

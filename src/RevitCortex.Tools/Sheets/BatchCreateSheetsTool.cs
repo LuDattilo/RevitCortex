@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Sheets;
 
@@ -71,7 +72,7 @@ public class BatchCreateSheetsTool : ICortexTool
                         if (Viewport.CanAddViewToSheet(doc, sheet.Id, viewEid))
                         {
                             var vp = Viewport.Create(doc, sheet.Id, viewEid, new XYZ(0.5, 0.5, 0));
-                            placedViews.Add(new { viewId = vid, viewportId = GetIdLong(vp.Id), success = true });
+                            placedViews.Add(new { viewId = vid, viewportId = ToolHelpers.GetElementIdValue(vp.Id), success = true });
                         }
                         else
                         {
@@ -81,7 +82,7 @@ public class BatchCreateSheetsTool : ICortexTool
 
                     results.Add(new
                     {
-                        sheetId = GetIdLong(sheet.Id),
+                        sheetId = ToolHelpers.GetElementIdValue(sheet.Id),
                         number = sheet.SheetNumber,
                         name = sheet.Name,
                         success = true,
@@ -125,14 +126,5 @@ public class BatchCreateSheetsTool : ICortexTool
 
         var first = tbs.FirstOrDefault();
         return first?.Id ?? ElementId.InvalidElementId;
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

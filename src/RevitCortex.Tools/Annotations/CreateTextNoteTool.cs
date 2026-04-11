@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Annotations;
 
@@ -155,7 +156,7 @@ public class CreateTextNoteTool : ICortexTool
         if (widthMm > 0)
             textNote.Width = widthMm / MmPerFoot;
 
-        createdIds.Add(GetIdLong(textNote.Id));
+        createdIds.Add(ToolHelpers.GetElementIdValue(textNote.Id));
     }
 
     private static XYZ ParseXYZ(JToken token)
@@ -164,14 +165,5 @@ public class CreateTextNoteTool : ICortexTool
         var y = token["y"]?.Value<double>() ?? 0;
         var z = token["z"]?.Value<double>() ?? 0;
         return new XYZ(x / MmPerFoot, y / MmPerFoot, z / MmPerFoot);
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

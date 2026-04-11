@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -125,7 +126,7 @@ public class CreateFloorTool : ICortexTool
 
             return CortexResult<object>.Ok(new
             {
-                floorId = GetIdLong(floor.Id),
+                floorId = ToolHelpers.GetElementIdValue(floor.Id),
                 floorTypeName = floorType.Name,
                 levelName = level.Name,
                 warnings
@@ -135,14 +136,5 @@ public class CreateFloorTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to create floor: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

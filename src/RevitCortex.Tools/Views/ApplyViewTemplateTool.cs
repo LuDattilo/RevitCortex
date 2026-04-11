@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Views;
 
@@ -50,7 +51,7 @@ public class ApplyViewTemplateTool : ICortexTool
             .OfClass(typeof(View))
             .Cast<View>()
             .Where(v => v.IsTemplate)
-            .Select(v => new { id = GetIdLong(v.Id), name = v.Name, viewType = v.ViewType.ToString() })
+            .Select(v => new { id = ToolHelpers.GetElementIdValue(v.Id), name = v.Name, viewType = v.ViewType.ToString() })
             .ToList();
         return CortexResult<object>.Ok(new { templateCount = templates.Count, templates });
     }
@@ -112,14 +113,5 @@ public class ApplyViewTemplateTool : ICortexTool
         }
         tx.Commit();
         return CortexResult<object>.Ok(new { removedCount = removed });
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

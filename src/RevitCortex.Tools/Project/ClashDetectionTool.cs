@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -103,8 +104,8 @@ public class ClashDetectionTool : ICortexTool
                     {
                         clashes.Add(new
                         {
-                            elementIdA = GetIdLong(a.Id),
-                            elementIdB = GetIdLong(b.Id),
+                            elementIdA = ToolHelpers.GetElementIdValue(a.Id),
+                            elementIdB = ToolHelpers.GetElementIdValue(b.Id),
                             categoryA = a.Category?.Name,
                             categoryB = b.Category?.Name,
                             nameA = a.Name,
@@ -133,14 +134,5 @@ public class ClashDetectionTool : ICortexTool
         return a.Min.X - tolerance <= b.Max.X && a.Max.X + tolerance >= b.Min.X
             && a.Min.Y - tolerance <= b.Max.Y && a.Max.Y + tolerance >= b.Min.Y
             && a.Min.Z - tolerance <= b.Max.Z && a.Max.Z + tolerance >= b.Min.Z;
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

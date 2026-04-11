@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -41,7 +42,7 @@ public class LoadSelectionTool : ICortexTool
                 var selections = allFilters.Select(sf => new
                 {
                     name = sf.Name,
-                    id = GetIdLong(sf.Id),
+                    id = ToolHelpers.GetElementIdValue(sf.Id),
                     elementCount = sf.GetElementIds().Count
                 }).ToList();
 
@@ -69,7 +70,7 @@ public class LoadSelectionTool : ICortexTool
                 uidoc.Selection.SetElementIds(elementIds);
             }
 
-            var ids = elementIds.Select(id => GetIdLong(id)).ToList();
+            var ids = elementIds.Select(id => ToolHelpers.GetElementIdValue(id)).ToList();
 
             return CortexResult<object>.Ok(new
             {
@@ -83,14 +84,5 @@ public class LoadSelectionTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to load selection: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -53,7 +54,7 @@ public class CreateRevisionTool : ICortexTool
             var rev = doc.GetElement(id) as Revision;
             return new
             {
-                id = GetIdLong(id),
+                id = ToolHelpers.GetElementIdValue(id),
                 sequenceNumber = rev?.SequenceNumber ?? 0,
                 date = rev?.RevisionDate ?? "",
                 description = rev?.Description ?? "",
@@ -86,7 +87,7 @@ public class CreateRevisionTool : ICortexTool
         return CortexResult<object>.Ok(new
         {
             action = "create",
-            revisionId = GetIdLong(revision.Id),
+            revisionId = ToolHelpers.GetElementIdValue(revision.Id),
             date = revision.RevisionDate,
             description = revision.Description
         });
@@ -145,17 +146,8 @@ public class CreateRevisionTool : ICortexTool
         return CortexResult<object>.Ok(new
         {
             action = "add_to_sheets",
-            revisionId = GetIdLong(revisionId),
+            revisionId = ToolHelpers.GetElementIdValue(revisionId),
             updatedSheetCount = updatedCount
         });
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

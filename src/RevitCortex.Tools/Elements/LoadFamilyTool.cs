@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -62,12 +63,12 @@ public class LoadFamilyTool : ICortexTool
             var types = family.GetFamilySymbolIds()
                 .Select(id => doc.GetElement(id) as FamilySymbol)
                 .Where(fs => fs != null)
-                .Select(fs => new { id = GetIdLong(fs!.Id), name = fs.Name })
+                .Select(fs => new { id = ToolHelpers.GetElementIdValue(fs!.Id), name = fs.Name })
                 .ToList();
 
             return CortexResult<object>.Ok(new
             {
-                familyId = GetIdLong(family.Id),
+                familyId = ToolHelpers.GetElementIdValue(family.Id),
                 familyName = family.Name,
                 categoryName = family.FamilyCategory?.Name,
                 typeCount = types.Count,
@@ -94,7 +95,7 @@ public class LoadFamilyTool : ICortexTool
 
         var result = families.Select(f => new
         {
-            id = GetIdLong(f.Id),
+            id = ToolHelpers.GetElementIdValue(f.Id),
             name = f.Name,
             category = f.FamilyCategory?.Name,
             isEditable = f.IsEditable,
@@ -127,18 +128,9 @@ public class LoadFamilyTool : ICortexTool
 
         return CortexResult<object>.Ok(new
         {
-            newTypeId = newType != null ? GetIdLong(newType.Id) : 0,
+            newTypeId = newType != null ? ToolHelpers.GetElementIdValue(newType.Id) : 0,
             newTypeName = newType?.Name,
             familyName = sourceType.FamilyName
         });
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

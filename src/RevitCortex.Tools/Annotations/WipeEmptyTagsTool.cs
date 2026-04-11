@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Annotations;
 
@@ -115,7 +116,7 @@ public class WipeEmptyTagsTool : ICortexTool
                 }
 
                 if (isEmpty)
-                    emptyTags.Add(new { id = GetIdLong(tag.Id), reason, viewName = tag.OwnerViewId != ElementId.InvalidElementId ? doc.GetElement(tag.OwnerViewId)?.Name : null });
+                    emptyTags.Add(new { id = ToolHelpers.GetElementIdValue(tag.Id), reason, viewName = tag.OwnerViewId != ElementId.InvalidElementId ? doc.GetElement(tag.OwnerViewId)?.Name : null });
             }
 
             if (!dryRun && emptyTags.Count > 0)
@@ -149,14 +150,5 @@ public class WipeEmptyTagsTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Sheets;
 
@@ -64,7 +65,7 @@ public class CreatePlaceholderSheetsTool : ICortexTool
             if (!string.IsNullOrEmpty(number)) sheet.SheetNumber = number;
             if (!string.IsNullOrEmpty(name)) sheet.Name = name;
 
-            results.Add(new { sheetId = GetIdLong(sheet.Id), number = sheet.SheetNumber, name = sheet.Name });
+            results.Add(new { sheetId = ToolHelpers.GetElementIdValue(sheet.Id), number = sheet.SheetNumber, name = sheet.Name });
         }
 
         tx.Commit();
@@ -77,7 +78,7 @@ public class CreatePlaceholderSheetsTool : ICortexTool
             .OfClass(typeof(ViewSheet))
             .Cast<ViewSheet>()
             .Where(s => s.IsPlaceholder)
-            .Select(s => new { id = GetIdLong(s.Id), number = s.SheetNumber, name = s.Name })
+            .Select(s => new { id = ToolHelpers.GetElementIdValue(s.Id), number = s.SheetNumber, name = s.Name })
             .ToList();
 
         return CortexResult<object>.Ok(new { placeholderCount = sheets.Count, sheets });
@@ -140,7 +141,7 @@ public class CreatePlaceholderSheetsTool : ICortexTool
 
             results.Add(new
             {
-                sheetId = GetIdLong(newSheet.Id),
+                sheetId = ToolHelpers.GetElementIdValue(newSheet.Id),
                 number = savedNumber,
                 name = savedName,
                 success = true
@@ -171,14 +172,5 @@ public class CreatePlaceholderSheetsTool : ICortexTool
         }
         tx.Commit();
         return CortexResult<object>.Ok(new { deletedCount = deleted });
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -84,7 +85,7 @@ public class CreateFilledRegionTool : ICortexTool
 
             return CortexResult<object>.Ok(new
             {
-                filledRegionId = GetIdLong(region.Id),
+                filledRegionId = ToolHelpers.GetElementIdValue(region.Id),
                 typeName = regionType.Name,
                 viewName = view.Name
             });
@@ -93,14 +94,5 @@ public class CreateFilledRegionTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to create filled region: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

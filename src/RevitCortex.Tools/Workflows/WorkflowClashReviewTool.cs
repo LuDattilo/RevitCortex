@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Workflows;
 
@@ -66,7 +67,7 @@ public class WorkflowClashReviewTool : ICortexTool
                         && bbA.Min.Y - tolerance <= bbB.Max.Y && bbA.Max.Y + tolerance >= bbB.Min.Y
                         && bbA.Min.Z - tolerance <= bbB.Max.Z && bbA.Max.Z + tolerance >= bbB.Min.Z)
                     {
-                        clashes.Add(new { elementIdA = GetIdLong(a.Id), elementIdB = GetIdLong(b.Id),
+                        clashes.Add(new { elementIdA = ToolHelpers.GetElementIdValue(a.Id), elementIdB = ToolHelpers.GetElementIdValue(b.Id),
                             nameA = a.Name, nameB = b.Name });
 
                         // Track combined bounding box for section box
@@ -95,7 +96,7 @@ public class WorkflowClashReviewTool : ICortexTool
                         Min = new XYZ(minPt.X - offset, minPt.Y - offset, minPt.Z - offset),
                         Max = new XYZ(maxPt.X + offset, maxPt.Y + offset, maxPt.Z + offset)
                     });
-                    sectionBoxViewId = GetIdLong(view3D.Id);
+                    sectionBoxViewId = ToolHelpers.GetElementIdValue(view3D.Id);
                 }
                 tx.Commit();
             }
@@ -127,14 +128,5 @@ public class WorkflowClashReviewTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

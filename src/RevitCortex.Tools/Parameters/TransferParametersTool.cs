@@ -182,13 +182,4 @@ public class TransferParametersTool : ICortexTool
         }
         catch { return false; }
     }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
-    }
 }

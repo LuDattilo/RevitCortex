@@ -4,7 +4,7 @@ import { homedir } from "os";
 
 const JSONL_PATH = join(homedir(), ".revitcortex", "usage.jsonl");
 
-export interface ApiUsageEntry {
+interface ApiUsageEntry {
   timestamp: string;
   session_id?: string;
   model?: string;

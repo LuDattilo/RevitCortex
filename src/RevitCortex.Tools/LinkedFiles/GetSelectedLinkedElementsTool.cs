@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.LinkedFiles;
 
@@ -60,8 +61,8 @@ public class GetSelectedLinkedElementsTool : ICortexTool
                 var transform = linkInstance.GetTotalTransform();
                 var linkData = new Dictionary<string, object?>
                 {
-                    ["instanceId"] = GetIdLong(linkInstance.Id),
-                    ["typeId"] = linkType != null ? GetIdLong(linkType.Id) : 0,
+                    ["instanceId"] = ToolHelpers.GetElementIdValue(linkInstance.Id),
+                    ["typeId"] = linkType != null ? ToolHelpers.GetElementIdValue(linkType.Id) : 0,
                     ["name"] = linkInstance.Name,
                     ["isLoaded"] = isLoaded,
                     ["isPinned"] = linkInstance.Pinned,
@@ -127,13 +128,4 @@ public class GetSelectedLinkedElementsTool : ICortexTool
     }
 
     private const double MmPerFoot = 304.8;
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
-    }
 }

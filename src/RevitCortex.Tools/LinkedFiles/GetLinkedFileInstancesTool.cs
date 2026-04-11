@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.LinkedFiles;
 
@@ -80,7 +81,7 @@ public class GetLinkedFileInstancesTool : ICortexTool
                         var transform = inst.GetTotalTransform();
                         instances.Add(new
                         {
-                            instanceId = GetIdLong(inst.Id),
+                            instanceId = ToolHelpers.GetElementIdValue(inst.Id),
                             isPinned = inst.Pinned,
                             origin = new { x = Math.Round(transform.Origin.X * MmPerFoot, 1), y = Math.Round(transform.Origin.Y * MmPerFoot, 1), z = Math.Round(transform.Origin.Z * MmPerFoot, 1) },
                             basisX = new { x = Math.Round(transform.BasisX.X, 6), y = Math.Round(transform.BasisX.Y, 6), z = Math.Round(transform.BasisX.Z, 6) },
@@ -91,7 +92,7 @@ public class GetLinkedFileInstancesTool : ICortexTool
 
                 results.Add(new
                 {
-                    typeId = GetIdLong(linkType.Id),
+                    typeId = ToolHelpers.GetElementIdValue(linkType.Id),
                     typeName,
                     isLoaded,
                     path,
@@ -115,13 +116,4 @@ public class GetLinkedFileInstancesTool : ICortexTool
     }
 
     private const double MmPerFoot = 304.8;
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
-    }
 }

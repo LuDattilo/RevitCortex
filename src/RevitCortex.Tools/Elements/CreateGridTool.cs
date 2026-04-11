@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -73,7 +74,7 @@ public class CreateGridTool : ICortexTool
                     warnings.Add($"Grid label '{label}' already exists, auto-assigned '{grid.Name}'.");
                 else if (TrySetName(grid, label))
                     existingNames.Add(label);
-                createdGrids.Add(new { id = GetIdLong(grid.Id), axis = "X", name = grid.Name, requestedLabel = label, position = i * xSpacingMm });
+                createdGrids.Add(new { id = ToolHelpers.GetElementIdValue(grid.Id), axis = "X", name = grid.Name, requestedLabel = label, position = i * xSpacingMm });
             }
 
             // Y grids (horizontal lines, labeled numerically by default)
@@ -89,7 +90,7 @@ public class CreateGridTool : ICortexTool
                     warnings.Add($"Grid label '{label}' already exists, auto-assigned '{grid.Name}'.");
                 else if (TrySetName(grid, label))
                     existingNames.Add(label);
-                createdGrids.Add(new { id = GetIdLong(grid.Id), axis = "Y", name = grid.Name, requestedLabel = label, position = i * ySpacingMm });
+                createdGrids.Add(new { id = ToolHelpers.GetElementIdValue(grid.Id), axis = "Y", name = grid.Name, requestedLabel = label, position = i * ySpacingMm });
             }
 
             tx.Commit();
@@ -129,14 +130,5 @@ public class CreateGridTool : ICortexTool
     {
         try { grid.Name = name; return true; }
         catch { return false; }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

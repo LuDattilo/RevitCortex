@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Sheets;
 
@@ -121,7 +122,7 @@ public class DuplicateSheetWithViewsTool : ICortexTool
                         if (Viewport.CanAddViewToSheet(doc, newSheet.Id, vpData.ViewId))
                         {
                             var vp = Viewport.Create(doc, newSheet.Id, vpData.ViewId, vpData.Center);
-                            newViewportIds.Add(GetIdLong(vp.Id));
+                            newViewportIds.Add(ToolHelpers.GetElementIdValue(vp.Id));
                             viewportCount++;
                         }
                     }
@@ -133,7 +134,7 @@ public class DuplicateSheetWithViewsTool : ICortexTool
                         {
                             try { newView.Name = $"{view.Name} - {newSheet.SheetNumber}"; } catch { }
                             var vp = Viewport.Create(doc, newSheet.Id, newViewId, vpData.Center);
-                            newViewportIds.Add(GetIdLong(vp.Id));
+                            newViewportIds.Add(ToolHelpers.GetElementIdValue(vp.Id));
                             viewportCount++;
                         }
                     }
@@ -149,7 +150,7 @@ public class DuplicateSheetWithViewsTool : ICortexTool
 
                 results.Add(new
                 {
-                    sheetId = GetIdLong(newSheet.Id),
+                    sheetId = ToolHelpers.GetElementIdValue(newSheet.Id),
                     number = newSheet.SheetNumber,
                     name = newSheet.Name,
                     viewportCount,
@@ -195,14 +196,5 @@ public class DuplicateSheetWithViewsTool : ICortexTool
             }
             catch { /* skip unwritable params */ }
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

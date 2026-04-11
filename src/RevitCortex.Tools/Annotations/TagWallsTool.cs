@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Annotations;
 
@@ -86,7 +87,7 @@ public class TagWallsTool : ICortexTool
                 }
                 catch (Exception ex)
                 {
-                    warnings.Add($"Failed to tag wall {GetIdLong(wall.Id)}: {ex.Message}");
+                    warnings.Add($"Failed to tag wall {ToolHelpers.GetElementIdValue(wall.Id)}: {ex.Message}");
                 }
             }
 
@@ -103,14 +104,5 @@ public class TagWallsTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to tag walls: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

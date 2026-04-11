@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -165,7 +166,7 @@ public class CreateLineBasedElementTool : ICortexTool
                         return;
                     }
                     if (requestedTypeId > 0)
-                        warnings.Add($"Requested wall typeId {requestedTypeId} not found. Defaulted to '{wallType.Name}' (ID: {GetIdLong(wallType.Id)})");
+                        warnings.Add($"Requested wall typeId {requestedTypeId} not found. Defaulted to '{wallType.Name}' (ID: {ToolHelpers.GetElementIdValue(wallType.Id)})");
                 }
 
                 using (var tx = new Transaction(doc, "RevitCortex: Create Wall"))
@@ -175,7 +176,7 @@ public class CreateLineBasedElementTool : ICortexTool
                     {
                         var wall = Wall.Create(doc, locationLine, wallType.Id, baseLevel.Id, heightFt, baseOffset, false, false);
                         if (wall != null)
-                            createdIds.Add(GetIdLong(wall.Id));
+                            createdIds.Add(ToolHelpers.GetElementIdValue(wall.Id));
                         tx.Commit();
                     }
                     catch
@@ -207,7 +208,7 @@ public class CreateLineBasedElementTool : ICortexTool
                         return;
                     }
                     if (requestedTypeId > 0)
-                        warnings.Add($"Requested typeId {requestedTypeId} not found. Defaulted to '{symbol.FamilyName}: {symbol.Name}' (ID: {GetIdLong(symbol.Id)})");
+                        warnings.Add($"Requested typeId {requestedTypeId} not found. Defaulted to '{symbol.FamilyName}: {symbol.Name}' (ID: {ToolHelpers.GetElementIdValue(symbol.Id)})");
                 }
 
                 using (var tx2 = new Transaction(doc, "RevitCortex: Create Line-Based Element"))
@@ -233,7 +234,7 @@ public class CreateLineBasedElementTool : ICortexTool
                             var offsetParam = instance.get_Parameter(BuiltInParameter.INSTANCE_FREE_HOST_OFFSET_PARAM)
                                           ?? instance.get_Parameter(BuiltInParameter.STRUCTURAL_BEAM_END0_ELEVATION);
                             // Use Z elevation from start point for structural framing
-                            createdIds.Add(GetIdLong(instance.Id));
+                            createdIds.Add(ToolHelpers.GetElementIdValue(instance.Id));
                         }
                         tx2.Commit();
                     }
@@ -264,14 +265,5 @@ public class CreateLineBasedElementTool : ICortexTool
         var y = token["y"]?.Value<double>() ?? 0;
         var z = token["z"]?.Value<double>() ?? 0;
         return new XYZ(x / MmPerFoot, y / MmPerFoot, z / MmPerFoot);
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

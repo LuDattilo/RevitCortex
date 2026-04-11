@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -56,7 +57,7 @@ public class CadLinkCleanupTool : ICortexTool
                     linkCount = imports.Count(i => i.IsLinked),
                     items = imports.Select(i => new
                     {
-                        id = GetIdLong(i.Id),
+                        id = ToolHelpers.GetElementIdValue(i.Id),
                         name = i.Name,
                         type = i.IsLinked ? "link" : "import",
                         viewSpecific = i.ViewSpecific,
@@ -74,7 +75,7 @@ public class CadLinkCleanupTool : ICortexTool
             if (elementIds.Count > 0)
             {
                 var idSet = elementIds.ToHashSet();
-                toDelete = toDelete.Where(i => idSet.Contains(GetIdLong(i.Id)));
+                toDelete = toDelete.Where(i => idSet.Contains(ToolHelpers.GetElementIdValue(i.Id)));
             }
             else
             {
@@ -94,14 +95,5 @@ public class CadLinkCleanupTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

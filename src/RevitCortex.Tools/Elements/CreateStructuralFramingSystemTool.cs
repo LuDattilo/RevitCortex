@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -87,7 +88,7 @@ public class CreateStructuralFramingSystemTool : ICortexTool
                 var line = Line.CreateBound(start, end);
 
                 var beam = doc.Create.NewFamilyInstance(line, beamType, level, StructuralType.Beam);
-                if (beam != null) createdBeams.Add(GetIdLong(beam.Id));
+                if (beam != null) createdBeams.Add(ToolHelpers.GetElementIdValue(beam.Id));
             }
 
             tx.Commit();
@@ -104,14 +105,5 @@ public class CreateStructuralFramingSystemTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

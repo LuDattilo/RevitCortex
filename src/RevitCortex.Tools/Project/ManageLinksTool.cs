@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -55,8 +56,8 @@ public class ManageLinksTool : ICortexTool
             var linkType = doc.GetElement(rl.GetTypeId()) as RevitLinkType;
             links.Add(new
             {
-                id = GetIdLong(rl.Id),
-                typeId = linkType != null ? GetIdLong(linkType.Id) : 0,
+                id = ToolHelpers.GetElementIdValue(rl.Id),
+                typeId = linkType != null ? ToolHelpers.GetElementIdValue(linkType.Id) : 0,
                 name = rl.Name,
                 linkType = "Revit",
                 isLoaded = RevitLinkType.IsLoaded(doc, rl.GetTypeId()),
@@ -69,7 +70,7 @@ public class ManageLinksTool : ICortexTool
         {
             links.Add(new
             {
-                id = GetIdLong(import.Id),
+                id = ToolHelpers.GetElementIdValue(import.Id),
                 typeId = (long)0,
                 name = import.Name,
                 linkType = import.IsLinked ? "CAD_Link" : "CAD_Import",
@@ -129,14 +130,5 @@ public class ManageLinksTool : ICortexTool
         tx.Commit();
 
         return CortexResult<object>.Ok(new { linkId, name = linkInstance.Name, action = "unloaded" });
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

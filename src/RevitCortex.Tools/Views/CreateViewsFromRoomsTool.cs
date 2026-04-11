@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Views;
 
@@ -73,7 +74,7 @@ public class CreateViewsFromRoomsTool : ICortexTool
                         {
                             TrySetName(sectionView, $"Section - {viewNameBase}");
                             sectionView.Scale = scale;
-                            createdViews.Add(new { id = GetIdLong(sectionView.Id), name = sectionView.Name, type = "section" });
+                            createdViews.Add(new { id = ToolHelpers.GetElementIdValue(sectionView.Id), name = sectionView.Name, type = "section" });
                         }
                         break;
                     case "elevation":
@@ -85,7 +86,7 @@ public class CreateViewsFromRoomsTool : ICortexTool
                             {
                                 TrySetName(elevView, $"{dir.Substring(0,1).ToUpper()}{dir.Substring(1)} - {viewNameBase}");
                                 elevView.Scale = scale;
-                                createdViews.Add(new { id = GetIdLong(elevView.Id), name = elevView.Name, type = $"elevation_{dir}" });
+                                createdViews.Add(new { id = ToolHelpers.GetElementIdValue(elevView.Id), name = elevView.Name, type = $"elevation_{dir}" });
                             }
                         }
                         break;
@@ -102,7 +103,7 @@ public class CreateViewsFromRoomsTool : ICortexTool
                         var callout = ViewSection.CreateCallout(doc, parentView.Id, calloutVft.Id, min, max);
                         TrySetName(callout, $"Callout - {viewNameBase}");
                         callout.Scale = scale;
-                        createdViews.Add(new { id = GetIdLong(callout.Id), name = callout.Name, type = "callout" });
+                        createdViews.Add(new { id = ToolHelpers.GetElementIdValue(callout.Id), name = callout.Name, type = "callout" });
                         break;
                 }
             }
@@ -176,14 +177,5 @@ public class CreateViewsFromRoomsTool : ICortexTool
                 catch { }
             }
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

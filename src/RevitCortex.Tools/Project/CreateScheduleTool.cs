@@ -104,7 +104,7 @@ public class CreateScheduleTool : ICortexTool
 
             return CortexResult<object>.Ok(new
             {
-                scheduleId = GetIdLong(schedule.Id),
+                scheduleId = ToolHelpers.GetElementIdValue(schedule.Id),
                 scheduleName = schedule.Name,
                 scheduleType,
                 addedFieldCount = addedFields.Count,
@@ -115,14 +115,5 @@ public class CreateScheduleTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to create schedule: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

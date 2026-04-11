@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Annotations;
 
@@ -138,7 +139,7 @@ public class ImportTableTool : ICortexTool
 
                 return CortexResult<object>.Ok(new
                 {
-                    viewId = GetIdLong(tableView.Id),
+                    viewId = ToolHelpers.GetElementIdValue(tableView.Id),
                     viewName = tableView.Name,
                     rowCount = rows.Count,
                     columnCount = colCount,
@@ -157,14 +158,5 @@ public class ImportTableTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
                 $"Failed to import table: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

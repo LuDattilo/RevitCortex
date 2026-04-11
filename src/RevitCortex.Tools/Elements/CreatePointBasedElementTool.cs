@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -144,7 +145,7 @@ public class CreatePointBasedElementTool : ICortexTool
                 return;
             }
             if (requestedTypeId > 0)
-                warnings.Add($"Requested typeId {requestedTypeId} not found. Defaulted to '{symbol.FamilyName}: {symbol.Name}' (ID: {GetIdLong(symbol.Id)})");
+                warnings.Add($"Requested typeId {requestedTypeId} not found. Defaulted to '{symbol.FamilyName}: {symbol.Name}' (ID: {ToolHelpers.GetElementIdValue(symbol.Id)})");
         }
 
         using var tx = new Transaction(doc, "RevitCortex: Create Point-Based Element");
@@ -245,7 +246,7 @@ public class CreatePointBasedElementTool : ICortexTool
                     ElementTransformUtils.RotateElement(doc, instance.Id, rotAxis, angleRad);
                 }
 
-                createdIds.Add(GetIdLong(instance.Id));
+                createdIds.Add(ToolHelpers.GetElementIdValue(instance.Id));
             }
 
             tx.Commit();
@@ -274,14 +275,5 @@ public class CreatePointBasedElementTool : ICortexTool
         var y = token["y"]?.Value<double>() ?? 0;
         var z = token["z"]?.Value<double>() ?? 0;
         return new XYZ(x / MmPerFoot, y / MmPerFoot, z / MmPerFoot);
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

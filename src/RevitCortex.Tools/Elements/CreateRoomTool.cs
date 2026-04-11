@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -117,7 +118,7 @@ public class CreateRoomTool : ICortexTool
 
             return CortexResult<object>.Ok(new
             {
-                roomId = GetIdLong(room.Id),
+                roomId = ToolHelpers.GetElementIdValue(room.Id),
                 roomName = room.get_Parameter(BuiltInParameter.ROOM_NAME)?.AsString() ?? name,
                 roomNumber = room.get_Parameter(BuiltInParameter.ROOM_NUMBER)?.AsString() ?? "",
                 levelName = level.Name
@@ -127,14 +128,5 @@ public class CreateRoomTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to create room: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }

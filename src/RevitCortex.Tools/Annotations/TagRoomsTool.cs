@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Annotations;
 
@@ -66,7 +67,7 @@ public class TagRoomsTool : ICortexTool
             var alreadyTagged = new FilteredElementCollector(doc, view.Id)
                 .OfCategory(BuiltInCategory.OST_RoomTags)
                 .Cast<RoomTag>()
-                .Select(rt => GetIdLong(rt.Room?.Id ?? ElementId.InvalidElementId))
+                .Select(rt => ToolHelpers.GetElementIdValue(rt.Room?.Id ?? ElementId.InvalidElementId))
                 .ToHashSet();
 
             int taggedCount = 0;
@@ -78,7 +79,7 @@ public class TagRoomsTool : ICortexTool
 
             foreach (var room in rooms)
             {
-                if (alreadyTagged.Contains(GetIdLong(room.Id)))
+                if (alreadyTagged.Contains(ToolHelpers.GetElementIdValue(room.Id)))
                 {
                     skippedCount++;
                     continue;
@@ -117,14 +118,5 @@ public class TagRoomsTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to tag rooms: {ex.Message}");
         }
-    }
-
-    private static long GetIdLong(ElementId id)
-    {
-#if REVIT2024_OR_GREATER
-        return id.Value;
-#else
-        return id.IntegerValue;
-#endif
     }
 }
