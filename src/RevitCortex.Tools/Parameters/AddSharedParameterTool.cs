@@ -67,11 +67,7 @@ public class AddSharedParameterTool : ICortexTool
             var definition = group.Definitions.get_Item(parameterName);
             if (definition == null)
             {
-#if REVIT2024_OR_GREATER
                 var externalDefOptions = new ExternalDefinitionCreationOptions(parameterName, SpecTypeId.String.Text);
-#else
-                var externalDefOptions = new ExternalDefinitionCreationOptions(parameterName, ParameterType.Text);
-#endif
                 definition = group.Definitions.Create(externalDefOptions);
             }
 

@@ -53,13 +53,8 @@ public class GetSharedParametersTool : ICortexTool
                 var guid = isShared ? ((ExternalDefinition)definition).GUID.ToString() : "";
                 var isInstance = binding is InstanceBinding;
 
-#if REVIT2024_OR_GREATER
-                var paramType = definition.GetDataType().TypeId ?? "";
+                var paramType = definition.GetDataType()?.TypeId ?? "";
                 var paramGroup = definition.GetGroupTypeId()?.TypeId ?? "";
-#else
-                var paramType = definition.ParameterType.ToString();
-                var paramGroup = definition.ParameterGroup.ToString();
-#endif
 
                 parameters.Add(new
                 {

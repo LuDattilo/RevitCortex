@@ -76,21 +76,21 @@ public class SetMaterialPropertiesTool : ICortexTool
                     var transparency = req["transparency"]?.Value<int?>();
                     if (transparency.HasValue)
                     {
-                        mat.Transparency = Math.Clamp(transparency.Value, 0, 100);
+                        mat.Transparency = Math.Max(0, Math.Min(100, transparency.Value));
                         changes.Add("transparency");
                     }
 
                     var shininess = req["shininess"]?.Value<int?>();
                     if (shininess.HasValue)
                     {
-                        mat.Shininess = Math.Clamp(shininess.Value, 0, 128);
+                        mat.Shininess = Math.Max(0, Math.Min(128, shininess.Value));
                         changes.Add("shininess");
                     }
 
                     var smoothness = req["smoothness"]?.Value<int?>();
                     if (smoothness.HasValue)
                     {
-                        mat.Smoothness = Math.Clamp(smoothness.Value, 0, 100);
+                        mat.Smoothness = Math.Max(0, Math.Min(100, smoothness.Value));
                         changes.Add("smoothness");
                     }
 

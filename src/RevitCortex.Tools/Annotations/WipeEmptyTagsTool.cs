@@ -89,8 +89,8 @@ public class WipeEmptyTagsTool : ICortexTool
                         }
                     }
 #else
-                    var taggedElem = tag.TaggedLocalElementId;
-                    if (taggedElem == ElementId.InvalidElementId || doc.GetElement(taggedElem) == null)
+                    var taggedElems = tag.GetTaggedLocalElements();
+                    if (taggedElems == null || taggedElems.Count == 0)
                     {
                         isEmpty = true;
                         reason = "Tagged element not found";

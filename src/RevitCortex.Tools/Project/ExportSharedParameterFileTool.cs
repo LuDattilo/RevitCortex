@@ -48,11 +48,7 @@ public class ExportSharedParameterFileTool : ICortexTool
                     {
                         name = def.Name,
                         guid = def.GUID.ToString(),
-#if REVIT2024_OR_GREATER
-                        dataType = def.GetDataType().TypeId,
-#else
-                        dataType = def.ParameterType.ToString(),
-#endif
+                        dataType = def.GetDataType()?.TypeId ?? "Unknown",
                         description = def.Description,
                         visible = def.Visible
                     });

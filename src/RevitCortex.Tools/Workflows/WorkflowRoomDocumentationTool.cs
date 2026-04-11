@@ -97,7 +97,7 @@ public class WorkflowRoomDocumentationTool : ICortexTool
                             var sectionView = CreateSection(doc, sectionVft.Id, bb, offset, dir);
                             if (sectionView != null)
                             {
-                                try { sectionView.Name = $"Section {dir[0..1].ToUpper()} - {roomNumber} {roomName}"; } catch { }
+                                try { sectionView.Name = $"Section {dir.Substring(0, 1).ToUpper()} - {roomNumber} {roomName}"; } catch { }
                                 sectionView.Scale = 50;
                                 createdViews.Add(new { id = GetIdLong(sectionView.Id), name = sectionView.Name, type = $"section_{dir}" });
                             }

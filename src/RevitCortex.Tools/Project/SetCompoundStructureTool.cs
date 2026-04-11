@@ -182,7 +182,7 @@ public class SetCompoundStructureTool : ICortexTool
 
         var existingLayers = cs.GetLayers().ToList();
         int insertAt = position ?? existingLayers.Count;
-        insertAt = Math.Clamp(insertAt, 0, existingLayers.Count);
+        insertAt = Math.Max(0, Math.Min(existingLayers.Count, insertAt));
 
         if (dryRun)
         {

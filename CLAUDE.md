@@ -12,6 +12,7 @@ RevitCortex is a next-generation MCP (Model Context Protocol) server for Autodes
 | 2024          | net48           |
 | 2025          | net8.0-windows  |
 | 2026          | net8.0-windows  |
+| 2027          | net10.0-windows |
 
 ## Project Structure
 
@@ -73,6 +74,7 @@ dotnet build -c "Debug R25" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   #
 dotnet build -c "Debug R24" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2024
 dotnet build -c "Debug R23" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2023
 dotnet build -c "Debug R26" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2026
+dotnet build -c "Debug R27" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2027
 ```
 
 ### TypeScript MCP Server

@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("2023","2024","2025","2026")]
+    [ValidateSet("2023","2024","2025","2026","2027")]
     [string]$RevitVersion = "2025",
     [ValidateSet("Debug","Release")]
     [string]$Config = "Debug"

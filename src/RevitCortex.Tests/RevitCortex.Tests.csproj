@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configurations>Debug R23;Debug R24;Debug R25;Debug R26;Release R23;Release R24;Release R25;Release R26</Configurations>
+    <Configurations>Debug R23;Debug R24;Debug R25;Debug R26;Debug R27;Release R23;Release R24;Release R25;Release R26;Release R27</Configurations>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>

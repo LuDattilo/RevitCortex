@@ -70,13 +70,8 @@ public class ManageProjectParametersTool : ICortexTool
             var guid = isShared ? ((ExternalDefinition)definition).GUID.ToString() : "";
             var isInstance = binding is InstanceBinding;
 
-#if REVIT2024_OR_GREATER
             var paramType = definition.GetDataType()?.TypeId ?? "Unknown";
             var paramGroup = definition.GetGroupTypeId()?.TypeId ?? "Unknown";
-#else
-            var paramType = definition.ParameterType.ToString();
-            var paramGroup = definition.ParameterGroup.ToString();
-#endif
 
             parameters.Add(new
             {

@@ -52,7 +52,7 @@ public class AuditFamiliesTool : ICortexTool
 
             var familyList = families.Select(f =>
             {
-                var count = instanceCounts.GetValueOrDefault(f.Id, 0);
+                var count = instanceCounts.TryGetValue(f.Id, out var cnt) ? cnt : 0;
                 return new
                 {
                     id = GetIdLong(f.Id),
