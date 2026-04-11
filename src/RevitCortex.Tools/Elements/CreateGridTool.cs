@@ -71,8 +71,8 @@ public class CreateGridTool : ICortexTool
                 var label = GenerateLabel(xStartLabel, i, xNaming);
                 if (existingNames.Contains(label))
                     warnings.Add($"Grid label '{label}' already exists, auto-assigned '{grid.Name}'.");
-                else
-                    TrySetName(grid, label);
+                else if (TrySetName(grid, label))
+                    existingNames.Add(label);
                 createdGrids.Add(new { id = GetIdLong(grid.Id), axis = "X", name = grid.Name, requestedLabel = label, position = i * xSpacingMm });
             }
 
@@ -87,8 +87,8 @@ public class CreateGridTool : ICortexTool
                 var label = GenerateLabel(yStartLabel, i, yNaming);
                 if (existingNames.Contains(label))
                     warnings.Add($"Grid label '{label}' already exists, auto-assigned '{grid.Name}'.");
-                else
-                    TrySetName(grid, label);
+                else if (TrySetName(grid, label))
+                    existingNames.Add(label);
                 createdGrids.Add(new { id = GetIdLong(grid.Id), axis = "Y", name = grid.Name, requestedLabel = label, position = i * ySpacingMm });
             }
 

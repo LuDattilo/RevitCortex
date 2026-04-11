@@ -39,7 +39,7 @@ public class WorkflowClashReviewTool : ICortexTool
         {
             var catIdA = Utilities.CategoryResolver.ResolveToId(doc, categoryA);
             var catIdB = Utilities.CategoryResolver.ResolveToId(doc, categoryB);
-            if (catIdA == ElementId.InvalidElementId || catIdB == ElementId.InvalidElementId)
+            if (catIdA == null || catIdB == null)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "Category not found");
 
             var setA = new FilteredElementCollector(doc).OfCategoryId(catIdA).WhereElementIsNotElementType().ToList();

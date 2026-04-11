@@ -59,10 +59,8 @@ public class ReloadLinkedFileFromTool : ICortexTool
 
             var modelPath = ModelPathUtils.ConvertUserVisiblePathToModelPath(newPath);
 
-            using var tx = new Transaction(doc, "RevitCortex: Reload Link From Path");
-            tx.Start();
+            // LoadFrom is not a transactable operation — must be called outside a Transaction
             linkType.LoadFrom(modelPath, new WorksetConfiguration());
-            tx.Commit();
 
             return CortexResult<object>.Ok(new
             {

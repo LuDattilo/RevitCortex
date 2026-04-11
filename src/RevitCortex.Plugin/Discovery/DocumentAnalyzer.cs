@@ -65,7 +65,6 @@ public class DocumentAnalyzer : IDocumentAnalyzer
             caps.EnableTool("get_linked_file_instances");
             caps.EnableTool("get_link_transform");
             caps.EnableTool("reload_linked_file_from");
-            caps.EnableTool("add_linked_file");
             caps.EnableTool("pin_unpin_link_instance");
             caps.EnableTool("move_link_instance");
             caps.EnableTool("align_link_to_host");

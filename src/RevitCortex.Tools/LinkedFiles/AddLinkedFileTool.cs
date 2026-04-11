@@ -16,7 +16,7 @@ public class AddLinkedFileTool : ICortexTool
     public string Name => "add_linked_file";
     public string Category => "LinkedFiles";
     public bool RequiresDocument => true;
-    public bool IsDynamic => true;
+    public bool IsDynamic => false;
     public string Description => "Adds a new Revit linked file from a file path and optionally places an instance at a specified position.";
 
     private const double MmPerFoot = 304.8;
@@ -43,23 +43,21 @@ public class AddLinkedFileTool : ICortexTool
             var modelPath = ModelPathUtils.ConvertUserVisiblePathToModelPath(filePath);
             var options = new RevitLinkOptions(false); // false = not relative path
 
-            using var tx = new Transaction(doc, "RevitCortex: Add Linked File");
-            tx.Start();
-
+            // RevitLinkType.Create and RevitLinkInstance.Create are not transactable
             var linkLoadResult = RevitLinkType.Create(doc, modelPath, options);
             var linkTypeId = linkLoadResult.ElementId;
 
-            // Place an instance
             var instance = RevitLinkInstance.Create(doc, linkTypeId);
 
-            // Move to position if specified
+            // MoveElement requires a Transaction
             if (Math.Abs(positionX) > 0.001 || Math.Abs(positionY) > 0.001 || Math.Abs(positionZ) > 0.001)
             {
+                using var tx = new Transaction(doc, "RevitCortex: Position Linked File");
+                tx.Start();
                 var offset = new XYZ(positionX / MmPerFoot, positionY / MmPerFoot, positionZ / MmPerFoot);
                 ElementTransformUtils.MoveElement(doc, instance.Id, offset);
+                tx.Commit();
             }
-
-            tx.Commit();
 
             return CortexResult<object>.Ok(new
             {

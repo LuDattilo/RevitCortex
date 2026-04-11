@@ -11,7 +11,7 @@ namespace RevitCortex.Plugin.Threading;
 public class ToolExecutionHandler : IExternalEventHandler
 {
     private readonly ManualResetEvent _resetEvent = new ManualResetEvent(false);
-    private volatile int _executionId;
+    private int _executionId;
 
     public ICortexTool? PendingTool { get; set; }
     public JObject? PendingInput { get; set; }
@@ -52,7 +52,7 @@ public class ToolExecutionHandler : IExternalEventHandler
 
     public void PrepareExecution(ICortexTool tool, JObject input, CortexSession session)
     {
-        _executionId++;
+        System.Threading.Interlocked.Increment(ref _executionId);
         PendingTool = tool;
         PendingInput = input;
         PendingSession = session;

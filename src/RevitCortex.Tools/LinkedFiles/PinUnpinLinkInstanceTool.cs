@@ -39,6 +39,7 @@ public class PinUnpinLinkInstanceTool : ICortexTool
         try
         {
             var results = new List<object>();
+            int successCount = 0;
 
             using var tx = new Transaction(doc, $"RevitCortex: {(pin ? "Pin" : "Unpin")} Link Instance");
             tx.Start();
@@ -59,11 +60,10 @@ public class PinUnpinLinkInstanceTool : ICortexTool
 
                 linkInstance.Pinned = pin;
                 results.Add(new { instanceId = id, success = true, name = linkInstance.Name, pinned = pin });
+                successCount++;
             }
 
             tx.Commit();
-
-            var successCount = results.Count(r => ((dynamic)r).success);
             return CortexResult<object>.Ok(new
             {
                 message = $"{(pin ? "Pinned" : "Unpinned")} {successCount}/{instanceIds.Count} instance(s)",

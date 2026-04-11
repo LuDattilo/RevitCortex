@@ -33,7 +33,7 @@ public class ManageViewTemplatesTool : ICortexTool
             {
                 "list" => ListTemplates(doc, input),
                 "duplicate" => DuplicateTemplate(doc, input),
-                "delete" => DeleteTemplate(doc, input),
+                "delete" => DeleteTemplate(doc, input, session),
                 "rename" => RenameTemplate(doc, input),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}", suggestion: "Use: list, duplicate, delete, rename")
@@ -102,9 +102,11 @@ public class ManageViewTemplatesTool : ICortexTool
         return CortexResult<object>.Ok(new { duplicatedCount = results.Count, templates = results });
     }
 
-    private static CortexResult<object> DeleteTemplate(Document doc, JObject input)
+    private static CortexResult<object> DeleteTemplate(Document doc, JObject input, CortexSession session)
     {
         var templateIds = input["templateIds"]?.ToObject<List<long>>() ?? new List<long>();
+        if (!session.RequestConfirmation("delete view template(s)", templateIds.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
         using var tx = new Transaction(doc, "RevitCortex: Delete View Templates");
         tx.Start();
         int deleted = 0;
