@@ -306,3 +306,41 @@ When a tool requires user selection or interaction that cannot be automated:
 - **Write operations**: Max 3-4 in parallel to avoid timeouts
 - **Heavy queries** (analyze_model_statistics, purge_unused): Run individually or max 2 concurrent
 - **create_view 3D**: Particularly heavy -- avoid running with other writes
+
+## Security Requirements (NFR)
+
+See `docs/SECURITY.md` for the full security analysis. The following are mandatory non-functional requirements.
+
+### Sandbox for `send_code_to_revit`
+
+Code submitted via `send_code_to_revit` is validated at runtime before execution. The following namespace patterns are **prohibited** and will cause the tool to return `CortexErrorCode.PermissionDenied`:
+
+- `System.IO` -- filesystem access
+- `System.Net` -- network access
+- `System.Diagnostics.Process` -- process spawning
+- `Microsoft.Win32` -- registry access
+- `System.Reflection.Emit` -- dynamic code generation
+- `System.Runtime.InteropServices` -- native interop
+
+The sandbox is implemented in `CodeSandbox.Validate(string code)` in RevitCortex.Core. All tools that execute user-provided code MUST call this before execution. The sandbox can be bypassed only by disabling `send_code_to_revit` entirely in settings.
+
+### Audit Log
+
+Every tool execution is logged to `~/.revitcortex/audit.jsonl` with:
+
+```json
+{"ts": "ISO8601", "tool": "tool_name", "input_summary": "...", "result": "ok|fail", "error_code": null, "elements_affected": 0}
+```
+
+The audit log is append-only. Implemented in `AuditLogger` in RevitCortex.Core. CortexRouter calls `AuditLogger.Log()` after every tool invocation. Log rotation is not automatic -- the file grows indefinitely (acceptable for local use).
+
+### Read-Only Mode
+
+When `readOnlyMode: true` is set in `~/.revitcortex/settings.json`, CortexRouter rejects all write tools with `CortexErrorCode.PermissionDenied`. This is enforced in the router via `CortexRouter.ReadOnlyMode`.
+
+Read-only classification uses a **naming convention** (no interface change needed):
+
+- **Read-only prefixes**: `get_`, `list_`, `find_`, `analyze_`, `check_`, `measure_`, `audit_`, `export_`, `say_hello`, `clash_detection`, `lines_per_view_count`
+- **Everything else**: considered a write tool, blocked in read-only mode
+
+The check is in `CortexRouter.IsReadOnlyTool(string toolName)` (public static, testable).

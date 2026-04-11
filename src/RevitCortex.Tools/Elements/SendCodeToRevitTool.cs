@@ -6,6 +6,7 @@ using System.Text;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
+using RevitCortex.Core.Security;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
 
@@ -33,6 +34,11 @@ public class SendCodeToRevitTool : ICortexTool
 
         if (string.IsNullOrEmpty(code))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "code is required");
+
+        // Sandbox validation: block prohibited namespace patterns
+        var sandboxResult = CodeSandbox.Validate(code);
+        if (sandboxResult != null)
+            return sandboxResult;
 
         try
         {

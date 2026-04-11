@@ -5,6 +5,7 @@ using System.Reflection;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Discovery;
 using RevitCortex.Core.Results;
+using RevitCortex.Core.Security;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
 using RevitCortex.Plugin.Threading;
@@ -16,13 +17,27 @@ public class CortexRouter
     private readonly Dictionary<string, ICortexTool> _tools = new();
     private readonly CortexSession _session;
     private readonly IDocumentAnalyzer _analyzer;
+    private readonly AuditLogger _auditLogger;
     private RevitThreadDispatcher? _dispatcher;
     private readonly HashSet<string> _disabledTools = new();
+    private bool _readOnlyMode;
 
-    public CortexRouter(CortexSession session, IDocumentAnalyzer analyzer)
+    /// <summary>
+    /// Prefixes that identify read-only (query-only) tools.
+    /// Tools matching these prefixes are allowed in read-only mode.
+    /// </summary>
+    private static readonly string[] ReadOnlyPrefixes = new[]
+    {
+        "get_", "list_", "find_", "analyze_", "check_",
+        "measure_", "audit_", "export_", "say_hello",
+        "clash_detection", "lines_per_view_count"
+    };
+
+    public CortexRouter(CortexSession session, IDocumentAnalyzer analyzer, AuditLogger? auditLogger = null)
     {
         _session = session;
         _analyzer = analyzer;
+        _auditLogger = auditLogger ?? new AuditLogger();
     }
 
     /// <summary>
@@ -70,10 +85,58 @@ public class CortexRouter
                 $"Tool '{toolName}' is not available for this document",
                 suggestion: "This tool requires specific document features (e.g., worksets, phases)");
 
+        // Read-only mode: block write tools
+        if (_readOnlyMode && !IsReadOnlyTool(toolName))
+            return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
+                $"Tool '{toolName}' is blocked in read-only mode",
+                suggestion: "Disable read-only mode in Settings to allow write operations");
+
+        CortexResult<object> result;
         if (_dispatcher != null)
-            return _dispatcher.Execute(tool, input, _session);
+            result = _dispatcher.Execute(tool, input, _session);
         else
-            return tool.Execute(input, _session);
+            result = tool.Execute(input, _session);
+
+        // Audit log: record every tool invocation
+        var inputSummary = BuildInputSummary(toolName, input);
+        _auditLogger.Log(toolName, inputSummary, result.Success,
+            result.Error?.Code, elementsAffected: 0);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Determines if a tool is read-only (query-only) based on naming convention.
+    /// </summary>
+    public static bool IsReadOnlyTool(string toolName)
+    {
+        foreach (var prefix in ReadOnlyPrefixes)
+        {
+            if (toolName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    public bool ReadOnlyMode
+    {
+        get => _readOnlyMode;
+        set => _readOnlyMode = value;
+    }
+
+    private static string BuildInputSummary(string toolName, JObject input)
+    {
+        // Extract key identifiers without logging full payload
+        var ids = input["elementIds"]?.ToString();
+        var code = input["code"] != null ? $"code({input["code"]!.ToString().Length} chars)" : null;
+        var category = input["filterCategory"]?.ToString() ?? input["category"]?.ToString();
+
+        var parts = new List<string>();
+        if (ids != null) parts.Add($"ids={ids}");
+        if (code != null) parts.Add(code);
+        if (category != null) parts.Add($"cat={category}");
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "(no params)";
     }
 
     public void SetDispatcher(RevitThreadDispatcher dispatcher)
