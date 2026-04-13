@@ -66,8 +66,8 @@ Write-Host ""
 Write-Host "[2/5] Detecting Revit installations..." -ForegroundColor Yellow
 
 $addinsRoot = "C:\ProgramData\Autodesk\Revit\Addins"
-$supportedVersions = @("2023", "2024", "2025", "2026")
-$configMap = @{ "2023" = "R23"; "2024" = "R24"; "2025" = "R25"; "2026" = "R26" }
+$supportedVersions = @("2023", "2024", "2025", "2026", "2027")
+$configMap = @{ "2023" = "R23"; "2024" = "R24"; "2025" = "R25"; "2026" = "R26"; "2027" = "R27" }
 $foundVersions = @()
 
 foreach ($ver in $supportedVersions) {
@@ -79,7 +79,7 @@ foreach ($ver in $supportedVersions) {
 }
 
 if ($foundVersions.Count -eq 0) {
-    Write-Host "  ERROR: No supported Revit installation found (2023-2026)." -ForegroundColor Red
+    Write-Host "  ERROR: No supported Revit installation found (2023-2027)." -ForegroundColor Red
     Write-Host "  Looked in: $addinsRoot" -ForegroundColor Red
     Read-Host "Press Enter to exit"
     exit 1

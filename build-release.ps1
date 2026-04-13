@@ -27,7 +27,7 @@ $toolsProject = Join-Path $RepoRoot "src\RevitCortex.Tools\RevitCortex.Tools.csp
 
 $builtVersions = @()
 
-foreach ($rv in @("R23", "R24", "R25", "R26")) {
+foreach ($rv in @("R23", "R24", "R25", "R26", "R27")) {
     $config = "Release $rv"
     $outDir = Join-Path $ReleaseDir "plugin\$rv"
 
@@ -77,6 +77,7 @@ Write-Host "[3/4] Copying support files..." -ForegroundColor Yellow
 
 # Installer scripts
 Copy-Item (Join-Path $RepoRoot "distribution\install.ps1") $ReleaseDir
+Copy-Item (Join-Path $RepoRoot "distribution\install.bat") $ReleaseDir
 Copy-Item (Join-Path $RepoRoot "distribution\uninstall.ps1") $ReleaseDir
 Copy-Item (Join-Path $RepoRoot "distribution\README.txt") $ReleaseDir
 

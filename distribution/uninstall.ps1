@@ -26,7 +26,7 @@ Write-Host "Removing Revit plugin..." -ForegroundColor Yellow
 $addinsRoot = "C:\ProgramData\Autodesk\Revit\Addins"
 $removedCount = 0
 
-foreach ($ver in @("2023", "2024", "2025", "2026")) {
+foreach ($ver in @("2023", "2024", "2025", "2026", "2027")) {
     $pluginDir = Join-Path $addinsRoot "$ver\RevitCortex"
     $addinFile = Join-Path $addinsRoot "$ver\RevitCortex.addin"
 
