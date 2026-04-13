@@ -157,3 +157,175 @@ export const IfcSetFamilyMappingFileInput = z.object({
     .string()
     .describe("Full path to the family mapping file (.txt). Set empty string to clear."),
 });
+
+// ══════════════════════════════════════════════════════════════
+// Step 2 — IFC Native Reconstruction
+// ══════════════════════════════════════════════════════════════
+
+// ── ifc_analyze_rebuildability ──
+export const IfcAnalyzeRebuildabilityInput = z.object({
+  categoryFilter: z
+    .string()
+    .optional()
+    .describe(
+      "OST category code to filter (e.g. 'OST_Walls'). Omit to analyze all IFC elements."
+    ),
+  maxElements: z
+    .number()
+    .optional()
+    .default(200)
+    .describe("Max elements to analyze. Default: 200"),
+});
+
+// ── ifc_list_rebuild_candidates ──
+export const IfcListRebuildCandidatesInput = z.object({
+  categoryFilter: z
+    .string()
+    .optional()
+    .describe("OST category code to filter. Omit for all categories."),
+  minConfidence: z
+    .number()
+    .optional()
+    .default(0.5)
+    .describe("Minimum rebuild confidence threshold (0.0-1.0). Default: 0.5"),
+  maxElements: z
+    .number()
+    .optional()
+    .default(100)
+    .describe("Max candidates to return. Default: 100"),
+});
+
+// ── ifc_rebuild_walls ──
+export const IfcRebuildWallsInput = z.object({
+  elementIds: z
+    .array(z.number())
+    .optional()
+    .describe("Specific DirectShape element IDs to rebuild. Omit to rebuild all wall candidates."),
+  wallTypeId: z
+    .number()
+    .optional()
+    .describe("WallType element ID to use. Omit to use the closest matching type by thickness."),
+  structural: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Mark rebuilt walls as structural. Default: false"),
+  dryRun: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Preview only, no changes made. Default: true"),
+});
+
+// ── ifc_rebuild_floors ──
+export const IfcRebuildFloorsInput = z.object({
+  elementIds: z
+    .array(z.number())
+    .optional()
+    .describe("Specific DirectShape element IDs to rebuild. Omit to rebuild all floor candidates."),
+  floorTypeId: z
+    .number()
+    .optional()
+    .describe("FloorType element ID to use. Omit to use the default floor type."),
+  dryRun: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Preview only, no changes made. Default: true"),
+});
+
+// ── ifc_rebuild_roofs ──
+export const IfcRebuildRoofsInput = z.object({
+  elementIds: z
+    .array(z.number())
+    .optional()
+    .describe("Specific DirectShape element IDs to rebuild. Omit to rebuild all roof candidates."),
+  roofTypeId: z
+    .number()
+    .optional()
+    .describe("RoofType element ID to use. Omit to use the default roof type."),
+  dryRun: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Preview only, no changes made. Default: true"),
+});
+
+// ── ifc_rebuild_structural_members ──
+export const IfcRebuildStructuralMembersInput = z.object({
+  elementIds: z
+    .array(z.number())
+    .optional()
+    .describe("Specific DirectShape element IDs to rebuild. Omit to rebuild all structural candidates."),
+  memberType: z
+    .enum(["columns", "beams", "all"])
+    .optional()
+    .default("all")
+    .describe("Which structural member type to rebuild. Default: all"),
+  familySymbolId: z
+    .number()
+    .optional()
+    .describe("FamilySymbol element ID to use. Omit to auto-select by cross-section."),
+  dryRun: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Preview only, no changes made. Default: true"),
+});
+
+// ── ifc_rebuild_openings ──
+export const IfcRebuildOpeningsInput = z.object({
+  elementIds: z
+    .array(z.number())
+    .optional()
+    .describe("Specific DirectShape element IDs representing openings. Omit to auto-detect."),
+  hostElementIds: z
+    .array(z.number())
+    .optional()
+    .describe("Host wall/floor element IDs to search for openings. Omit to search all rebuilt elements."),
+  dryRun: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Preview only, no changes made. Default: true"),
+});
+
+// ── ifc_rebuild_family_instances ──
+export const IfcRebuildFamilyInstancesInput = z.object({
+  elementIds: z
+    .array(z.number())
+    .optional()
+    .describe("Specific DirectShape element IDs to rebuild as family instances."),
+  categoryFilter: z
+    .enum(["OST_Doors", "OST_Windows", "OST_GenericModel"])
+    .optional()
+    .describe("Category to filter. Omit to rebuild doors and windows."),
+  dryRun: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Preview only, no changes made. Default: true"),
+});
+
+// ── ifc_compare_original_vs_rebuilt ──
+export const IfcCompareOriginalVsRebuiltInput = z.object({
+  originalElementId: z
+    .number()
+    .describe("Element ID of the original DirectShape (IFC import)"),
+  rebuiltElementId: z
+    .number()
+    .describe("Element ID of the rebuilt native Revit element"),
+});
+
+// ── ifc_tag_unreconstructable_elements ──
+export const IfcTagUnreconstructableElementsInput = z.object({
+  elementIds: z
+    .array(z.number())
+    .optional()
+    .describe("Specific element IDs to tag. Omit to tag all elements that failed rebuild analysis."),
+  tagValue: z
+    .string()
+    .optional()
+    .default("IFC_UNRECONSTRUCTABLE")
+    .describe("Value to set in the Comments parameter. Default: IFC_UNRECONSTRUCTABLE"),
+});

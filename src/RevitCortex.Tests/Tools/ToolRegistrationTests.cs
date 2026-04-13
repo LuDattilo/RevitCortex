@@ -101,8 +101,8 @@ public class ToolRegistrationTests
     public void ToolCount_MatchesExpected()
     {
         // Update this number when adding new tools to catch accidental omissions
-        Assert.True(AllToolTypes.Count >= 123,
-            $"Expected at least 123 tools but found {AllToolTypes.Count}. " +
+        Assert.True(AllToolTypes.Count >= 133,
+            $"Expected at least 133 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 

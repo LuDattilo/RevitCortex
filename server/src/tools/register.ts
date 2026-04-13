@@ -143,6 +143,16 @@ import { registerIfcExportWithConfigurationTool } from "./ifc_export_with_config
 import { registerIfcListExportConfigurationsTool } from "./ifc_list_export_configurations.js";
 import { registerIfcGetExportConfigurationTool } from "./ifc_get_export_configuration.js";
 import { registerIfcSetFamilyMappingFileTool } from "./ifc_set_family_mapping_file.js";
+import { registerIfcAnalyzeRebuildabilityTool } from "./ifc_analyze_rebuildability.js";
+import { registerIfcListRebuildCandidatesTool } from "./ifc_list_rebuild_candidates.js";
+import { registerIfcRebuildWallsTool } from "./ifc_rebuild_walls.js";
+import { registerIfcRebuildFloorsTool } from "./ifc_rebuild_floors.js";
+import { registerIfcRebuildRoofsTool } from "./ifc_rebuild_roofs.js";
+import { registerIfcRebuildStructuralMembersTool } from "./ifc_rebuild_structural_members.js";
+import { registerIfcRebuildOpeningsTool } from "./ifc_rebuild_openings.js";
+import { registerIfcRebuildFamilyInstancesTool } from "./ifc_rebuild_family_instances.js";
+import { registerIfcCompareOriginalVsRebuiltTool } from "./ifc_compare_original_vs_rebuilt.js";
+import { registerIfcTagUnreconstructableElementsTool } from "./ifc_tag_unreconstructable_elements.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -290,6 +300,16 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "ifc_list_export_configurations", register: registerIfcListExportConfigurationsTool },
   { name: "ifc_get_export_configuration", register: registerIfcGetExportConfigurationTool },
   { name: "ifc_set_family_mapping_file", register: registerIfcSetFamilyMappingFileTool },
+  { name: "ifc_analyze_rebuildability", register: registerIfcAnalyzeRebuildabilityTool },
+  { name: "ifc_list_rebuild_candidates", register: registerIfcListRebuildCandidatesTool },
+  { name: "ifc_rebuild_walls", register: registerIfcRebuildWallsTool },
+  { name: "ifc_rebuild_floors", register: registerIfcRebuildFloorsTool },
+  { name: "ifc_rebuild_roofs", register: registerIfcRebuildRoofsTool },
+  { name: "ifc_rebuild_structural_members", register: registerIfcRebuildStructuralMembersTool },
+  { name: "ifc_rebuild_openings", register: registerIfcRebuildOpeningsTool },
+  { name: "ifc_rebuild_family_instances", register: registerIfcRebuildFamilyInstancesTool },
+  { name: "ifc_compare_original_vs_rebuilt", register: registerIfcCompareOriginalVsRebuiltTool },
+  { name: "ifc_tag_unreconstructable_elements", register: registerIfcTagUnreconstructableElementsTool },
 ];
 
 export function registerTools(server: McpServer): void {

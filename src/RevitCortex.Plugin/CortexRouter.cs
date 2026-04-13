@@ -31,7 +31,8 @@ public class CortexRouter
         "get_", "list_", "find_", "analyze_", "check_",
         "measure_", "audit_", "export_", "say_hello",
         "clash_detection", "lines_per_view_count",
-        "ifc_get_", "ifc_list_", "ifc_export_", "ifc_validate_"
+        "ifc_get_", "ifc_list_", "ifc_export_", "ifc_validate_",
+        "ifc_analyze_", "ifc_compare_"
     };
 
     public CortexRouter(CortexSession session, IDocumentAnalyzer analyzer, AuditLogger? auditLogger = null)
