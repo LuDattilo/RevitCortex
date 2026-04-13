@@ -14,6 +14,22 @@ RevitCortex is a next-generation MCP (Model Context Protocol) server for Autodes
 | 2026          | net8.0-windows  |
 | 2027          | net10.0-windows |
 
+## Cross-Target Compatibility (net48 vs net8+)
+
+R2023 and R2024 target **net48**. Code that compiles on net8+ may fail on net48. Before using any C# feature, check this list:
+
+| Feature | net8+ | net48 | Fix |
+|---------|-------|-------|-----|
+| `record` types | OK | **ERROR** CS0518 (`IsExternalInit` missing) | Use `class` with readonly properties and constructor |
+| `Dictionary.GetValueOrDefault()` | OK | **ERROR** CS1061 | Use `TryGetValue` with ternary |
+| `init` property accessors | OK | **ERROR** CS0518 | Use `{ get; }` + constructor |
+| `Index`/`Range` (`^1`, `..`) | OK | **ERROR** | Use `.Length - 1`, `.Substring()` |
+| `IAsyncEnumerable<T>` | OK | **ERROR** | Not available on net48 |
+| `file`-scoped types | OK | **ERROR** | Use `internal` |
+| Default interface methods | OK | **ERROR** | Move to abstract class or separate method |
+
+**Rule**: After adding/modifying any C# file, always build for BOTH `Debug R25` (net8) AND `Debug R24` (net48) before committing. A green R25 build does NOT guarantee R24 will compile.
+
 ## Project Structure
 
 ```
