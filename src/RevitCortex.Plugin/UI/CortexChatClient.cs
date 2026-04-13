@@ -19,7 +19,26 @@ public class CortexChatClient
     private string? _apiKey;
     private const string ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
     private string _model = "claude-sonnet-4-6";
-    private const int MCP_PORT = 8080;
+    private static int MCP_PORT = 8080;
+
+    static CortexChatClient()
+    {
+        try
+        {
+            string settingsPath = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".revitcortex", "settings.json");
+            if (File.Exists(settingsPath))
+            {
+                var json = File.ReadAllText(settingsPath);
+                var settings = JObject.Parse(json);
+                var port = settings["Port"]?.ToObject<int>();
+                if (port.HasValue && port.Value > 0 && port.Value <= 65535)
+                    MCP_PORT = port.Value;
+            }
+        }
+        catch { /* fallback to 8080 */ }
+    }
     private CancellationTokenSource? _cts;
 
     public string Model

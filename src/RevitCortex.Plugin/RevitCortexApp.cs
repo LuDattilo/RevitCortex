@@ -19,9 +19,11 @@ public class RevitCortexApp : IExternalApplication
     private CortexSession? _session;
     private UIApplication? _uiApplication;
     private int _panelHideAttempts = 5;
+    private int _port = 8080;
 
     public static RevitCortexApp? Instance { get; private set; }
     public bool IsServiceRunning => _socketService?.IsRunning ?? false;
+    public int Port => _port;
     public UIApplication? UiApplication => _uiApplication;
     public CortexRouter? Router => _router;
 
@@ -68,12 +70,13 @@ public class RevitCortexApp : IExternalApplication
             var dispatcher = new RevitThreadDispatcher(executionHandler, externalEvent);
             _router.SetDispatcher(dispatcher);
 
-            // Load disabled tools and read-only mode from settings
+            // Load disabled tools, read-only mode, and port from settings
             LoadDisabledTools();
             LoadReadOnlyMode();
+            LoadPort();
 
             // Create socket service but do NOT start automatically
-            _socketService = new SocketService(_router);
+            _socketService = new SocketService(_router, _port);
 
             // Listen for document events
             application.ControlledApplication.DocumentOpened += OnDocumentOpened;
@@ -231,6 +234,34 @@ public class RevitCortexApp : IExternalApplication
             _router.OnDocumentChanged(doc, locale);
             System.Diagnostics.Trace.WriteLine(
                 $"[RevitCortex] Document switched: {doc.Title}, locale: {locale}");
+        }
+    }
+
+    private void LoadPort()
+    {
+        try
+        {
+            string settingsPath = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".revitcortex", "settings.json");
+            if (System.IO.File.Exists(settingsPath))
+            {
+                var json = System.IO.File.ReadAllText(settingsPath);
+                var settings = Newtonsoft.Json.JsonConvert.DeserializeObject<
+                    Newtonsoft.Json.Linq.JObject>(json);
+                var port = settings?["Port"]?.ToObject<int>();
+                if (port.HasValue && port.Value > 0 && port.Value <= 65535)
+                {
+                    _port = port.Value;
+                    System.Diagnostics.Trace.WriteLine(
+                        $"[RevitCortex] Port configured: {_port}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[RevitCortex] Could not load port setting: {ex.Message}");
         }
     }
 

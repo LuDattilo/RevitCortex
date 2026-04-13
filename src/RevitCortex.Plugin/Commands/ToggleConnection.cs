@@ -29,7 +29,7 @@ public class ToggleConnection : IExternalCommand
                 // Pass active document so the session is initialized immediately
                 var doc = commandData.Application.ActiveUIDocument?.Document;
                 app.StartService(doc);
-                TaskDialog.Show("RevitCortex", "Server started on port 8080.");
+                TaskDialog.Show("RevitCortex", $"Server started on port {app.Port}.");
             }
 
             return Result.Succeeded;

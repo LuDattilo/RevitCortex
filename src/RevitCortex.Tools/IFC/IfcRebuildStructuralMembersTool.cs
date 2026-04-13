@@ -67,6 +67,12 @@ public class IfcRebuildStructuralMembersTool : ICortexTool
         var results = new List<object>();
         int rebuilt = 0, skipped = 0;
 
+        if (!dryRun)
+        {
+            if (!session.RequestConfirmation("rebuild structural members", candidates.Count))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+        }
+
         foreach (var ds in candidates)
         {
             var catName = ds.Category?.Name ?? "";

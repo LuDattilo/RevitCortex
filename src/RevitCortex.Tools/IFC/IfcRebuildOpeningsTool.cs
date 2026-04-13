@@ -51,8 +51,8 @@ public class IfcRebuildOpeningsTool : ICortexTool
                 {
                     var ifcType = IfcGeometryHelper.GetIfcParameter(ds, "IfcExportAs")
                                ?? IfcGeometryHelper.GetIfcParameter(ds, "IfcType") ?? "";
-                    return ifcType.Contains("Opening", StringComparison.OrdinalIgnoreCase)
-                        || ifcType.Contains("IfcOpeningElement", StringComparison.OrdinalIgnoreCase);
+                    return ifcType.IndexOf("Opening", StringComparison.OrdinalIgnoreCase) >= 0
+                        || ifcType.IndexOf("IfcOpeningElement", StringComparison.OrdinalIgnoreCase) >= 0;
                 })
                 .ToList();
         }
@@ -77,6 +77,12 @@ public class IfcRebuildOpeningsTool : ICortexTool
 
         var results = new List<object>();
         int created = 0, skipped = 0;
+
+        if (!dryRun)
+        {
+            if (!session.RequestConfirmation("rebuild openings", openingCandidates.Count))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+        }
 
         foreach (var openingDs in openingCandidates)
         {

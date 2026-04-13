@@ -69,6 +69,12 @@ public class IfcRebuildRoofsTool : ICortexTool
         var results = new List<object>();
         int rebuilt = 0, skipped = 0;
 
+        if (!dryRun)
+        {
+            if (!session.RequestConfirmation("rebuild roofs", candidates.Count))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+        }
+
         foreach (var ds in candidates)
         {
             var solids = IfcGeometryHelper.GetSolids(ds);

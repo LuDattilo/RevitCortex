@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
@@ -40,59 +35,16 @@ public class SendCodeToRevitTool : ICortexTool
         if (sandboxResult != null)
             return sandboxResult;
 
-        try
-        {
-            // Store the code in session for the plugin layer to execute via Roslyn/CodeDom
-            // This tool acts as a bridge - the actual compilation and execution
-            // is handled by the Plugin layer which has access to the full Revit runtime
-            session.Store.Set("pendingCode", code);
-            session.Store.Set("pendingCodeTransaction", transactionMode);
+        // Store the code in session for the plugin layer to pick up
+        session.Store.Set("pendingCode", code);
+        session.Store.Set("pendingCodeTransaction", transactionMode);
 
-            // Try to evaluate the code using reflection-based approach
-            object? result = null;
-
-            if (transactionMode == "auto")
-            {
-                using var tx = new Transaction(doc, "RevitCortex: Execute Code");
-                tx.Start();
-                result = EvaluateSimpleCode(doc, code);
-                tx.Commit();
-            }
-            else
-            {
-                result = EvaluateSimpleCode(doc, code);
-            }
-
-            return CortexResult<object>.Ok(new
-            {
-                success = true,
-                result = result?.ToString() ?? "Code executed (no return value)",
-                resultType = result?.GetType().Name ?? "void"
-            });
-        }
-        catch (Exception ex)
-        {
-            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Code execution failed: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Evaluates simple code patterns that can be handled via reflection.
-    /// For complex code, the Plugin layer should handle compilation.
-    /// </summary>
-    private static object? EvaluateSimpleCode(Document document, string code)
-    {
-        // Handle common patterns:
-        // 1. FilteredElementCollector queries
-        // 2. Simple property reads
-        // 3. Element counts
-
-        // For now, execute via a known set of safe operations
-        // The full code execution capability requires the Plugin layer's
-        // Roslyn/CodeDom integration which has access to the full runtime
-
-        // Return the code as-is for logging/debugging
-        // The actual execution is delegated to the plugin infrastructure
-        return $"Code received ({code.Length} chars). Execution delegated to plugin runtime.";
+        return CortexResult<object>.Fail(CortexErrorCode.Unknown,
+            "Runtime code execution is not yet implemented. " +
+            $"Code ({code.Length} chars) was stored in session as 'pendingCode' " +
+            "but no Roslyn/CodeDom compiler is available to execute it.",
+            suggestion: "Use dedicated RevitCortex tools instead of raw C# code. " +
+                "For element queries use ai_element_filter, for parameter reads use get_element_parameters, " +
+                "for modifications use set_element_parameters or bulk_modify_parameter_values.");
     }
 }
