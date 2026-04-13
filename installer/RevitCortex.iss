@@ -8,7 +8,7 @@
 
 #define MyAppName "RevitCortex"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "GPA S.r.l."
+#define MyAppPublisher "Luigi Dattilo"
 #define MyAppURL "https://github.com/LuDattilo/RevitCortex"
 
 [Setup]
