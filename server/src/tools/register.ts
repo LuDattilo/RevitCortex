@@ -131,6 +131,7 @@ import { registerDeleteMaterialTool } from "./delete_material.js";
 import { registerGetCompoundStructureTool } from "./get_compound_structure.js";
 import { registerSetCompoundStructureTool } from "./set_compound_structure.js";
 import { registerDuplicateSystemTypeTool } from "./duplicate_system_type.js";
+import { registerDuplicateFamilyTypeTool } from "./duplicate_family_type.js";
 import { registerReportTokenUsageTool } from "./report_token_usage.js";
 import { logInfo } from "../logging/logger.js";
 
@@ -267,6 +268,7 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "get_compound_structure", register: registerGetCompoundStructureTool },
   { name: "set_compound_structure", register: registerSetCompoundStructureTool },
   { name: "duplicate_system_type", register: registerDuplicateSystemTypeTool },
+  { name: "duplicate_family_type", register: registerDuplicateFamilyTypeTool },
   { name: "report_token_usage", register: registerReportTokenUsageTool },
 ];
 
