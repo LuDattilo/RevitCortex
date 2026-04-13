@@ -107,7 +107,7 @@ public class IfcExportWithConfigurationTool : ICortexTool
 
         try
         {
-            var versionStr = configOptions.GetValueOrDefault("IFCVersion", "IFC4RV");
+            var versionStr = configOptions.TryGetValue("IFCVersion", out var v) ? v : "IFC4RV";
             Enum.TryParse<IFCVersion>(versionStr, ignoreCase: true, out var fileVersion);
 
             var options = new IFCExportOptions { FileVersion = fileVersion };
@@ -140,17 +140,31 @@ public class IfcExportWithConfigurationTool : ICortexTool
 
             using var tx = new Transaction(doc!, "RevitCortex: Export IFC (configured)");
             tx.Start();
-            var success = doc!.Export(outputDirectory, fileName, options);
+            var exportResult = doc!.Export(outputDirectory, fileName, options);
             tx.Commit();
 
             var actualFileName = string.IsNullOrEmpty(fileName) ? doc.Title : fileName;
+            var outputPath = Path.Combine(outputDirectory, actualFileName + ".ifc");
+
+            if (!exportResult)
+                return CortexResult<object>.Fail(CortexErrorCode.Unknown,
+                    $"Revit export returned false for {outputPath}",
+                    suggestion: "Check that the document contains exportable elements and the output path is writable");
+
+            if (!File.Exists(outputPath))
+                return CortexResult<object>.Fail(CortexErrorCode.Unknown,
+                    $"Export reported success but file was not written: {outputPath}",
+                    suggestion: "Check disk space, permissions, and antivirus exclusions for the output directory");
+
+            var fileInfo = new FileInfo(outputPath);
 
             return CortexResult<object>.Ok(new
             {
-                success,
                 configurationName = configName,
                 outputDirectory,
                 fileName = actualFileName + ".ifc",
+                outputPath,
+                fileSizeBytes = fileInfo.Length,
                 fileVersion = fileVersion.ToString(),
                 overridesApplied = overrides?.Count ?? 0,
             });

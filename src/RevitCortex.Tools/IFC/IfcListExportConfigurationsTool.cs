@@ -44,5 +44,15 @@ public class IfcListExportConfigurationsTool : ICortexTool
         });
     }
 
-    internal record ConfigInfo(string Version, string Description);
+    internal class ConfigInfo
+    {
+        public string Version { get; }
+        public string Description { get; }
+
+        public ConfigInfo(string version, string description)
+        {
+            Version = version;
+            Description = description;
+        }
+    }
 }
