@@ -133,6 +133,16 @@ import { registerSetCompoundStructureTool } from "./set_compound_structure.js";
 import { registerDuplicateSystemTypeTool } from "./duplicate_system_type.js";
 import { registerDuplicateFamilyTypeTool } from "./duplicate_family_type.js";
 import { registerReportTokenUsageTool } from "./report_token_usage.js";
+import { registerIfcGetCapabilitiesTool } from "./ifc_get_capabilities.js";
+import { registerIfcValidateRequestTool } from "./ifc_validate_request.js";
+import { registerIfcLinkTool } from "./ifc_link.js";
+import { registerIfcReloadLinkTool } from "./ifc_reload_link.js";
+import { registerIfcOpenOrImportTool } from "./ifc_open_or_import.js";
+import { registerIfcExportBasicTool } from "./ifc_export_basic.js";
+import { registerIfcExportWithConfigurationTool } from "./ifc_export_with_configuration.js";
+import { registerIfcListExportConfigurationsTool } from "./ifc_list_export_configurations.js";
+import { registerIfcGetExportConfigurationTool } from "./ifc_get_export_configuration.js";
+import { registerIfcSetFamilyMappingFileTool } from "./ifc_set_family_mapping_file.js";
 import { logInfo } from "../logging/logger.js";
 
 const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void }> = [
@@ -270,6 +280,16 @@ const toolRegistrations: Array<{ name: string; register: (s: McpServer) => void 
   { name: "duplicate_system_type", register: registerDuplicateSystemTypeTool },
   { name: "duplicate_family_type", register: registerDuplicateFamilyTypeTool },
   { name: "report_token_usage", register: registerReportTokenUsageTool },
+  { name: "ifc_get_capabilities", register: registerIfcGetCapabilitiesTool },
+  { name: "ifc_validate_request", register: registerIfcValidateRequestTool },
+  { name: "ifc_link", register: registerIfcLinkTool },
+  { name: "ifc_reload_link", register: registerIfcReloadLinkTool },
+  { name: "ifc_open_or_import", register: registerIfcOpenOrImportTool },
+  { name: "ifc_export_basic", register: registerIfcExportBasicTool },
+  { name: "ifc_export_with_configuration", register: registerIfcExportWithConfigurationTool },
+  { name: "ifc_list_export_configurations", register: registerIfcListExportConfigurationsTool },
+  { name: "ifc_get_export_configuration", register: registerIfcGetExportConfigurationTool },
+  { name: "ifc_set_family_mapping_file", register: registerIfcSetFamilyMappingFileTool },
 ];
 
 export function registerTools(server: McpServer): void {
