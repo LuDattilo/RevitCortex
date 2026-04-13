@@ -48,15 +48,31 @@ public class IfcLinkTool : ICortexTool
         try
         {
             var options = new RevitLinkOptions(false);
-            var linkResult = RevitLinkType.CreateFromIFC(
-                doc!, ifcFilePath, revitFilePath, recreateLink, options);
 
-            var linkTypeId = linkResult.ElementId;
-            if (linkTypeId == null || linkTypeId == ElementId.InvalidElementId)
-                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
-                    "CreateFromIFC returned an invalid element ID");
+            ElementId linkTypeId;
+            using (var tx = new Transaction(doc!, "RevitCortex: Link IFC"))
+            {
+                tx.Start();
+                var linkResult = RevitLinkType.CreateFromIFC(
+                    doc!, ifcFilePath, revitFilePath, recreateLink, options);
 
-            var instance = RevitLinkInstance.Create(doc!, linkTypeId);
+                linkTypeId = linkResult.ElementId;
+                if (linkTypeId == null || linkTypeId == ElementId.InvalidElementId)
+                {
+                    tx.RollBack();
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        "CreateFromIFC returned an invalid element ID");
+                }
+                tx.Commit();
+            }
+
+            RevitLinkInstance instance;
+            using (var tx2 = new Transaction(doc!, "RevitCortex: Place IFC Link"))
+            {
+                tx2.Start();
+                instance = RevitLinkInstance.Create(doc!, linkTypeId);
+                tx2.Commit();
+            }
 
             return CortexResult<object>.Ok(new
             {
