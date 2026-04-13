@@ -1,12 +1,12 @@
 # RevitCortex
 
-A next-generation **MCP (Model Context Protocol) server** for Autodesk Revit with 124 tools, typed errors, session state, dynamic tool discovery, and a built-in AI chat panel.
+A next-generation **MCP (Model Context Protocol) server** for Autodesk Revit with 154 tools, typed errors, session state, dynamic tool discovery, and a built-in AI chat panel.
 
 RevitCortex lets Claude (or any MCP-compatible LLM) read, create, modify, and analyze Revit models in real time -- from querying elements and parameters to creating views, sheets, schedules, and running full audit workflows.
 
 ## Features
 
-- **124 MCP tools** across 14 categories: Elements, Views, Sheets, Schedules, Parameters, Materials, Creation, Export, Audit, Workflows, Database, Journal, Code, and Meta
+- **154 MCP tools** across 15 categories: Elements, Views, Sheets, Schedules, Parameters, Materials, Creation, Export, Audit, Workflows, Database, IFC, Journal, Code, and Meta
 - **Typed results** -- every tool returns `CortexResult<T>` with structured error codes, not raw strings
 - **Session state** -- `CortexSession` persists data across tool calls within a session
 - **Dynamic tools** -- tools auto-hide when the active document doesn't support them
@@ -231,7 +231,7 @@ The environment variable takes priority. The API key is **not needed** for MCP c
 
 ### Via MCP Client (Claude Desktop / Claude Code)
 
-Once configured, Claude has access to all 124 tools. Examples:
+Once configured, Claude has access to all 154 tools. Examples:
 
 | Request | Tools Used |
 |---------|-----------|
@@ -240,6 +240,9 @@ Once configured, Claude has access to all 124 tools. Examples:
 | "Create a floor plan for each room" | `create_views_from_rooms` |
 | "Export all room data to Excel" | `export_to_excel` |
 | "Run a full model health check" | `workflow_model_audit` |
+| "Link this IFC file into the project" | `ifc_validate_request` → `ifc_link` |
+| "Analyze which IFC elements can become native Revit" | `ifc_analyze_rebuildability` |
+| "Rebuild all walls from the IFC import" | `ifc_rebuild_walls` |
 | "Delete all unused families" | `purge_unused` (shows confirmation dialog) |
 | "Color all doors red" | `color_elements` |
 | "How much did I use today?" | `report_token_usage` |
@@ -457,6 +460,31 @@ Use the `dryRun: true` parameter (where available) to preview changes without ap
 | `store_room_data` | Save room data to local SQLite |
 | `query_stored_data` | Query stored projects and rooms |
 
+### IFC (20 tools)
+
+| Tool | Description |
+|------|-------------|
+| `ifc_get_capabilities` | Detect IFC version support and revit-ifc add-in presence |
+| `ifc_validate_request` | Validate IFC file path, extension, and schema version |
+| `ifc_link` | Link an IFC file into the active document (RevitLinkType) |
+| `ifc_reload_link` | Reload an existing IFC link, optionally from a new file |
+| `ifc_open_or_import` | Open or import an IFC file using IFCImportOptions |
+| `ifc_export_basic` | Export to IFC with basic options (version, quantities, splitting) |
+| `ifc_export_with_configuration` | Export using named configurations with overrides |
+| `ifc_list_export_configurations` | List available built-in export configurations |
+| `ifc_get_export_configuration` | Get full details of a specific export configuration |
+| `ifc_set_family_mapping_file` | Set family mapping file for IFC exports (session) |
+| `ifc_analyze_rebuildability` | Analyze IFC DirectShapes for native reconstruction feasibility |
+| `ifc_list_rebuild_candidates` | List elements above a rebuild confidence threshold |
+| `ifc_rebuild_walls` | Rebuild native walls from IFC DirectShapes |
+| `ifc_rebuild_floors` | Rebuild native floors from IFC DirectShapes |
+| `ifc_rebuild_roofs` | Rebuild native roofs from IFC DirectShapes |
+| `ifc_rebuild_structural_members` | Rebuild columns and beams from IFC DirectShapes |
+| `ifc_rebuild_openings` | Cut openings in rebuilt walls/floors |
+| `ifc_rebuild_family_instances` | Place doors, windows from IFC DirectShapes |
+| `ifc_compare_original_vs_rebuilt` | Compare volume/geometry between original and rebuilt |
+| `ifc_tag_unreconstructable_elements` | Tag elements that cannot be rebuilt |
+
 ### Journal, Code, Meta (3 tools)
 
 | Tool | Description |
@@ -542,8 +570,8 @@ RevitCortex/
       database/                  SQLite modules (project data, usage tracking)
       journal/                   Revit journal file analysis (parser, analyzers)
       logging/                   Structured logging, token tracking, compaction
-      schemas/                   Zod schemas (14 schema files)
-      tools/                     Tool definitions (124 tools + register.ts)
+      schemas/                   Zod schemas (17 schema files)
+      tools/                     Tool definitions (154 tools + register.ts)
     index.ts                     Server entry point
     esbuild.config.mjs           Build configuration
     package.json                 npm dependencies
