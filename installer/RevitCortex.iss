@@ -94,7 +94,7 @@ Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""& {{
 
 [UninstallRun]
 ; Remove Claude Desktop config entry
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""& {{ $cp = Join-Path $env:APPDATA 'Claude\claude_desktop_config.json'; if (Test-Path $cp) {{ try {{ $c = Get-Content $cp -Raw | ConvertFrom-Json; if ($c.mcpServers -and $c.mcpServers.revitcortex) {{ $c.mcpServers.PSObject.Properties.Remove('revitcortex'); $c | ConvertTo-Json -Depth 10 | Set-Content $cp -Encoding UTF8 }} }} catch {{}} }} }}"""; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""& {{ $cp = Join-Path $env:APPDATA 'Claude\claude_desktop_config.json'; if (Test-Path $cp) {{ try {{ $c = Get-Content $cp -Raw | ConvertFrom-Json; if ($c.mcpServers -and $c.mcpServers.revitcortex) {{ $c.mcpServers.PSObject.Properties.Remove('revitcortex'); $c | ConvertTo-Json -Depth 10 | Set-Content $cp -Encoding UTF8 }} }} catch {{}} }} }}"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveClaudeDesktop"
 
 [Code]
 var
