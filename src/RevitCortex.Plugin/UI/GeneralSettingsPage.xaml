@@ -8,18 +8,46 @@
     <Grid Background="White">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,15">
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="General Settings" FontSize="22" FontWeight="SemiBold" Foreground="#333"/>
             <TextBlock Text="Configure server and plugin options" Foreground="#666" Margin="0,5,0,0"/>
         </StackPanel>
 
+        <!-- Connection Status Banner -->
+        <Border Grid.Row="1" x:Name="StatusBanner" CornerRadius="6" Padding="14,10"
+                Margin="0,0,0,15" Background="#F5F5F5" BorderThickness="1" BorderBrush="#E0E0E0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <!-- Status dot -->
+                <Ellipse x:Name="StatusDot" Grid.Column="0" Width="12" Height="12"
+                         VerticalAlignment="Center" Margin="0,0,10,0" Fill="#9E9E9E"/>
+                <!-- Status text -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock x:Name="StatusTitle" Text="Server stopped"
+                               FontSize="13" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock x:Name="StatusDetail" Text="Click 'Cortex Switch' in the ribbon to start"
+                               FontSize="11" Foreground="#666" Margin="0,2,0,0"/>
+                </StackPanel>
+                <!-- Port badge -->
+                <Border Grid.Column="2" x:Name="PortBadge" CornerRadius="4" Padding="8,3"
+                        Background="#E0E0E0" VerticalAlignment="Center">
+                    <TextBlock x:Name="PortBadgeText" FontSize="11" Foreground="#555"/>
+                </Border>
+            </Grid>
+        </Border>
+
         <!-- Form -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <Grid Margin="0,0,20,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="200"/>
@@ -115,7 +143,7 @@
         </ScrollViewer>
 
         <!-- Footer -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
             <Button Content="Reset Defaults" Padding="15,8" Margin="0,0,10,0" FontSize="13"
                     Background="#F5F5F5" Foreground="#333" BorderBrush="#E0E0E0"
                     Click="ResetDefaults_Click" Cursor="Hand"/>

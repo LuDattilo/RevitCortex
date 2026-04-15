@@ -1,10 +1,13 @@
 #if REVIT2025_OR_GREATER
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Threading;
+using System.Reflection;
+using System.Text;
 using Autodesk.Revit.DB;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
-using Microsoft.CodeAnalysis.Scripting;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
@@ -12,20 +15,13 @@ using RevitCortex.Core.Results;
 namespace RevitCortex.Tools.CodeExecution;
 
 /// <summary>
-/// Compiles and executes C# code snippets inside the Revit process using Roslyn Scripting API.
+/// Compiles and executes C# code snippets inside the Revit process using the Roslyn
+/// CSharpCompilation API (no Scripting layer — avoids CreateFromAssemblyInternal conflicts).
+/// Requires Revit 2025+ (net8).
 /// </summary>
 public static class RoslynExecutor
 {
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
-
-    private static readonly string[] AutoImports = new[]
-    {
-        "System",
-        "System.Linq",
-        "System.Collections.Generic",
-        "Autodesk.Revit.DB",
-        "Autodesk.Revit.UI",
-    };
+    private static readonly int PrefixLines = 12; // lines added by WrapCode before user code
 
     public static CortexResult<object> Execute(
         string code,
@@ -34,16 +30,68 @@ public static class RoslynExecutor
     {
         try
         {
-            var options = ScriptOptions.Default
-                .AddReferences(AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location)))
-                .AddImports(AutoImports);
+            var wrappedCode = WrapCode(code);
+
+            // Collect file-based references — deduplicate by simple name to avoid
+            // "assembly already imported" errors when multiple plugins load the same DLL
+            var refs = new List<MetadataReference>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    if (!asm.IsDynamic && !string.IsNullOrEmpty(asm.Location))
+                    {
+                        var name = asm.GetName().Name ?? string.Empty;
+                        if (seen.Add(name))
+                            refs.Add(MetadataReference.CreateFromFile(asm.Location));
+                    }
+                }
+                catch { }
+            }
+
+            var parseOptions = CSharpParseOptions.Default
+                .WithLanguageVersion(LanguageVersion.Latest);
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(wrappedCode, parseOptions);
+
+            var compilation = CSharpCompilation.Create(
+                assemblyName: $"RevitCortexScript_{Guid.NewGuid():N}",
+                syntaxTrees: new[] { syntaxTree },
+                references: refs,
+                options: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: OptimizationLevel.Release,
+                    allowUnsafe: false));
+
+            using var ms = new MemoryStream();
+            var emitResult = compilation.Emit(ms);
+
+            if (!emitResult.Success)
+            {
+                var errors = emitResult.Diagnostics
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d =>
+                    {
+                        var line = d.Location.GetLineSpan().StartLinePosition.Line + 1 - PrefixLines;
+                        return $"Line {line}: {d.GetMessage()}";
+                    });
+                return CortexResult<object>.Fail(
+                    CortexErrorCode.InvalidInput,
+                    $"Compilation error:\n{string.Join("\n", errors)}",
+                    suggestion: "Globals: document (Document), uiDocument (UIDocument), app (Application). Use explicit 'return'.");
+            }
+
+            ms.Seek(0, SeekOrigin.Begin);
+            var assembly = Assembly.Load(ms.ToArray());
+            var type = assembly.GetType("RevitCortex.DynamicScript.ScriptRunner")!;
+            var method = type.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
 
             object? result;
 
             if (transactionMode == "none")
             {
-                result = ExecuteScript(code, options, globals);
+                result = method.Invoke(null, new object[] { globals.document, globals.uiDocument, globals.app });
             }
             else
             {
@@ -51,7 +99,7 @@ public static class RoslynExecutor
                 tx.Start();
                 try
                 {
-                    result = ExecuteScript(code, options, globals);
+                    result = method.Invoke(null, new object[] { globals.document, globals.uiDocument, globals.app });
                     if (tx.GetStatus() == TransactionStatus.Started)
                         tx.Commit();
                 }
@@ -65,36 +113,42 @@ public static class RoslynExecutor
 
             return CortexResult<object>.Ok(SerializeResult(result));
         }
-        catch (CompilationErrorException ex)
-        {
-            var errors = string.Join("\n", ex.Diagnostics.Select(d => d.ToString()));
-            return CortexResult<object>.Fail(
-                CortexErrorCode.InvalidInput,
-                $"Compilation error:\n{errors}",
-                suggestion: "Check C# syntax. Globals: document (Document), uiDocument (UIDocument), app (Application). Auto-imports: System, System.Linq, Autodesk.Revit.DB, Autodesk.Revit.UI.");
-        }
-        catch (OperationCanceledException)
+        catch (TargetInvocationException ex) when (ex.InnerException != null)
         {
             return CortexResult<object>.Fail(
-                CortexErrorCode.Timeout,
-                $"Script execution timed out after {DefaultTimeout.TotalSeconds}s");
+                CortexErrorCode.Unknown,
+                $"Runtime error: {ex.InnerException.Message}",
+                suggestion: "Check variable names, null references, and Revit API usage.");
         }
         catch (Exception ex)
         {
-            var innerMsg = ex.InnerException?.Message ?? ex.Message;
             return CortexResult<object>.Fail(
                 CortexErrorCode.Unknown,
-                $"Runtime error: {innerMsg}",
-                suggestion: "Check variable names, null references, and Revit API usage.");
+                $"Execution error: {ex.Message}");
         }
     }
 
-    private static object? ExecuteScript(string code, ScriptOptions options, ScriptGlobals globals)
+    private static string WrapCode(string userCode)
     {
-        using var cts = new CancellationTokenSource(DefaultTimeout);
-        var task = CSharpScript.EvaluateAsync<object?>(
-            code, options, globals, typeof(ScriptGlobals), cts.Token);
-        return task.GetAwaiter().GetResult();
+        var sb = new StringBuilder();
+        sb.AppendLine("using System;");
+        sb.AppendLine("using System.Linq;");
+        sb.AppendLine("using System.Collections.Generic;");
+        sb.AppendLine("using Autodesk.Revit.DB;");
+        sb.AppendLine("using Autodesk.Revit.UI;");
+        sb.AppendLine("using Newtonsoft.Json.Linq;");
+        sb.AppendLine("namespace RevitCortex.DynamicScript {");
+        sb.AppendLine("  public static class ScriptRunner {");
+        sb.AppendLine("    public static object Run(");
+        sb.AppendLine("      Autodesk.Revit.DB.Document document,");
+        sb.AppendLine("      Autodesk.Revit.UI.UIDocument uiDocument,");
+        sb.AppendLine("      Autodesk.Revit.ApplicationServices.Application app) {");
+        sb.AppendLine(userCode);
+        sb.AppendLine("      return null;");
+        sb.AppendLine("    }");
+        sb.AppendLine("  }");
+        sb.AppendLine("}");
+        return sb.ToString();
     }
 
     private static object SerializeResult(object? result)
@@ -105,15 +159,13 @@ public static class RoslynExecutor
         if (result is string or int or long or double or float or bool or decimal)
             return new { result };
 
-        if (result is Element elem)
-        {
 #if REVIT2024_OR_GREATER
-            var id = elem.Id.Value;
+        if (result is Element elem)
+            return new { elementId = elem.Id.Value, name = elem.Name, category = elem.Category?.Name };
 #else
-            var id = elem.Id.IntegerValue;
+        if (result is Element elem)
+            return new { elementId = elem.Id.IntegerValue, name = elem.Name, category = elem.Category?.Name };
 #endif
-            return new { elementId = id, name = elem.Name, category = elem.Category?.Name };
-        }
 
         try
         {

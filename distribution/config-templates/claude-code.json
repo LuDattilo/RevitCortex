@@ -1,8 +1,7 @@
 {
   "mcpServers": {
     "revitcortex": {
-      "command": "dotnet",
-      "args": ["run", "--project", "__SERVER_PATH__"]
+      "command": "C:\\Users\\<YOUR_USERNAME>\\.revitcortex\\server\\RevitCortex.Server.exe"
     }
   }
 }

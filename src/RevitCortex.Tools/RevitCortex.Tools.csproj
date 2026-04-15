@@ -42,9 +42,9 @@
     <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitVersion).*" />
   </ItemGroup>
 
-  <!-- Roslyn Scripting for send_code_to_revit (net8+ only) -->
+  <!-- Roslyn Compiler for send_code_to_revit (net8+ only) — CSharpCompilation, no Scripting layer -->
   <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.12.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
   </ItemGroup>
 
   <ItemGroup>

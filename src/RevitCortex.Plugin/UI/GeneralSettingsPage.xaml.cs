@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace RevitCortex.Plugin.UI;
 
@@ -23,6 +24,35 @@ public partial class GeneralSettingsPage : Page
         InitializeComponent();
         LoadSettings();
         LoadVersionInfo();
+        RefreshConnectionStatus();
+    }
+
+    private void RefreshConnectionStatus()
+    {
+        var app = RevitCortexApp.Instance;
+        bool running = app?.IsServiceRunning ?? false;
+        int port = app?.Port ?? 8080;
+
+        if (running)
+        {
+            StatusDot.Fill = new SolidColorBrush(Color.FromRgb(46, 125, 50));   // green
+            StatusBanner.Background = new SolidColorBrush(Color.FromRgb(232, 245, 233));
+            StatusBanner.BorderBrush = new SolidColorBrush(Color.FromRgb(165, 214, 167));
+            StatusTitle.Text = "Server running";
+            StatusDetail.Text = $"Listening on localhost:{port} — ready for AI commands";
+            PortBadgeText.Text = $"Port {port}";
+            PortBadge.Background = new SolidColorBrush(Color.FromRgb(165, 214, 167));
+        }
+        else
+        {
+            StatusDot.Fill = new SolidColorBrush(Color.FromRgb(158, 158, 158)); // gray
+            StatusBanner.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
+            StatusBanner.BorderBrush = new SolidColorBrush(Color.FromRgb(224, 224, 224));
+            StatusTitle.Text = "Server stopped";
+            StatusDetail.Text = "Click 'Cortex Switch' in the ribbon to start";
+            PortBadgeText.Text = $"Port {port}";
+            PortBadge.Background = new SolidColorBrush(Color.FromRgb(224, 224, 224));
+        }
     }
 
     private void LoadSettings()

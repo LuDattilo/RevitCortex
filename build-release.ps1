@@ -54,22 +54,20 @@ foreach ($rv in @("R23", "R24", "R25", "R26", "R27")) {
 if ($builtVersions.Count -eq 0) { throw "No Revit versions built successfully" }
 Write-Host "  Built: $($builtVersions -join ', ')" -ForegroundColor Green
 
-# --- Build TypeScript server ---
+# --- Build C# MCP server (self-contained, win-x64) ---
 Write-Host ""
-Write-Host "[2/4] Building TypeScript server..." -ForegroundColor Yellow
+Write-Host "[2/4] Building C# MCP server..." -ForegroundColor Yellow
 
-Push-Location (Join-Path $RepoRoot "server")
-npm install --silent 2>$null
-npm run build
-Pop-Location
-
+$serverProject = Join-Path $RepoRoot "src\RevitCortex.Server\RevitCortex.Server.csproj"
 $serverTarget = Join-Path $ReleaseDir "server"
-New-Item -ItemType Directory -Path "$serverTarget\build" -Force | Out-Null
-Copy-Item (Join-Path $RepoRoot "server\build\index.js") "$serverTarget\build\"
-Copy-Item (Join-Path $RepoRoot "server\build\sql-wasm.wasm") "$serverTarget\build\"
-Copy-Item (Join-Path $RepoRoot "server\package.json") "$serverTarget\"
 
-Write-Host "  Server built and copied." -ForegroundColor Green
+dotnet publish $serverProject -c Release -o $serverTarget --self-contained true -r win-x64 -v quiet 2>$null
+if ($LASTEXITCODE -ne 0) { throw "MCP server build failed" }
+
+$exePath = Join-Path $serverTarget "RevitCortex.Server.exe"
+if (!(Test-Path $exePath)) { throw "Server executable not found after publish: $exePath" }
+
+Write-Host "  Server built: $exePath" -ForegroundColor Green
 
 # --- Copy support files ---
 Write-Host ""

@@ -19,6 +19,7 @@ public class RevitCortexApp : IExternalApplication
     private CortexSession? _session;
     private UIApplication? _uiApplication;
     private int _port = 8080;
+    private Autodesk.Revit.UI.PushButton? _connectButton;
 
     public static RevitCortexApp? Instance { get; private set; }
     public bool IsServiceRunning => _socketService?.IsRunning ?? false;
@@ -109,17 +110,33 @@ public class RevitCortexApp : IExternalApplication
             {
                 var locale = LocaleDetector.Detect(activeDocument);
                 _router.OnDocumentChanged(activeDocument, locale);
+                // Re-store UIApplication after session reinitialize (needed by send_code_to_revit)
+                if (_uiApplication != null)
+                    _session?.Store.Set("uiApplication", _uiApplication);
                 System.Diagnostics.Trace.WriteLine(
                     $"[RevitCortex] Session initialized with document: {activeDocument.Title}, locale: {locale}");
             }
 
             _socketService.Start();
+            UpdateConnectionButtonIcon();
         }
     }
 
     public void StopService()
     {
         _socketService?.Stop();
+        UpdateConnectionButtonIcon();
+    }
+
+    private void UpdateConnectionButtonIcon()
+    {
+        if (_connectButton == null) return;
+        bool active = IsServiceRunning;
+        _connectButton.Image = IconFactory.CreateConnectionIcon(16, active);
+        _connectButton.LargeImage = IconFactory.CreateConnectionIcon(32, active);
+        _connectButton.ToolTip = active
+            ? $"RevitCortex running on port {_port} — click to stop"
+            : "Start RevitCortex server";
     }
 
     private void CreateRibbonPanel(UIControlledApplication application)
@@ -128,13 +145,13 @@ public class RevitCortexApp : IExternalApplication
         string assemblyLocation = Assembly.GetExecutingAssembly().Location;
 
         // Connection toggle button
-        var connectBtn = new PushButtonData(
+        var connectBtnData = new PushButtonData(
             "ID_CORTEX_TOGGLE", "Cortex\r\nSwitch",
             assemblyLocation, "RevitCortex.Plugin.Commands.ToggleConnection");
-        connectBtn.ToolTip = "Start / Stop RevitCortex server";
-        connectBtn.Image = IconFactory.CreateConnectionIcon(16);
-        connectBtn.LargeImage = IconFactory.CreateConnectionIcon(32);
-        panel.AddItem(connectBtn);
+        connectBtnData.ToolTip = "Start RevitCortex server";
+        connectBtnData.Image = IconFactory.CreateConnectionIcon(16, false);
+        connectBtnData.LargeImage = IconFactory.CreateConnectionIcon(32, false);
+        _connectButton = panel.AddItem(connectBtnData) as Autodesk.Revit.UI.PushButton;
 
         // Settings button
         var settingsBtn = new PushButtonData(
@@ -153,6 +170,10 @@ public class RevitCortexApp : IExternalApplication
 
         var locale = LocaleDetector.Detect(doc);
         _router!.OnDocumentChanged(doc, locale);
+
+        // Re-store UIApplication after session reinitialize (needed by send_code_to_revit)
+        if (_uiApplication != null)
+            _session?.Store.Set("uiApplication", _uiApplication);
 
         System.Diagnostics.Trace.WriteLine(
             $"[RevitCortex] Document opened. Locale: {locale}, " +
@@ -221,6 +242,9 @@ public class RevitCortexApp : IExternalApplication
         {
             var locale = LocaleDetector.Detect(doc);
             _router.OnDocumentChanged(doc, locale);
+            // Re-store UIApplication after session reinitialize (needed by send_code_to_revit)
+            if (_uiApplication != null)
+                _session?.Store.Set("uiApplication", _uiApplication);
             System.Diagnostics.Trace.WriteLine(
                 $"[RevitCortex] Document switched: {doc.Title}, locale: {locale}");
         }

@@ -15,11 +15,14 @@ public static class IconFactory
     private static readonly Color TealPrimary = Color.FromRgb(0, 131, 143);   // #00838F
     private static readonly Color TealDark = Color.FromRgb(0, 96, 100);       // #006064
     private static readonly Color IndigoAccent = Color.FromRgb(92, 107, 192); // #5C6BC0
+    private static readonly Color ActiveGreen = Color.FromRgb(46, 125, 50);   // #2E7D32
+    private static readonly Color InactiveGray = Color.FromRgb(97, 97, 97);   // #616161
 
-    /// <summary>Connection icon: lightning bolt on teal background</summary>
-    public static BitmapSource CreateConnectionIcon(int size)
+    /// <summary>Connection icon: lightning bolt. Green when active, gray when stopped.</summary>
+    public static BitmapSource CreateConnectionIcon(int size, bool isActive = false)
     {
-        return CreateIconWithDrawing(size, TealPrimary, (dc, s) =>
+        var bg = isActive ? ActiveGreen : InactiveGray;
+        return CreateIconWithDrawing(size, bg, (dc, s) =>
         {
             // Lightning bolt
             double m = s * 0.2; // margin

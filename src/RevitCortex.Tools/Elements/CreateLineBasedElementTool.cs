@@ -159,7 +159,7 @@ public class CreateLineBasedElementTool : ICortexTool
                     wallType = new FilteredElementCollector(doc)
                         .OfClass(typeof(WallType))
                         .Cast<WallType>()
-                        .FirstOrDefault();
+                        .FirstOrDefault(wt => wt.Kind == WallKind.Basic);
                     if (wallType == null)
                     {
                         warnings.Add("No wall types available in project.");

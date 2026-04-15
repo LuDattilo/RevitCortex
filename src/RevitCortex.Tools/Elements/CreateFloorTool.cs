@@ -20,7 +20,7 @@ public class CreateFloorTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates a floor from boundary points or a room boundary.";
+    public string Description => "Creates an architectural floor (category: Floors) from boundary points or a room boundary. For structural foundation slabs use create_surface_based_element with category OST_StructuralFoundation. If a floorTypeName is not provided, defaults to the first architectural floor type (OST_Floors) in the project.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -44,12 +44,14 @@ public class CreateFloorTool : ICortexTool
                 : null;
             if (floorType == null && !string.IsNullOrEmpty(floorTypeName))
             {
-                var defaultType = new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>().FirstOrDefault();
+                var defaultType = new FilteredElementCollector(doc).OfClass(typeof(FloorType))
+                    .OfCategory(BuiltInCategory.OST_Floors).Cast<FloorType>().FirstOrDefault();
                 if (defaultType != null)
-                    floorTypeWarning = $"Floor type '{floorTypeName}' not found. Used default type '{defaultType.Name}'.";
+                    floorTypeWarning = $"Floor type '{floorTypeName}' not found. Used default architectural floor type '{defaultType.Name}'.";
                 floorType = defaultType;
             }
-            floorType ??= new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>().FirstOrDefault();
+            floorType ??= new FilteredElementCollector(doc).OfClass(typeof(FloorType))
+                .OfCategory(BuiltInCategory.OST_Floors).Cast<FloorType>().FirstOrDefault();
 
             if (floorType == null)
                 return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No floor types available");
