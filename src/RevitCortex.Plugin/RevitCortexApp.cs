@@ -67,7 +67,7 @@ public class RevitCortexApp : IExternalApplication
             application.ControlledApplication.DocumentOpened += OnDocumentOpened;
             application.ControlledApplication.DocumentClosing += OnDocumentClosing;
 
-            // Capture UIApplication when Revit is idle (needed for chat panel chips)
+            // Capture UIApplication when Revit is idle (needed for ViewActivated hook)
             application.Idling += OnIdling;
 
             System.Diagnostics.Trace.WriteLine(
@@ -146,7 +146,7 @@ public class RevitCortexApp : IExternalApplication
         panel.AddItem(settingsBtn);
     }
 
-    private void OnDocumentOpened(object sender, DocumentOpenedEventArgs args)
+    private void OnDocumentOpened(object? sender, DocumentOpenedEventArgs args)
     {
         var doc = args.Document;
         if (doc == null) return;
@@ -159,7 +159,7 @@ public class RevitCortexApp : IExternalApplication
             $"Capabilities: {_router!.GetAvailableToolNames().Count} tools available");
     }
 
-    private void OnDocumentClosing(object sender, DocumentClosingEventArgs args)
+    private void OnDocumentClosing(object? sender, DocumentClosingEventArgs args)
     {
         try
         {

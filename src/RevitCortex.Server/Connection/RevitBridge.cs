@@ -76,7 +76,7 @@ public sealed class RevitBridge : IDisposable
                 throw new InvalidOperationException(errMsg);
             }
 
-            return response["result"]!;
+            return response["result"] ?? JValue.CreateNull();
         }
 
         throw new TimeoutException($"Command '{method}' timed out after {_commandTimeout.TotalSeconds}s");

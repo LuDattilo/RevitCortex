@@ -275,4 +275,14 @@ public static class CreationTools
         var result = await revit.ExecuteAsync("batch_export", JObject.Parse(data), ct);
         return result.ToString();
     }
+
+    [McpServerTool(Name = "import_table"), Description("Import CSV/TSV file as a formatted table in a drafting or legend view.")]
+    public static async Task<string> ImportTable(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("import_table", JObject.Parse(data), ct);
+        return result.ToString();
+    }
 }
