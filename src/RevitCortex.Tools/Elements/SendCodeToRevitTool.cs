@@ -4,20 +4,22 @@ using RevitCortex.Core.Results;
 using RevitCortex.Core.Security;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.CodeExecution;
 
 namespace RevitCortex.Tools.Elements;
 
 /// <summary>
 /// Executes custom C# code snippets in the Revit context.
-/// Uses Roslyn scripting when available, otherwise evaluates simple expressions.
+/// Uses Roslyn Scripting on Revit 2025+ (net8), CSharpCodeProvider on Revit 2023/2024 (net48).
 /// </summary>
 public class SendCodeToRevitTool : ICortexTool
 {
     public string Name => "send_code_to_revit";
-    public string Category => "Elements";
+    public string Category => "Code";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Executes custom C# code snippets in the Revit context. Uses Roslyn scripting when available, otherwise evaluates simple expressions.";
+    public string Description => "Execute custom C# code in the Revit context. Globals: document (Document), uiDocument (UIDocument), app (Application). Auto-imports: System, System.Linq, Autodesk.Revit.DB, Autodesk.Revit.UI. On Revit 2023/2024 use explicit 'return' statements.";
+
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -35,16 +37,25 @@ public class SendCodeToRevitTool : ICortexTool
         if (sandboxResult != null)
             return sandboxResult;
 
-        // Store the code in session for the plugin layer to pick up
-        session.Store.Set("pendingCode", code);
-        session.Store.Set("pendingCodeTransaction", transactionMode);
+        // Build globals from session
+        var uiApp = session.Store.Get<object>("uiApplication") as Autodesk.Revit.UI.UIApplication;
+        var uiDoc = uiApp?.ActiveUIDocument;
 
-        return CortexResult<object>.Fail(CortexErrorCode.Unknown,
-            "Runtime code execution is not yet implemented. " +
-            $"Code ({code.Length} chars) was stored in session as 'pendingCode' " +
-            "but no Roslyn/CodeDom compiler is available to execute it.",
-            suggestion: "Use dedicated RevitCortex tools instead of raw C# code. " +
-                "For element queries use ai_element_filter, for parameter reads use get_element_parameters, " +
-                "for modifications use set_element_parameters or bulk_modify_parameter_values.");
+        if (uiDoc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "UIApplication not available in session");
+
+        var globals = new ScriptGlobals
+        {
+            document = doc,
+            uiDocument = uiDoc,
+            app = uiApp!.Application
+        };
+
+#if REVIT2025_OR_GREATER
+        return RoslynExecutor.Execute(code, globals, transactionMode);
+#else
+        return CodeDomExecutor.Execute(code, globals, transactionMode);
+#endif
     }
 }

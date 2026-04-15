@@ -194,6 +194,9 @@ public class RevitCortexApp : IExternalApplication
         {
             _uiApplication.ViewActivated += OnViewActivated;
 
+            // Store UIApplication in session for send_code_to_revit
+            _session?.Store.Set("uiApplication", _uiApplication);
+
             // If a document is already open, initialize the session now
             var doc = _uiApplication.ActiveUIDocument?.Document;
             if (doc != null && _router != null &&
