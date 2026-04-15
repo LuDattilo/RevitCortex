@@ -4,7 +4,7 @@ import { withRevitConnection } from "../connection/ConnectionManager.js";
 import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerBatchRenameTool(server: McpServer): void {
-  server.tool("batch_rename", "Batch rename views, sheets, levels, grids, or rooms", BatchRenameInput.shape, async (args) => {
+  server.tool("batch_rename", "Batch rename views, sheets, levels, grids, rooms, or system types (wall/floor/ceiling/roof types)", BatchRenameInput.shape, async (args) => {
     const start = Date.now();
     try {
       const result = await withRevitConnection(async (client) => {

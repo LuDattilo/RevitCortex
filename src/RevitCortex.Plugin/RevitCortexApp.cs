@@ -80,6 +80,7 @@ public class RevitCortexApp : IExternalApplication
 
             // Listen for document events
             application.ControlledApplication.DocumentOpened += OnDocumentOpened;
+            application.ControlledApplication.DocumentClosing += OnDocumentClosing;
 
             // Capture UIApplication when Revit is idle (needed for chat panel chips)
             application.Idling += OnIdling;
@@ -102,6 +103,7 @@ public class RevitCortexApp : IExternalApplication
         {
             _socketService?.Stop();
             application.ControlledApplication.DocumentOpened -= OnDocumentOpened;
+            application.ControlledApplication.DocumentClosing -= OnDocumentClosing;
             application.Idling -= OnIdling;
             if (_uiApplication != null)
                 _uiApplication.ViewActivated -= OnViewActivated;
@@ -179,6 +181,37 @@ public class RevitCortexApp : IExternalApplication
         System.Diagnostics.Trace.WriteLine(
             $"[RevitCortex] Document opened. Locale: {locale}, " +
             $"Capabilities: {_router!.GetAvailableToolNames().Count} tools available");
+    }
+
+    private void OnDocumentClosing(object sender, DocumentClosingEventArgs args)
+    {
+        try
+        {
+            // Stop the TCP server to prevent stale commands reaching a different document
+            if (_socketService != null && _socketService.IsRunning)
+            {
+                _socketService.Stop();
+                System.Diagnostics.Trace.WriteLine(
+                    "[RevitCortex] Server stopped: document closing");
+            }
+
+            // Clear session state (store, capabilities, locale)
+            _session?.Reinitialize(new Core.Discovery.DocumentCapabilities(), "en");
+
+            // Clear the chat panel history
+            CortexPanel.Instance?.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                CortexPanel.Instance?.OnDocumentClosing();
+            }));
+
+            System.Diagnostics.Trace.WriteLine(
+                "[RevitCortex] Session reset: document closing");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[RevitCortex] Error on document closing: {ex.Message}");
+        }
     }
 
     private void OnIdling(object? sender, Autodesk.Revit.UI.Events.IdlingEventArgs e)

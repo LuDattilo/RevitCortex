@@ -12,7 +12,7 @@ using RevitCortex.Tools.Utilities;
 namespace RevitCortex.Tools.Elements;
 
 /// <summary>
-/// Batch renames elements (views, sheets, levels, grids, rooms) using find/replace, prefix, suffix, or regex.
+/// Batch renames elements (views, sheets, levels, grids, rooms, system types) using find/replace, prefix, or suffix.
 /// </summary>
 public class BatchRenameTool : ICortexTool
 {
@@ -20,7 +20,7 @@ public class BatchRenameTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Batch renames elements (views, sheets, levels, grids, rooms) using find/replace, prefix, suffix, or regex.";
+    public string Description => "Batch renames elements (views, sheets, levels, grids, rooms) or system types (wall types, floor types, ceiling types, roof types) using find/replace, prefix, or suffix.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -64,6 +64,10 @@ public class BatchRenameTool : ICortexTool
                     "grids" => new FilteredElementCollector(doc).OfClass(typeof(Grid)).Cast<Element>(),
                     "rooms" => new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Rooms)
                         .WhereElementIsNotElementType().Cast<Element>(),
+                    "walltypes" => new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<Element>(),
+                    "floortypes" => new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<Element>(),
+                    "ceilingtypes" => new FilteredElementCollector(doc).OfClass(typeof(CeilingType)).Cast<Element>(),
+                    "rooftypes" => new FilteredElementCollector(doc).OfClass(typeof(RoofType)).Cast<Element>(),
                     _ => Enumerable.Empty<Element>()
                 }).ToList();
             }

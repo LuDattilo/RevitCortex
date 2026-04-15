@@ -305,6 +305,24 @@ public partial class CortexPanel : Page
         TypingText.Text = "Cancelling...";
     }
 
+    /// <summary>
+    /// Called when the active document is closing. Resets chat and client state
+    /// so commands and context from one document don't leak into another.
+    /// </summary>
+    public void OnDocumentClosing()
+    {
+        _messages.Clear();
+        _client?.ClearHistory();
+        _client = null; // Force new client with fresh conversation on next document
+        _chips.Clear();
+        ChipsBar.Visibility = Visibility.Collapsed;
+        _isProcessing = false;
+        SendButton.IsEnabled = true;
+        TypingIndicator.Visibility = Visibility.Collapsed;
+        AddMessage("assistant",
+            "Document closed. Open a new document and click \"Cortex Switch\" to reconnect.");
+    }
+
     private void ClearChat_Click(object sender, MouseButtonEventArgs e)
     {
         _messages.Clear();

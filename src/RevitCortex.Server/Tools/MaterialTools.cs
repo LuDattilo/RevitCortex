@@ -1,0 +1,66 @@
+using System.ComponentModel;
+using ModelContextProtocol.Server;
+using Newtonsoft.Json.Linq;
+using RevitCortex.Server.Connection;
+
+namespace RevitCortex.Server.Tools;
+
+[McpServerToolType]
+public static class MaterialTools
+{
+    [McpServerTool(Name = "get_materials"), Description("List all materials in the active Revit document.")]
+    public static async Task<string> GetMaterials(
+        RevitConnectionManager revit,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("get_materials", new JObject(), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "create_material"), Description("Create a new material in the Revit project.")]
+    public static async Task<string> CreateMaterial(
+        RevitConnectionManager revit,
+        [Description("Material name")] string name,
+        [Description("Material class (e.g. Concrete, Finish, Insulation)")] string? materialClass = null,
+        [Description("Color as hex string (e.g. #808080)")] string? color = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["name"] = name };
+        if (materialClass != null) p["materialClass"] = materialClass;
+        if (color != null) p["color"] = color;
+        var result = await revit.ExecuteAsync("create_material", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "get_compound_structure"), Description("Get wall/floor/roof/ceiling layer structure by type ID or name.")]
+    public static async Task<string> GetCompoundStructure(
+        RevitConnectionManager revit,
+        [Description("Type element ID")] int? typeId = null,
+        [Description("Type name")] string? typeName = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (typeId != null) p["typeId"] = typeId;
+        if (typeName != null) p["typeName"] = typeName;
+        var result = await revit.ExecuteAsync("get_compound_structure", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "set_compound_structure"), Description("Set or replace compound structure layers on a wall/floor/roof/ceiling type.")]
+    public static async Task<string> SetCompoundStructure(
+        RevitConnectionManager revit,
+        [Description("Type element ID")] int typeId,
+        [Description("Layer definitions as JSON array: [{function, materialName, widthMm}]")] string layers,
+        [Description("Preview changes without applying")] bool dryRun = true,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["typeId"] = typeId,
+            ["dryRun"] = dryRun,
+            ["layers"] = JArray.Parse(layers),
+        };
+        var result = await revit.ExecuteAsync("set_compound_structure", p, ct);
+        return result.ToString();
+    }
+}

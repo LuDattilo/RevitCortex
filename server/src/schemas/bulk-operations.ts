@@ -46,8 +46,8 @@ export const SetMaterialPropertiesInput = z.object({
 });
 
 export const BatchRenameInput = z.object({
-  elementIds: z.array(z.number()).optional().describe("Specific element IDs to rename"),
-  targetCategory: z.enum(["Views", "Sheets", "Levels", "Grids", "Rooms"]).optional().describe("Target category"),
+  elementIds: z.array(z.number()).optional().describe("Specific element IDs to rename (works for any element including system types)"),
+  targetCategory: z.enum(["Views", "Sheets", "Levels", "Grids", "Rooms", "WallTypes", "FloorTypes", "CeilingTypes", "RoofTypes"]).optional().describe("Target category to rename"),
   findText: z.string().optional().describe("Text to find"),
   replaceText: z.string().optional().describe("Replacement text"),
   prefix: z.string().optional().describe("Prefix to add"),

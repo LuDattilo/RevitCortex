@@ -1,5 +1,7 @@
 # RevitCortex -- AI Assistant Guide
 
+Flussi operativi collaudati: vedere WORKFLOWS.md
+
 ## Project Overview
 
 RevitCortex is a next-generation MCP (Model Context Protocol) server for Autodesk Revit. It improves on the original mcp-servers-for-revit with typed errors, session state, and dynamic tool discovery. Tools are rewritten from scratch -- not copied from the fork reference.
@@ -178,6 +180,8 @@ node server/generate-tool-schemas.mjs
 ### Fundamental Rule
 
 > Before calling any tool, ask: **do I already have this information in the current conversation context?** If yes, do not call the tool again.
+
+> Quando in una sessione si trova un flusso che funziona e non e gia in WORKFLOWS.md, aggiornare WORKFLOWS.md prima di chiudere la sessione -- questo vale anche se il flusso sembra ovvio.
 
 ### Default Parameters to Override
 
