@@ -56,26 +56,23 @@ RevitCortex/
       Results/                  CortexResultTests
       Router/                   CortexRouterTests, FakeTool, FakeAnalyzer
       Session/                  SessionStoreTests
-  server/                     TypeScript MCP server (stdio transport)
-    src/
-      connection/               TCP connection to Plugin
-      logging/                  Structured logging
-      schemas/                  Zod schemas
-      tools/                    Tool definitions
-    index.ts                    Entry point
+  src/RevitCortex.Server/     C# MCP server (stdio transport)
+    Program.cs                  Entry point (MCP hosting)
+    Connection/RevitBridge.cs   TCP bridge to Plugin
+    Tools/                      149 tool definitions (9 files)
 ```
 
 ## Architecture: Layer Cake
 
 ```
-MCP Server (TypeScript) -> SocketService -> CortexRouter -> ICortexTool
+MCP Server (C#) -> SocketService -> CortexRouter -> ICortexTool
                                                 |
                                           CortexSession
                                                 |
                                     DocumentCapabilities
 ```
 
-- **MCP Server (TypeScript)** -- Zod validation, JSON schema generation, stdio transport to Claude.
+- **MCP Server (C#)** -- ModelContextProtocol SDK, stdio transport to Claude. Located in `src/RevitCortex.Server/`.
 - **SocketService (C#)** -- TCP listener, JSON-RPC framing between TS server and C# plugin.
 - **CortexRouter (C#)** -- Deserializes the JSON-RPC request, finds the matching ICortexTool by name, invokes it with CortexSession, returns CortexResult.
 - **ICortexTool (C#)** -- Unified interface for all tools.
@@ -95,10 +92,10 @@ dotnet build -c "Debug R26" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   #
 dotnet build -c "Debug R27" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2027
 ```
 
-### TypeScript MCP Server
+### C# MCP Server
 
 ```bash
-cd server && npm install && npm run build
+dotnet build src/RevitCortex.Server/RevitCortex.Server.csproj
 ```
 
 ### Tests
@@ -307,18 +304,16 @@ When adding new destructive tools, always call `session.RequestConfirmation("act
 
 ## UI Components
 
-The plugin includes a Revit ribbon panel and dockable chat panel:
+The plugin includes a Revit ribbon panel with two buttons (Cortex Switch, Settings) and a settings window for port, log level, and tool visibility.
 
-- **Commands/** -- IExternalCommand classes: ToggleConnection, ToggleCortexPanel, OpenSettings
-- **UI/CortexPanel** -- WPF dockable chat panel with prompt chips, chat export, status indicator
-- **UI/CortexChatClient** -- Anthropic API client (tool use loop, thinking, retry on 429/529)
-- **UI/SettingsWindow** -- General settings, API key, tools enable/disable
+- **Commands/** -- IExternalCommand classes: ToggleConnection, OpenSettings
+- **UI/SettingsWindow** -- General settings, tools enable/disable
 - **UI/IconFactory** -- Generates ribbon icons programmatically (no PNG files)
 - **UI/ConfirmationHelper** -- TaskDialog for destructive operations
 
 The server is **off by default** -- user must click "Cortex Switch" in the ribbon to start it.
 
-Settings are stored in `~/.revitcortex/settings.json` (port, log level, model, disabled tools).
+Settings are stored in `~/.revitcortex/settings.json` (port, log level, disabled tools).
 
 ## Deploy
 

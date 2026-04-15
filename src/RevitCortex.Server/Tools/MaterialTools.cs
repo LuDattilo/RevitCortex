@@ -63,4 +63,54 @@ public static class MaterialTools
         var result = await revit.ExecuteAsync("set_compound_structure", p, ct);
         return result.ToString();
     }
+
+    [McpServerTool(Name = "get_material_properties"), Description("Get detailed material properties including structural and thermal data")]
+    public static async Task<string> GetMaterialProperties(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("get_material_properties", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "get_material_quantities"), Description("Calculate material area and volume across elements")]
+    public static async Task<string> GetMaterialQuantities(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("get_material_quantities", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "delete_material"), Description("Delete a material from the project")]
+    public static async Task<string> DeleteMaterial(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("delete_material", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "duplicate_material"), Description("Duplicate an existing material with a new name")]
+    public static async Task<string> DuplicateMaterial(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("duplicate_material", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "duplicate_family_type"), Description("Duplicate a loadable family type with a new name")]
+    public static async Task<string> DuplicateFamilyType(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("duplicate_family_type", JObject.Parse(data), ct);
+        return result.ToString();
+    }
 }

@@ -18,7 +18,6 @@ public class RevitCortexApp : IExternalApplication
     private CortexRouter? _router;
     private CortexSession? _session;
     private UIApplication? _uiApplication;
-    private int _panelHideAttempts = 5;
     private int _port = 8080;
 
     public static RevitCortexApp? Instance { get; private set; }
@@ -33,20 +32,6 @@ public class RevitCortexApp : IExternalApplication
 
         try
         {
-            // Register dockable pane (must happen before Revit main window is shown)
-            try
-            {
-                application.RegisterDockablePane(
-                    CortexDockablePaneProvider.PaneId,
-                    "RevitCortex",
-                    new CortexDockablePaneProvider());
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(
-                    $"[RevitCortex] Panel registration skipped: {ex.Message}");
-            }
-
             // Create ribbon panel
             CreateRibbonPanel(application);
 
@@ -82,7 +67,7 @@ public class RevitCortexApp : IExternalApplication
             application.ControlledApplication.DocumentOpened += OnDocumentOpened;
             application.ControlledApplication.DocumentClosing += OnDocumentClosing;
 
-            // Capture UIApplication when Revit is idle (needed for chat panel chips)
+            // Capture UIApplication when Revit is idle (needed for ViewActivated hook)
             application.Idling += OnIdling;
 
             System.Diagnostics.Trace.WriteLine(
@@ -151,15 +136,6 @@ public class RevitCortexApp : IExternalApplication
         connectBtn.LargeImage = IconFactory.CreateConnectionIcon(32);
         panel.AddItem(connectBtn);
 
-        // Panel toggle button
-        var panelBtn = new PushButtonData(
-            "ID_CORTEX_PANEL", "Chat\r\nPanel",
-            assemblyLocation, "RevitCortex.Plugin.Commands.ToggleCortexPanel");
-        panelBtn.ToolTip = "Show / Hide RevitCortex chat panel";
-        panelBtn.Image = IconFactory.CreatePanelIcon(16);
-        panelBtn.LargeImage = IconFactory.CreatePanelIcon(32);
-        panel.AddItem(panelBtn);
-
         // Settings button
         var settingsBtn = new PushButtonData(
             "ID_CORTEX_SETTINGS", "Settings",
@@ -170,7 +146,7 @@ public class RevitCortexApp : IExternalApplication
         panel.AddItem(settingsBtn);
     }
 
-    private void OnDocumentOpened(object sender, DocumentOpenedEventArgs args)
+    private void OnDocumentOpened(object? sender, DocumentOpenedEventArgs args)
     {
         var doc = args.Document;
         if (doc == null) return;
@@ -183,7 +159,7 @@ public class RevitCortexApp : IExternalApplication
             $"Capabilities: {_router!.GetAvailableToolNames().Count} tools available");
     }
 
-    private void OnDocumentClosing(object sender, DocumentClosingEventArgs args)
+    private void OnDocumentClosing(object? sender, DocumentClosingEventArgs args)
     {
         try
         {
@@ -198,12 +174,6 @@ public class RevitCortexApp : IExternalApplication
             // Clear session state (store, capabilities, locale)
             _session?.Reinitialize(new Core.Discovery.DocumentCapabilities(), "en");
 
-            // Clear the chat panel history
-            CortexPanel.Instance?.Dispatcher.BeginInvoke(new Action(() =>
-            {
-                CortexPanel.Instance?.OnDocumentClosing();
-            }));
-
             System.Diagnostics.Trace.WriteLine(
                 "[RevitCortex] Session reset: document closing");
         }
@@ -216,23 +186,6 @@ public class RevitCortexApp : IExternalApplication
 
     private void OnIdling(object? sender, Autodesk.Revit.UI.Events.IdlingEventArgs e)
     {
-        // Force-hide chat panel on startup (Revit persists pane state between sessions)
-        // Retry for several Idling cycles because Revit restores pane state asynchronously
-        if (_panelHideAttempts > 0 && sender is UIApplication app)
-        {
-            _panelHideAttempts--;
-            try
-            {
-                var pane = app.GetDockablePane(UI.CortexDockablePaneProvider.PaneId);
-                if (pane != null && pane.IsShown())
-                {
-                    pane.Hide();
-                    _panelHideAttempts = 0; // Success, stop trying
-                }
-            }
-            catch { }
-        }
-
         if (_uiApplication != null) return;
         _uiApplication = sender as UIApplication;
 

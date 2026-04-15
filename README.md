@@ -1,19 +1,18 @@
 # RevitCortex
 
-A next-generation **MCP (Model Context Protocol) server** for Autodesk Revit with 154 tools, typed errors, session state, dynamic tool discovery, and a built-in AI chat panel.
+A next-generation **MCP (Model Context Protocol) server** for Autodesk Revit with 149 tools, typed errors, session state, and dynamic tool discovery. Pure C# — no Node.js required.
 
 RevitCortex lets Claude (or any MCP-compatible LLM) read, create, modify, and analyze Revit models in real time -- from querying elements and parameters to creating views, sheets, schedules, and running full audit workflows.
 
 ## Features
 
-- **154 MCP tools** across 15 categories: Elements, Views, Sheets, Schedules, Parameters, Materials, Creation, Export, Audit, Workflows, Database, IFC, Journal, Code, and Meta
+- **149 MCP tools** across 15 categories: Elements, Views, Sheets, Schedules, Parameters, Materials, Creation, Export, Audit, Workflows, IFC, Links, Journal, Code, and Meta
+- **Pure C# architecture** -- MCP server and Revit plugin both in C#, no Node.js dependency
 - **Typed results** -- every tool returns `CortexResult<T>` with structured error codes, not raw strings
 - **Session state** -- `CortexSession` persists data across tool calls within a session
 - **Dynamic tools** -- tools auto-hide when the active document doesn't support them
 - **Multi-locale** -- detects Revit language (EN, IT, FR, DE) and adapts parameter/category names
-- **Built-in chat panel** -- WPF dockable panel with direct Anthropic API integration, thinking support, prompt chips, and chat export
 - **Confirmation dialogs** -- destructive operations show a native Revit TaskDialog before executing
-- **Token usage tracking** -- tracks API and MCP tool token consumption with cost reports
 - **Multi-version** -- supports Revit 2023, 2024, 2025, and 2026
 
 ---
@@ -40,10 +39,8 @@ RevitCortex lets Claude (or any MCP-compatible LLM) read, create, modify, and an
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | **Autodesk Revit** | 2023, 2024, 2025, or 2026 | Any edition (LT not supported) |
-| **.NET SDK** | 8.0+ | For building Revit 2025/2026 targets |
+| **.NET SDK** | 8.0+ | For building the MCP server and Revit 2025/2026 plugin |
 | **.NET Framework** | 4.8 | For building Revit 2023/2024 targets (included in Windows 10+) |
-| **Node.js** | 18+ | For the TypeScript MCP server |
-| **npm** | 9+ | Comes with Node.js |
 | **Git** | 2.30+ | For cloning the repository |
 | **Windows** | 10 or 11 | Revit is Windows-only |
 
@@ -59,7 +56,6 @@ RevitCortex lets Claude (or any MCP-compatible LLM) read, create, modify, and an
 
 | Requirement | Purpose |
 |-------------|---------|
-| **Anthropic API key** | Required only for the built-in Revit chat panel (not needed for MCP client usage) |
 | **Visual Studio 2022** | For C# debugging and development |
 | **PowerShell 5.1+** | For the deploy script (included in Windows) |
 
@@ -67,23 +63,13 @@ RevitCortex lets Claude (or any MCP-compatible LLM) read, create, modify, and an
 
 ## Dependencies
 
-### TypeScript MCP Server (npm)
+### C# MCP Server (NuGet)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `@modelcontextprotocol/sdk` | ^1.7.0 | MCP protocol implementation, stdio transport |
-| `sql.js` | ^1.14.1 | SQLite database (project data, usage tracking) |
-| `zod` | ^3.24.2 | Schema validation and JSON schema generation |
-
-Dev dependencies:
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `typescript` | ^5.8.2 | TypeScript compiler |
-| `esbuild` | ^0.28.0 | Bundler (single-file build) |
-| `@types/node` | ^22.13.10 | Node.js type definitions |
-| `@types/sql.js` | ^1.4.11 | sql.js type definitions |
-| `rimraf` | ^5.0.10 | Cross-platform rm -rf |
+| `ModelContextProtocol` | 1.2.0 | MCP protocol implementation, stdio transport |
+| `Newtonsoft.Json` | 13.0.4 | JSON serialization (JSON-RPC bridge to plugin) |
+| `Microsoft.Extensions.Hosting` | 10.0.6 | .NET hosting, DI, logging |
 
 ### C# Plugin (NuGet)
 
@@ -116,16 +102,13 @@ git clone https://github.com/LuDattilo/RevitCortex.git
 cd RevitCortex
 ```
 
-### 2. Build the TypeScript MCP server
+### 2. Build the C# MCP server
 
 ```bash
-cd server
-npm install
-npm run build
-cd ..
+dotnet build src/RevitCortex.Server/RevitCortex.Server.csproj
 ```
 
-This installs all npm dependencies and produces a bundled `server/build/index.js`.
+NuGet packages are restored automatically on first build.
 
 ### 3. Build the C# Revit plugin
 
@@ -168,8 +151,7 @@ After deploying, restart Revit. A **RevitCortex** tab appears in the ribbon with
 | Button | Description |
 |--------|-------------|
 | **Cortex Switch** | Start/stop the MCP TCP server (off by default) |
-| **Cortex Panel** | Open the AI chat dockable panel |
-| **Settings** | Configure port, API key, model, tool visibility, pricing |
+| **Settings** | Configure port, log level, and tool visibility |
 
 ---
 
@@ -185,8 +167,8 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 {
   "mcpServers": {
     "revitcortex": {
-      "command": "node",
-      "args": ["C:/absolute/path/to/RevitCortex/server/build/index.js"]
+      "command": "dotnet",
+      "args": ["run", "--project", "C:/absolute/path/to/RevitCortex/src/RevitCortex.Server"]
     }
   }
 }
@@ -200,8 +182,8 @@ Add to your project's `.mcp.json` or configure globally with `claude mcp add`:
 {
   "mcpServers": {
     "revitcortex": {
-      "command": "node",
-      "args": ["C:/absolute/path/to/RevitCortex/server/build/index.js"]
+      "command": "dotnet",
+      "args": ["run", "--project", "C:/absolute/path/to/RevitCortex/src/RevitCortex.Server"]
     }
   }
 }
@@ -215,15 +197,6 @@ Before using any tool, ensure:
 2. **Cortex Switch is ON** -- click it in the RevitCortex ribbon tab
 3. The MCP server is running (Claude Desktop/Code starts it automatically)
 4. Default TCP port is **8080** (configurable in Settings)
-
-### API Key Setup (Chat Panel Only)
-
-The built-in chat panel calls the Anthropic API directly. Configure your key via:
-
-- **Environment variable:** `ANTHROPIC_API_KEY=sk-ant-...`
-- **File:** `%USERPROFILE%\.claude\api_key.txt` (one line, just the key)
-
-The environment variable takes priority. The API key is **not needed** for MCP client usage (Claude Desktop/Code use their own keys).
 
 ---
 
@@ -246,14 +219,6 @@ Once configured, Claude has access to all 154 tools. Examples:
 | "Delete all unused families" | `purge_unused` (shows confirmation dialog) |
 | "Color all doors red" | `color_elements` |
 | "How much did I use today?" | `report_token_usage` |
-
-### Via Built-in Chat Panel
-
-1. Click **Cortex Panel** in the Revit ribbon
-2. Type your request in natural language
-3. The panel calls Claude's API with all Revit tools available
-4. Prompt chips at the bottom offer common actions
-5. Use the export button to save chat history
 
 ### Locale Detection
 
@@ -500,7 +465,7 @@ Use the `dryRun: true` parameter (where available) to preview changes without ap
 ```
  Claude / LLM
       |
- MCP Server (TypeScript)    Zod validation, JSON schema, stdio transport
+ MCP Server (C#)            ModelContextProtocol SDK, stdio transport
       |  (TCP localhost:8080)
  SocketService (C#)         TCP bridge, JSON-RPC framing
       |
@@ -517,7 +482,7 @@ Use the `dryRun: true` parameter (where available) to preview changes without ap
 
 ### Design Decisions
 
-- **Two-process architecture**: The TypeScript MCP server handles stdio transport and Zod schema validation. The C# plugin runs inside Revit's process and executes operations via the Revit API. They communicate via TCP/JSON-RPC on localhost.
+- **Two-process architecture**: The C# MCP server handles stdio transport and schema validation via the ModelContextProtocol SDK. The C# plugin runs inside Revit's process and executes operations via the Revit API. They communicate via TCP/JSON-RPC on localhost.
 - **Server off by default**: The TCP server starts only when the user clicks "Cortex Switch". This prevents unwanted connections and resource usage.
 - **Confirmation for destructive ops**: Tools like `delete_element`, `purge_unused` show a native Revit `TaskDialog` before executing. Cancelled operations return a structured `Cancelled` error code.
 - **Language-independent categories**: All tools use `OST_*` BuiltInCategory codes instead of localized display names.
@@ -564,18 +529,20 @@ RevitCortex/
       Router/                    CortexRouterTests
       Session/                   SessionStoreTests
 
-  server/                      TypeScript MCP server
-    src/
-      connection/                TCP connection to Plugin (ConnectionManager)
-      database/                  SQLite modules (project data, usage tracking)
-      journal/                   Revit journal file analysis (parser, analyzers)
-      logging/                   Structured logging, token tracking, compaction
-      schemas/                   Zod schemas (17 schema files)
-      tools/                     Tool definitions (154 tools + register.ts)
-    index.ts                     Server entry point
-    esbuild.config.mjs           Build configuration
-    package.json                 npm dependencies
-    tsconfig.json                TypeScript configuration
+  src/RevitCortex.Server/      C# MCP server (stdio transport)
+    Program.cs                   Server entry point (MCP hosting)
+    Connection/
+      RevitBridge.cs             TCP bridge to Plugin (JSON-RPC)
+    Tools/                       Tool definitions (149 tools across 9 files)
+      MetaTools.cs               say_hello, get_project_info
+      ElementTools.cs            Element CRUD, filtering, selection
+      ViewTools.cs               Views, sheets, schedules
+      ProjectTools.cs            Project info, audit, workflows
+      CreationTools.cs           Element creation, export
+      MaterialTools.cs           Materials, compound structures
+      ParameterTools.cs          Parameter operations
+      LinkTools.cs               Linked file management
+      IfcTools.cs                IFC import/export/reconstruction
 
   docs/
     superpowers/
@@ -593,13 +560,7 @@ Settings are stored in `~/.revitcortex/settings.json` (created on first run):
 {
   "port": 8080,
   "logLevel": "Info",
-  "model": "claude-sonnet-4-6",
-  "disabledTools": [],
-  "tokenPricing": {
-    "claude-sonnet-4-6": { "inputPerMTok": 3.0, "outputPerMTok": 15.0 },
-    "claude-opus-4-6": { "inputPerMTok": 15.0, "outputPerMTok": 75.0 },
-    "claude-haiku-4-5": { "inputPerMTok": 0.80, "outputPerMTok": 4.0 }
-  }
+  "disabledTools": []
 }
 ```
 
@@ -607,20 +568,15 @@ Settings are stored in `~/.revitcortex/settings.json` (created on first run):
 |---------|---------|-------------|
 | `port` | 8080 | TCP port for MCP server <-> Plugin communication |
 | `logLevel` | Info | Log verbosity: Info, Warning, Error |
-| `model` | claude-sonnet-4-6 | Claude model for the built-in chat panel |
 | `disabledTools` | [] | Array of tool names to hide from the MCP client |
-| `tokenPricing` | (see above) | Per-model pricing for cost reports ($/MTok) |
 
 ### Data Files
 
 | File | Purpose |
 |------|---------|
 | `~/.revitcortex/settings.json` | User settings |
-| `~/.revitcortex/revitcortex-data.db` | Project and room SQLite database |
-| `~/.revitcortex/usage-mcp.db` | MCP tool token usage tracking |
-| `~/.revitcortex/usage.jsonl` | API call token usage tracking |
 | `~/.revitcortex/logs/` | Structured log files |
-| `~/.revitcortex/reports/` | Generated CSV usage reports |
+| `~/.revitcortex/audit.jsonl` | Tool execution audit log |
 
 ---
 
@@ -629,14 +585,14 @@ Settings are stored in `~/.revitcortex/settings.json` (created on first run):
 ### Full Build (all components)
 
 ```bash
-# TypeScript server
-cd server && npm install && npm run build && cd ..
+# C# MCP server
+dotnet build src/RevitCortex.Server/RevitCortex.Server.csproj
 
 # C# plugin (pick your Revit version)
 dotnet build -c "Debug R25" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
 
 # Unit tests
-dotnet test -c "Debug R25"
+dotnet test -c "Debug R25" src/RevitCortex.Tests/RevitCortex.Tests.csproj
 ```
 
 ### Build All Revit Versions
@@ -648,16 +604,6 @@ dotnet build -c "Debug R25" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
 dotnet build -c "Debug R26" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
 ```
 
-### Regenerate Tool Schemas
-
-After adding or modifying tool Zod schemas:
-
-```bash
-node server/generate-tool-schemas.mjs
-```
-
-This updates `tool-schemas.txt` with compact one-line-per-tool signatures used for token optimization.
-
 ---
 
 ## Troubleshooting
@@ -668,17 +614,11 @@ This updates `tool-schemas.txt` with compact one-line-per-tool signatures used f
 2. Click **Cortex Switch** in the ribbon to start the TCP server
 3. Check the port in Settings matches the default (8080)
 
-### "API key not configured" in chat panel
-
-1. Set `ANTHROPIC_API_KEY` environment variable, OR
-2. Create `%USERPROFILE%\.claude\api_key.txt` with your key
-3. Restart Revit after setting the environment variable
-
 ### Tools not appearing in Claude Desktop
 
-1. Verify `claude_desktop_config.json` has the correct absolute path to `server/build/index.js`
+1. Verify `claude_desktop_config.json` has the correct absolute path to `src/RevitCortex.Server`
 2. Restart Claude Desktop after config changes
-3. Check that `npm run build` completed successfully in the `server/` directory
+3. Check that `dotnet build src/RevitCortex.Server/RevitCortex.Server.csproj` completed successfully
 
 ### Build errors for specific Revit version
 

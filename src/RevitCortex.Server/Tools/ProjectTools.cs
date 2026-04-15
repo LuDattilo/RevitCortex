@@ -344,4 +344,44 @@ public static class ProjectTools
         var result = await revit.ExecuteAsync("workflow_sheet_set", JObject.Parse(data), ct);
         return result.ToString();
     }
+
+    [McpServerTool(Name = "get_shared_parameters"), Description("List all project parameters with bindings and categories")]
+    public static async Task<string> GetSharedParameters(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("get_shared_parameters", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "lines_per_view_count"), Description("Count detail lines per view for performance auditing")]
+    public static async Task<string> LinesPerViewCount(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("lines_per_view_count", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "list_family_sizes"), Description("List families with type and instance counts")]
+    public static async Task<string> ListFamilySizes(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("list_family_sizes", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "list_schedulable_fields"), Description("Discover available schedulable fields for a category")]
+    public static async Task<string> ListSchedulableFields(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("list_schedulable_fields", JObject.Parse(data), ct);
+        return result.ToString();
+    }
 }
