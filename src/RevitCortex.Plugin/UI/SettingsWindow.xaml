@@ -20,14 +20,8 @@
                     <ListBoxItem x:Name="GeneralItem" IsSelected="True" Padding="10,8">
                         <TextBlock Text="General" FontSize="14"/>
                     </ListBoxItem>
-                    <ListBoxItem x:Name="ApiKeyItem" Padding="10,8">
-                        <TextBlock Text="API Key" FontSize="14"/>
-                    </ListBoxItem>
                     <ListBoxItem x:Name="ToolsItem" Padding="10,8">
                         <TextBlock Text="Tools" FontSize="14"/>
-                    </ListBoxItem>
-                    <ListBoxItem x:Name="UsageItem" Padding="10,8">
-                        <TextBlock Text="Usage" FontSize="14"/>
                     </ListBoxItem>
                 </ListBox>
             </StackPanel>

@@ -203,4 +203,44 @@ public static class ElementTools
         var result = await revit.ExecuteAsync("set_element_workset", JObject.Parse(data), ct);
         return result.ToString();
     }
+
+    [McpServerTool(Name = "get_elements_in_spatial_volume"), Description("Find elements within a 3D bounding box or room volume")]
+    public static async Task<string> GetElementsInSpatialVolume(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("get_elements_in_spatial_volume", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "get_linked_elements"), Description("Query elements from linked Revit models with optional filtering")]
+    public static async Task<string> GetLinkedElements(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("get_linked_elements", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "get_room_openings"), Description("Get doors/windows adjacent to rooms with dimensions")]
+    public static async Task<string> GetRoomOpenings(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("get_room_openings", JObject.Parse(data), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "modify_element"), Description("Move, rotate, mirror, or copy elements")]
+    public static async Task<string> ModifyElement(
+        RevitConnectionManager revit,
+        [Description("JSON parameters")] string data,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("modify_element", JObject.Parse(data), ct);
+        return result.ToString();
+    }
 }
