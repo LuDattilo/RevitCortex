@@ -23,21 +23,54 @@ $configMap = @{ "2023" = "R23"; "2024" = "R24"; "2025" = "R25"; "2026" = "R26"; 
 $foundVersions = @()
 
 foreach ($ver in $supportedVersions) {
-    $verDir = Join-Path $addinsRoot $ver
     $pluginDir = Join-Path $ScriptDir "plugin\$($configMap[$ver])"
-    if ((Test-Path $verDir) -and (Test-Path $pluginDir)) {
+    if (!(Test-Path $pluginDir)) { continue }   # no plugin built for this version
+
+    $verDir = Join-Path $addinsRoot $ver
+
+    # Primary: addins folder already exists (Revit launched at least once)
+    # Fallback: check Windows Registry for Autodesk Revit installation
+    $revitInstalled = Test-Path $verDir
+    if (-not $revitInstalled) {
+        $regPaths = @(
+            "HKLM:\SOFTWARE\Autodesk\Revit\$ver",
+            "HKLM:\SOFTWARE\WOW6432Node\Autodesk\Revit\$ver",
+            "HKCU:\SOFTWARE\Autodesk\Revit\$ver"
+        )
+        foreach ($rp in $regPaths) {
+            if (Test-Path $rp) { $revitInstalled = $true; break }
+        }
+    }
+
+    if ($revitInstalled) {
+        # Create the addins folder if it doesn't exist yet (Revit installed but never launched)
+        if (!(Test-Path $verDir)) {
+            New-Item -ItemType Directory -Path $verDir -Force | Out-Null
+            Write-Host "    Created addins folder for Revit $ver (first launch)" -ForegroundColor Gray
+        }
         $foundVersions += $ver
     }
 }
 
 if ($foundVersions.Count -eq 0) {
     Write-Host "  ERROR: No supported Revit installation found (2023-2027)." -ForegroundColor Red
-    Write-Host "  Looked in: $addinsRoot" -ForegroundColor Red
+    Write-Host "  Looked in: $addinsRoot and Windows Registry" -ForegroundColor Red
     Read-Host "Press Enter to exit"
     exit 1
 }
 
 Write-Host "  Found Revit: $($foundVersions -join ', ')" -ForegroundColor Green
+
+# Warn if default port 8080 is already in use by another process
+$defaultPort = 8080
+$portInUse = (Get-NetTCPConnection -LocalPort $defaultPort -State Listen -ErrorAction SilentlyContinue)
+if ($portInUse) {
+    Write-Host ""
+    Write-Host "  WARNING: Port $defaultPort is already in use by another process." -ForegroundColor Yellow
+    Write-Host "  RevitCortex uses this port to communicate between the plugin and the MCP server." -ForegroundColor Yellow
+    Write-Host "  To use a different port, set it in: $env:USERPROFILE\.revitcortex\settings.json" -ForegroundColor Yellow
+    Write-Host "  Example: { ""Port"": 8081 }" -ForegroundColor Gray
+}
 
 # --- Step 2: Install Plugin ---
 Write-Host ""

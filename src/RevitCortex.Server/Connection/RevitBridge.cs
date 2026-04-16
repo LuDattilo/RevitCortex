@@ -34,7 +34,24 @@ public sealed class RevitBridge : IDisposable
         _client = new TcpClient();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(5));
-        await _client.ConnectAsync(_host, _port, cts.Token);
+        try
+        {
+            await _client.ConnectAsync(_host, _port, cts.Token);
+        }
+        catch (SocketException ex)
+        {
+            throw new InvalidOperationException(
+                $"Cannot connect to Revit on {_host}:{_port}. " +
+                $"Make sure Revit is open and the RevitCortex plugin is loaded (green icon in the ribbon). " +
+                $"If you changed the port, set REVITCORTEX_PORT or update ~/.revitcortex/settings.json. " +
+                $"(SocketError: {ex.SocketErrorCode})", ex);
+        }
+        catch (OperationCanceledException)
+        {
+            throw new TimeoutException(
+                $"Timed out connecting to Revit on {_host}:{_port}. " +
+                $"Make sure Revit is open and the RevitCortex plugin is active.");
+        }
         var stream = _client.GetStream();
         _reader = new StreamReader(stream, Encoding.UTF8);
         _writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true };
