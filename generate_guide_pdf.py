@@ -205,7 +205,7 @@ def build_pdf():
     pdf.set_font("Helvetica", "", 12)
     pdf.set_text_color(*C_GRAY)
     pdf.cell(0, 7, "Assistente AI per Autodesk Revit", align="C", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 7, "134 Strumenti | Revit 2023-2027", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 7, "149 Strumenti | Revit 2023-2027", align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.cell(0, 7, "Supporto multilingua: EN, IT, FR, DE", align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(30)
     pdf.set_font("Helvetica", "I", 10)
@@ -258,17 +258,22 @@ def build_pdf():
 
     pdf.h2("Cosa ti serve")
     pdf.para("1. Autodesk Revit 2023, 2024, 2025, 2026 o 2027\n"
-             "2. Node.js 18 o superiore (scaricalo da nodejs.org)\n"
-             "3. Claude Desktop con piano Pro o Max (scaricalo da claude.ai/download)\n"
-             "4. Il plugin RevitCortex installato nella cartella Addins di Revit")
+             "2. Claude Desktop con piano Pro o Max (scaricalo da claude.ai/download)\n"
+             "   oppure Claude Code (CLI)\n"
+             "3. Il pacchetto RevitCortex (ZIP con installer incluso)")
 
     pdf.h2("Installazione")
-    pdf.para("Apri un terminale nella cartella del progetto RevitCortex ed esegui:")
-    pdf.code("# Installa il plugin per Revit 2025\npowershell -ExecutionPolicy Bypass -File deploy.ps1 -RevitVersion 2025\n\n"
-             "# Compila il server MCP\ncd server && npm install && npm run build")
-    pdf.para("Poi configura Claude Desktop aggiungendo al file claude_desktop_config.json:")
-    pdf.code('{\n  "mcpServers": {\n    "revit-cortex": {\n      "command": "node",\n'
-             '      "args": ["C:\\\\RevitCortex\\\\server\\\\build\\\\index.js"]\n    }\n  }\n}')
+    pdf.para("Estrai lo ZIP di RevitCortex in una cartella a tua scelta, poi fai doppio clic su install.bat "
+             "(oppure tasto destro su install.ps1 > Esegui con PowerShell). "
+             "L'installer richiede i privilegi di amministratore e in pochi secondi:")
+    pdf.para("  - Copia il plugin nelle cartelle Addins di tutte le versioni Revit rilevate\n"
+             "  - Installa il server MCP in %USERPROFILE%\\.revitcortex\\server\\\n"
+             "  - Configura automaticamente Claude Desktop o Claude Code a tua scelta")
+    pdf.para("Non serve installare Node.js, Python o altri runtime: il server e' un eseguibile autonomo (.exe).")
+    pdf.para("Al termine dell'installazione, la configurazione di Claude Desktop e' gia' pronta:")
+    pdf.code('{\n  "mcpServers": {\n    "revitcortex": {\n'
+             '      "command": "C:\\\\Users\\\\<nome>\\\\' + '.revitcortex\\\\server\\\\RevitCortex.Server.exe",\n'
+             '      "args": []\n    }\n  }\n}')
 
     pdf.h2("La tua prima sessione")
     pdf.para("Segui questi passi nell'ordine:")
