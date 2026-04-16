@@ -234,6 +234,8 @@ def build_pdf():
         ("16", "Workflow compositi", "Audit completo, data roundtrip, sheet set"),
         ("17", "Sicurezza", "Sandbox, read-only, audit log, conferme"),
         ("18", "Ottimizzazione sessione", "Pattern di sessione, gestione token"),
+        ("19", "IFC", "Importazione, esportazione, ricostruzione nativa"),
+        ("", "Appendice", "Libreria di prompt pronti all'uso per scenario"),
     ]
     for num, title, desc in toc:
         pdf.set_font("Helvetica", "B", 10)
@@ -1459,6 +1461,306 @@ def build_pdf():
         "Per investigare crash, problemi di memoria, o comportamenti anomali.",
         [("Analizza le ultime 3 sessioni di Revit",
           "Sessione 1: 45 min, 3.2GB RAM peak, 12 transazioni | Sessione 2: crash dopo 23 min...")])
+
+    # =======================================================
+    # 19 - IFC
+    # =======================================================
+    pdf.section_title("19", "IFC - Importazione, Esportazione e Ricostruzione")
+    pdf.para("IFC (Industry Foundation Classes) e' il formato aperto per l'interoperabilita' BIM. "
+             "RevitCortex offre tre gruppi di strumenti: "
+             "importazione/collegamento, esportazione configurabile, "
+             "e ricostruzione nativa - il workflow piu' avanzato che converte gli elementi IFC "
+             "in elementi Revit nativi editabili.")
+
+    pdf.h2("Verifica e diagnostica")
+
+    pdf.tool_card("ifc_get_capabilities",
+        "Verifica il supporto IFC di questa installazione Revit: versioni supportate, add-in revit-ifc.",
+        "Prima di lavorare con IFC, per sapere cosa e' disponibile.",
+        [("Quali versioni IFC supporta questa installazione di Revit?",
+          "IFC 2x3, IFC 4, IFC 4x3 supportati | revit-ifc add-in: v24.1.0 | Schema: ifcXML supportato"),
+         ("Revit supporta IFC 4.3?",
+          "IFC 4x3 supportato (add-in v24.1.0). Export e import disponibili.")])
+
+    pdf.tool_card("ifc_validate_request",
+        "Valida un file IFC prima di importarlo: controlla il percorso, l'estensione e la versione dello schema.",
+        "Prima di importare o collegare un file IFC per intercettare errori subito.",
+        [("Controlla se il file C:/Modelli/Edificio_Strutture.ifc e' valido",
+          "OK: file trovato, estensione .ifc valida, schema IFC 2x3 rilevato"),
+         ("Verifica il file IFC prima di collegarlo al progetto",
+          "OK: schema IFC 4, dimensione 45MB, struttura valida")])
+
+    pdf.h2("Importazione e collegamento")
+
+    pdf.tool_card("ifc_link",
+        "Collega un file IFC al progetto come link esterno (rimane aggiornabile).",
+        "Quando vuoi fare riferimento al modello IFC senza incorporarlo nel progetto.",
+        [("Collega il modello strutturale IFC dal percorso C:/Modelli/Strutture.ifc",
+          "Link IFC aggiunto: 'Strutture.ifc', 1.245 elementi, sistema di coordinate condivise"),
+         ("Aggiungi il file IFC dell'impianto MEP come collegamento",
+          "Link IFC 'MEP.ifc' collegato: 3.102 elementi, posizione origine")])
+
+    pdf.tool_card("ifc_reload_link",
+        "Ricarica un collegamento IFC esistente, opzionalmente da un nuovo percorso.",
+        "Quando il file IFC e' stato aggiornato dal consulente strutturale o MEP.",
+        [("Ricarica il link IFC strutturale",
+          "Link 'Strutture.ifc' ricaricato: 1.287 elementi (+42 rispetto alla versione precedente)"),
+         ("Ricarica il link MEP dal nuovo percorso aggiornato",
+          "Link ricaricato dal nuovo percorso, 3.150 elementi aggiornati")])
+
+    pdf.tool_card("ifc_open_or_import",
+        "Apre un file IFC come nuovo progetto Revit o lo importa nel documento attivo.",
+        "Quando vuoi incorporare definitivamente il modello IFC nel progetto.",
+        [("Apri il file IFC come nuovo progetto Revit",
+          "File aperto come nuovo progetto Revit, 2.456 elementi convertiti in DirectShape"),
+         ("Importa il file IFC nel progetto corrente",
+          "1.245 DirectShape importati nel documento attivo")])
+
+    pdf.h2("Esportazione")
+
+    pdf.tool_card("ifc_list_export_configurations",
+        "Elenca le configurazioni di esportazione IFC disponibili (predefinite e personalizzate).",
+        "Prima di esportare, per scegliere la configurazione giusta.",
+        [("Quali configurazioni IFC posso usare per l'export?",
+          "6 configurazioni: IFC2x3 Coordination View, IFC4 Reference View, IFC4 Design Transfer, GSA (2010), COBie 2.4, Custom_Arch")])
+
+    pdf.tool_card("ifc_get_export_configuration",
+        "Mostra tutti i dettagli di una specifica configurazione di esportazione IFC.",
+        "Per verificare i parametri di una configurazione prima di usarla.",
+        [("Mostrami i dettagli della configurazione 'IFC4 Design Transfer'",
+          "Schema: IFC4 | Classificazione: OmniClass | Export di: muri, porte, finestre, spazi | Includere quantita': si'")])
+
+    pdf.tool_card("ifc_export_basic",
+        "Esporta il modello in IFC con opzioni base: versione schema, percorso di output.",
+        "Per export rapido senza configurazioni complesse.",
+        [("Esporta il modello come IFC 4 nella cartella C:/Consegne",
+          "Export completato: Edificio_A.ifc (45MB), schema IFC4, 3.456 elementi"),
+         ("Esporta in IFC 2x3 per compatibilita' con sistemi vecchi",
+          "Export IFC 2x3 completato: 3.201 elementi, formato compatibile")])
+
+    pdf.tool_card("ifc_export_with_configuration",
+        "Esporta usando una configurazione nominata con la possibilita' di override specifici.",
+        "Per export professionale con parametri controllati.",
+        [("Esporta usando la configurazione 'IFC4 Design Transfer' con classificazione OmniClass",
+          "Export con configurazione 'IFC4 Design Transfer': 3.456 elementi, 156 spazi, classificazione OmniClass applicata"),
+         ("Esporta solo il Piano Terra con la configurazione COBie 2.4",
+          "Export COBie completato: 245 elementi Piano Terra, foglio COBie generato")])
+
+    pdf.tool_card("ifc_set_family_mapping_file",
+        "Imposta un file di mapping per associare le famiglie Revit ai tipi IFC corretti.",
+        "Per garantire che le famiglie vengano esportate con il tipo IFC appropriato.",
+        [("Imposta il file di mapping famiglie dal percorso C:/Config/FamilyMapping.txt",
+          "File di mapping impostato: 45 regole di associazione famiglia->tipo IFC caricate")])
+
+    pdf.h2("Ricostruzione nativa (IFC -> Revit nativo)")
+    pdf.para("Quando si importa un file IFC, Revit crea dei DirectShape  - oggetti geometrici non editabili. "
+             "Il workflow di ricostruzione analizza questi elementi e li converte in elementi Revit nativi "
+             "(muri, pavimenti, travi, porte) completamente modificabili.")
+    pdf.tip("Workflow consigliato: analizza -> elenca candidati -> ricostruisci per categoria -> taglia aperture -> piazza porte/finestre -> confronta -> tagga i non ricostruibili.")
+
+    pdf.tool_card("ifc_analyze_rebuildability",
+        "Analizza i DirectShape IFC nel modello e calcola per ciascuno la fattibilita' di ricostruzione nativa.",
+        "Primo passo del workflow di ricostruzione: capire quanti elementi possono essere convertiti.",
+        [("Analizza il modello IFC importato: quanti elementi posso ricostruire?",
+          "Analisi completata: 1.245 DirectShape | Muri: 312 (89% ricostruibili) | Pavimenti: 45 (95%) | Travi: 67 (78%) | Non ricostruibili: 123 (10%)"),
+         ("Verifica la ricostruibilita' solo per i muri",
+          "312 muri analizzati: 278 ricostruibili (confidenza >80%), 34 complessi (possibile perdita geometrica)")])
+
+    pdf.tool_card("ifc_list_rebuild_candidates",
+        "Elenca gli elementi con confidenza di ricostruzione sopra una soglia specificata.",
+        "Per decidere quali elementi ricostruire partendo da quelli piu' sicuri.",
+        [("Mostra tutti gli elementi ricostruibili con confidenza almeno 85%",
+          "847 candidati: 278 muri, 43 pavimenti, 62 travi, 45 pilastri (confidenza min: 85%)"),
+         ("Quali muri posso ricostruire con sicurezza?",
+          "278 muri con confidenza >80%: 245 rettangolari semplici, 33 con sagoma irregolare")])
+
+    pdf.tool_card("ifc_rebuild_walls",
+        "Ricostruisce i muri da DirectShape IFC in muri Revit nativi con spessore e tipo corretti.",
+        "Dopo l'analisi, per convertire i muri IFC in muri Revit modificabili.",
+        [("Ricostruisci tutti i muri dall'IFC importato",
+          "278 muri ricostruiti come muri Revit nativi: tipo 'Basic Wall 200mm' (142), 'Basic Wall 300mm' (89), altri (47)"),
+         ("Ricostruisci solo i muri al Piano Terra",
+          "68 muri Piano Terra ricostruiti, livello di base impostato a 'Piano Terra'")])
+
+    pdf.tool_card("ifc_rebuild_floors",
+        "Ricostruisce i pavimenti da DirectShape IFC in solai Revit nativi.",
+        "Per convertire i pavimenti IFC in elementi editabili con stratigrafia.",
+        [("Ricostruisci i pavimenti dal modello IFC",
+          "43 pavimenti ricostruiti: tipo 'Generic Floor 200mm', area totale 4.560 mq"),
+         ("Ricostruisci i solai con il tipo di pavimento architettonico",
+          "43 pavimenti ricostruiti con tipo 'Architectural Floor 150mm'")])
+
+    pdf.tool_card("ifc_rebuild_roofs",
+        "Ricostruisce i tetti da DirectShape IFC in tetti Revit nativi.",
+        "Per convertire la copertura IFC in un elemento editabile con pendenze.",
+        [("Ricostruisci la copertura dal file IFC",
+          "5 falde ricostruite come tetto Revit nativo, pendenze calcolate automaticamente"),
+         ("Ricostruisci il tetto piano",
+          "1 tetto piano ricostruito: tipo 'Flat Roof 300mm', area 980 mq")])
+
+    pdf.tool_card("ifc_rebuild_structural_members",
+        "Ricostruisce colonne e travi da DirectShape IFC in elementi strutturali Revit nativi.",
+        "Per convertire il telaio strutturale IFC in elementi analizzabili e modificabili.",
+        [("Ricostruisci tutto il telaio strutturale dall'IFC",
+          "Completato: 45 pilastri HEB240/300 ricostruiti, 67 travi IPE300/400 ricostruite"),
+         ("Ricostruisci solo le travi del Piano 2",
+          "22 travi Piano 2 ricostruite: HEB300 (12), IPE400 (10), campata media 7.2m")])
+
+    pdf.tool_card("ifc_rebuild_openings",
+        "Taglia le aperture nelle pareti e nei solai ricostruiti, in corrispondenza delle aperture IFC originali.",
+        "Dopo aver ricostruito muri e solai, per creare le aperture corrette.",
+        [("Taglia le aperture nei muri ricostruiti",
+          "234 aperture tagliate: 156 per porte, 78 per finestre"),
+         ("Crea le aperture anche nei solai ricostruiti",
+          "12 aperture per vano scala e impianti tagliate nei solai")])
+
+    pdf.tool_card("ifc_rebuild_family_instances",
+        "Posiziona porte e finestre nelle aperture ricostruite, usando famiglie Revit native.",
+        "Ultimo passo di ricostruzione: popolare le aperture con elementi nativi.",
+        [("Posiziona porte e finestre nelle aperture ricostruite",
+          "156 porte posizionate (M_Single-Flush 900x2100), 78 finestre posizionate (Fixed 1200x1500)"),
+         ("Piazza le porte usando la famiglia 'Fire Door EI60' per le aperture tagliafuoco",
+          "45 porte tagliafuoco posizionate, 111 porte standard")])
+
+    pdf.tool_card("ifc_compare_original_vs_rebuilt",
+        "Confronta volume e geometria tra gli elementi IFC originali e quelli Revit ricostruiti.",
+        "Per verificare la fedeltà della ricostruzione prima di eliminare i DirectShape.",
+        [("Confronta gli elementi ricostruiti con gli originali IFC",
+          "Media fedeltà: 97.3% | Muri: 98.1% | Pavimenti: 96.8% | 12 elementi con scarto >5% segnalati"),
+         ("Verifica la fedeltà dei muri ricostruiti",
+          "278 muri confrontati: 265 (95%) fedeltà >95%, 13 con divergenza geometrica da verificare")])
+
+    pdf.tool_card("ifc_tag_unreconstructable_elements",
+        "Tagga gli elementi IFC che non possono essere ricostruiti come nativi (geometria troppo complessa).",
+        "Per documentare quali elementi restano come DirectShape e devono essere gestiti manualmente.",
+        [("Tagga tutti gli elementi che non ho potuto ricostruire",
+          "123 elementi taggati come 'IFC_Non_Ricostruibile': 45 scale, 34 rampe, 44 geometrie complesse"),
+         ("Aggiungi un parametro 'Motivo Non Ricostruzione' agli elementi non ricostruiti",
+          "123 elementi: parametro aggiunto con motivazione (scala, geometria curva, ecc.)")])
+
+    # =======================================================
+    # APPENDICE  - LIBRERIA DI PROMPT
+    # =======================================================
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.set_text_color(*C_PRIMARY)
+    pdf.cell(0, 14, "Appendice - Libreria di Prompt", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.ln(2)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(*C_GRAY)
+    pdf.multi_cell(0, 5.5, "Prompt pronti all'uso organizzati per scenario. Copia, adatta al tuo progetto e incollali in Claude.")
+    pdf.ln(4)
+
+    def prompt_row(label, text):
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*C_ACCENT)
+        pdf.cell(38, 5.5, label)
+        pdf.set_font("Helvetica", "I", 8.5)
+        pdf.set_text_color(0, 70, 40)
+        pdf.set_fill_color(*C_BG_PROMPT)
+        pdf.multi_cell(0, 5.5, f'"{text}"', fill=True)
+        pdf.ln(0.5)
+
+    scenarios = [
+        ("ORIENTARSI IN UN MODELLO NUOVO", [
+            ("Panoramica completa", "Cos'e' questo progetto? Mostrami livelli, workset, fasi e file collegati."),
+            ("Statistiche rapide", "Quanti elementi ci sono per categoria? Mostrami le prime 10 categorie."),
+            ("Vista attiva", "In che vista sono? Quanti elementi sono visibili?"),
+            ("Salute del modello", "Fai un check rapido della salute del modello e mostrami i 5 avvisi piu' importanti."),
+        ]),
+        ("CERCARE E FILTRARE ELEMENTI", [
+            ("Per categoria", "Trova tutti i [pilastri strutturali] nel modello, mostrami tipo e livello."),
+            ("Per parametro", "Trova tutte le porte dove il campo 'Resistenza al fuoco' e' vuoto."),
+            ("Per valore", "Quali muri al Piano 1 hanno spessore maggiore di 250mm?"),
+            ("Nella vista attiva", "Elenca tutti i muri visibili in questa vista con tipo e lunghezza."),
+            ("Elemento selezionato", "Cosa ho selezionato? Mostrami tutti i parametri."),
+        ]),
+        ("MODIFICARE PARAMETRI", [
+            ("Singolo elemento", "Imposta il Contrassegno della porta 12345 a 'D-001'."),
+            ("In massa (sicuro)", "Quante porte verrebbero modificate se imposto il Produttore a 'ACME'? (anteprima)"),
+            ("In massa (esegui)", "OK, procedi: imposta il Produttore 'ACME' per tutte le porte."),
+            ("Da Excel", "Importa i valori di parametro dal file Excel 'DoorData.xlsx' (prima mostrami anteprima)."),
+            ("Rinomina", "Rinomina tutte le viste sostituendo 'Copia di ' con '' (rimuovi il prefisso)."),
+            ("Numera stanze", "Numera tutte le stanze partendo da 101, in ordine da sinistra a destra."),
+        ]),
+        ("CREARE ELEMENTI", [
+            ("Muro", "Crea un muro di tipo 'Basic Wall 200mm' dal punto (0,0) al punto (8,0) al Piano Terra."),
+            ("Pavimento", "Crea un pavimento architettonico nella stanza 205 con tipo 'Concrete 150mm'."),
+            ("Porta", "Posiziona una porta 'M_Single-Flush 900x2100' nel muro 5678 a 1.5m dall'estremita' sinistra."),
+            ("Stanza", "Crea una stanza 'Ufficio Direttore' numero 101 al Piano 1 alle coordinate (12, 8)."),
+            ("Livello", "Crea il Piano 3 a quota 10.5 metri."),
+            ("Griglia", "Crea una griglia 4x3 con passo 6 metri, assi A-D e 1-3."),
+        ]),
+        ("VISTE E TAVOLE", [
+            ("Pianta", "Crea una pianta del Piano 2 in scala 1:100."),
+            ("Sezione", "Crea una sezione che taglia l'edificio da ovest a est al Piano Terra."),
+            ("Vista 3D isolata", "Crea una vista 3D con section box attorno agli elementi selezionati."),
+            ("Tavole in batch", "Crea le tavole A-101, A-102, A-103 con il cartiglio 'Company Titleblock'."),
+            ("Posiziona vista", "Metti la pianta del Piano 1 sulla tavola A-101, centrata."),
+            ("Viste per stanze", "Crea una sezione per ogni stanza del Piano 1."),
+            ("Esporta DWG", "Esporta tutte le tavole in DWG nella cartella C:/Consegne."),
+        ]),
+        ("ABACHI E DATI", [
+            ("Abaco rapido", "Crea un abaco delle porte con Nome tipo, Livello e Resistenza al fuoco."),
+            ("Abaco stanze", "Crea un elenco stanze con nome, numero, area e dipartimento."),
+            ("Esporta CSV", "Esporta l'abaco porte come file CSV."),
+            ("Esporta Excel", "Esporta tutti i dati delle porte in un file Excel sul desktop."),
+            ("Leggi abaco", "Mostrami le prime 20 righe dell'abaco 'Abaco Porte'."),
+        ]),
+        ("QUALITA' E AUDIT", [
+            ("Check mattutino", "Com'e' la salute del modello? Score e problemi principali."),
+            ("Warning", "Mostrami i 10 avvisi piu' frequenti nel modello."),
+            ("Clash detection", "Controlla interferenze tra travi e condotte. Crea una vista 3D per le interferenze trovate."),
+            ("Famiglie pesanti", "Quali sono le 10 famiglie piu' usate? Ci sono famiglie non utilizzate?"),
+            ("Prima della consegna", "Fai un audit completo: salute, avvisi critici, famiglie non usate, viste pesanti."),
+        ]),
+        ("MATERIALI E STRATIGRAFIE", [
+            ("Elenco materiali", "Elenca tutti i materiali nel modello raggruppati per classe."),
+            ("Stratigrafia", "Mostra la composizione a strati del muro 'Muro Esterno 300mm'."),
+            ("Crea materiale", "Crea un materiale 'Vetro Serigrafato' con trasparenza 30% e colore grigio chiaro."),
+            ("Quantita'", "Quanti mq di calcestruzzo sono usati nel modello?"),
+        ]),
+        ("IFC  - IMPORTAZIONE E ESPORTAZIONE", [
+            ("Verifica supporto", "Quali versioni IFC supporta questa installazione di Revit?"),
+            ("Valida file", "Controlla se il file C:/Consegne/Strutture.ifc e' valido prima di collegarlo."),
+            ("Collega IFC", "Collega il modello strutturale IFC dal file C:/Modelli/Strutture.ifc."),
+            ("Esporta IFC4", "Esporta il modello come IFC 4 nella cartella C:/Consegne."),
+            ("Config export", "Esporta usando la configurazione 'IFC4 Design Transfer'."),
+        ]),
+        ("IFC  - RICOSTRUZIONE NATIVA", [
+            ("Analisi", "Analizza gli elementi IFC importati: quanti posso ricostruire come elementi Revit nativi?"),
+            ("Candidati", "Elenca tutti gli elementi con confidenza di ricostruzione sopra l'85%."),
+            ("Ricostruisci muri", "Ricostruisci tutti i muri dall'IFC importato come muri Revit nativi."),
+            ("Ricostruisci tutto", "Ricostruisci muri, pavimenti, travi e pilastri. Poi taglia le aperture e piazza porte e finestre."),
+            ("Confronta", "Confronta la geometria degli elementi ricostruiti con gli originali IFC. Qual e' la fedeltà media?"),
+            ("Tagga residui", "Tagga gli elementi IFC che non possono essere ricostruiti come nativi."),
+        ]),
+        ("PULIZIA E FINE PROGETTO", [
+            ("Purge", "Cosa posso eliminare dal modello? Famiglie, tipi e materiali non usati. (anteprima prima)"),
+            ("CAD inutili", "Elenca tutti i file CAD importati nel modello. Poi elimina quelli non piu' necessari."),
+            ("Viste orfane", "Mostrami le viste non posizionate su nessuna tavola. Vuoi eliminare quelle di lavoro?"),
+            ("Tag vuoti", "Rimuovi tutti i tag con valore vuoto dalla vista corrente."),
+            ("Workset", "Sposta tutte le porte nel workset 'Architettura - Porte'."),
+        ]),
+        ("SCRIPT C# PERSONALIZZATO (Revit 2025+)", [
+            ("Operazione batch", "Usa send_code_to_revit per rinominare tutte le famiglie di tipo 'Generic' aggiungendo il prefisso 'STD-'."),
+            ("Tipo complesso", "Scrivi un codice C# per creare un tipo pavimento 'PV_001' con 3 strati: gres 10mm, massetto 60mm, CLS 150mm."),
+            ("Lettura avanzata", "Usa send_code_to_revit per calcolare l'area totale di tutti i muri per livello e restituire una tabella."),
+        ]),
+    ]
+
+    for scenario_title, prompts in scenarios:
+        if pdf.get_y() > 255:
+            pdf.add_page()
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*C_PRIMARY)
+        pdf.set_fill_color(230, 240, 255)
+        pdf.cell(0, 7, f"  {scenario_title}", fill=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1)
+        for label, text in prompts:
+            prompt_row(label, text)
+        pdf.ln(1)
 
     # -- Save --
     out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "RevitCortex_User_Guide.pdf")
