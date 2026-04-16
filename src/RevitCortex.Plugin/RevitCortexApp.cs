@@ -161,6 +161,20 @@ public class RevitCortexApp : IExternalApplication
         settingsBtn.Image = IconFactory.CreateSettingsIcon(16);
         settingsBtn.LargeImage = IconFactory.CreateSettingsIcon(32);
         panel.AddItem(settingsBtn);
+
+        // Send support report button
+        var supportBtn = new PushButtonData(
+            "ID_CORTEX_SUPPORT", "Send log\r\nto support",
+            assemblyLocation, "RevitCortex.Plugin.Commands.SendSupportReport");
+        supportBtn.ToolTip = "Send a bug report to RevitCortex support";
+        supportBtn.LongDescription =
+            "Collects recent audit logs, token-usage log, settings, and the most recent " +
+            "Revit journal into a ZIP on the desktop, then opens a pre-filled Outlook " +
+            "message addressed to support. Add a short description of the problem " +
+            "and click Send. No personal data is sent beyond what's in the logs.";
+        supportBtn.Image = IconFactory.CreateSupportIcon(16);
+        supportBtn.LargeImage = IconFactory.CreateSupportIcon(32);
+        panel.AddItem(supportBtn);
     }
 
     private void OnDocumentOpened(object? sender, DocumentOpenedEventArgs args)

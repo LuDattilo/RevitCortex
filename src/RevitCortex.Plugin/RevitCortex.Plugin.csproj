@@ -57,6 +57,13 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.12.0" />
   </ItemGroup>
 
+  <!-- ZipArchive lives in separate assemblies on net48 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\RevitCortex.Core\RevitCortex.Core.csproj" />
   </ItemGroup>
