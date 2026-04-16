@@ -126,11 +126,30 @@ Get-ChildItem $serverTarget -Recurse -File | ForEach-Object {
 }
 Write-Host "  Unblocked files (Zone.Identifier removed)" -ForegroundColor Gray
 
-# Add Windows Defender exclusion for the server folder so real-time protection
-# does not quarantine the self-contained EXE (common false positive for new executables).
+# Add Windows Defender exclusion for the server folder (opt-in, idempotent).
+# Real-time protection occasionally quarantines the self-contained EXE as a
+# false positive. We ask before modifying Defender config and skip if already set.
 if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
-    Add-MpPreference -ExclusionPath $serverTarget -ErrorAction SilentlyContinue
-    Write-Host "  Windows Defender exclusion added for server folder" -ForegroundColor Gray
+    $existing = @()
+    try {
+        $mp = Get-MpPreference -ErrorAction SilentlyContinue
+        if ($mp -and $mp.ExclusionPath) { $existing = @($mp.ExclusionPath) }
+    } catch {}
+
+    if ($existing -contains $serverTarget) {
+        Write-Host "  Windows Defender exclusion already present — skipping" -ForegroundColor Gray
+    } else {
+        Write-Host ""
+        Write-Host "  Windows Defender occasionally quarantines new self-contained executables." -ForegroundColor Yellow
+        Write-Host "  Proposed exclusion: $serverTarget" -ForegroundColor Yellow
+        $defAnswer = Read-Host "  Add Defender exclusion? (y/N)"
+        if ($defAnswer -eq "y" -or $defAnswer -eq "Y") {
+            Add-MpPreference -ExclusionPath $serverTarget -ErrorAction SilentlyContinue
+            Write-Host "  Windows Defender exclusion added" -ForegroundColor Gray
+        } else {
+            Write-Host "  Skipped Defender exclusion. If the EXE is quarantined, re-run install.ps1." -ForegroundColor Gray
+        }
+    }
 }
 
 Write-Host "  Server installed: $serverExe" -ForegroundColor Green
