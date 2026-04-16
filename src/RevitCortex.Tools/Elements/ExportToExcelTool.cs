@@ -63,9 +63,10 @@ public class ExportToExcelTool : ICortexTool
             if (elemList.Count == 0)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No elements found");
 
-            // Discover parameters
+            // Discover parameters (with type element cache)
             var instanceParamNames = new LinkedHashSet();
             var typeParamNames = new LinkedHashSet();
+            var typeCache = new Dictionary<ElementId, Element?>();
 
             foreach (var elem in elemList.Take(100)) // Sample first 100 for discovery
             {
@@ -77,13 +78,21 @@ public class ExportToExcelTool : ICortexTool
 
                 if (includeTypeParams)
                 {
-                    var typeElem = doc.GetElement(elem.GetTypeId());
-                    if (typeElem != null)
+                    var typeId = elem.GetTypeId();
+                    if (typeId != ElementId.InvalidElementId)
                     {
-                        foreach (Parameter p in typeElem.Parameters)
+                        if (!typeCache.TryGetValue(typeId, out var typeElem))
                         {
-                            if (parameterNames.Count == 0 || parameterNames.Contains(p.Definition.Name))
-                                typeParamNames.Add(p.Definition.Name);
+                            typeElem = doc.GetElement(typeId);
+                            typeCache[typeId] = typeElem;
+                        }
+                        if (typeElem != null)
+                        {
+                            foreach (Parameter p in typeElem.Parameters)
+                            {
+                                if (parameterNames.Count == 0 || parameterNames.Contains(p.Definition.Name))
+                                    typeParamNames.Add(p.Definition.Name);
+                            }
                         }
                     }
                 }
@@ -136,7 +145,12 @@ public class ExportToExcelTool : ICortexTool
 
                 if (includeTypeParams)
                 {
-                    var typeElem = doc.GetElement(elem.GetTypeId());
+                    var typeId = elem.GetTypeId();
+                    if (!typeCache.TryGetValue(typeId, out var typeElem))
+                    {
+                        typeElem = typeId != ElementId.InvalidElementId ? doc.GetElement(typeId) : null;
+                        typeCache[typeId] = typeElem;
+                    }
                     foreach (var name in typeParamNames.Items)
                     {
                         var p = typeElem?.LookupParameter(name);

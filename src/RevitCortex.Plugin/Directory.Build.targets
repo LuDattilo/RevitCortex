@@ -1,0 +1,9 @@
+<Project>
+  <!-- On machines where only v4.8.1 reference assemblies are installed (not v4.8),
+       redirect net48 builds to use v4.8.1 — a strict superset with identical BCL surface.
+       Must be in Directory.Build.targets (not .props) so that $(TargetFramework) is
+       already resolved from the project's PropertyGroup when this condition is tested. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <FrameworkPathOverride>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1</FrameworkPathOverride>
+  </PropertyGroup>
+</Project>

@@ -173,11 +173,13 @@ public class CreateViewFilterTool : ICortexTool
 
     private static FilterRule? CreateRule(ElementId paramId, string rule, string value, StorageType storageType)
     {
+        // Note: Revit 2025+ removed the bool caseSensitive parameter from string filter rules.
+        // The 3-arg overload (paramId, value, caseSensitive) only exists in Revit 2024 and earlier.
         switch (rule.ToLowerInvariant())
         {
             case "equals":
                 return storageType == StorageType.String
-#if REVIT2026_OR_GREATER
+#if REVIT2025_OR_GREATER
                     ? ParameterFilterRuleFactory.CreateEqualsRule(paramId, value)
 #else
                     ? ParameterFilterRuleFactory.CreateEqualsRule(paramId, value, false)
@@ -187,26 +189,26 @@ public class CreateViewFilterTool : ICortexTool
                         : null;
             case "not_equals":
                 return storageType == StorageType.String
-#if REVIT2026_OR_GREATER
+#if REVIT2025_OR_GREATER
                     ? ParameterFilterRuleFactory.CreateNotEqualsRule(paramId, value)
 #else
                     ? ParameterFilterRuleFactory.CreateNotEqualsRule(paramId, value, false)
 #endif
                     : null;
             case "contains":
-#if REVIT2026_OR_GREATER
+#if REVIT2025_OR_GREATER
                 return ParameterFilterRuleFactory.CreateContainsRule(paramId, value);
 #else
                 return ParameterFilterRuleFactory.CreateContainsRule(paramId, value, false);
 #endif
             case "begins_with":
-#if REVIT2026_OR_GREATER
+#if REVIT2025_OR_GREATER
                 return ParameterFilterRuleFactory.CreateBeginsWithRule(paramId, value);
 #else
                 return ParameterFilterRuleFactory.CreateBeginsWithRule(paramId, value, false);
 #endif
             case "ends_with":
-#if REVIT2026_OR_GREATER
+#if REVIT2025_OR_GREATER
                 return ParameterFilterRuleFactory.CreateEndsWithRule(paramId, value);
 #else
                 return ParameterFilterRuleFactory.CreateEndsWithRule(paramId, value, false);

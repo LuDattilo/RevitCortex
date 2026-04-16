@@ -45,47 +45,85 @@ public class FilterByParameterValueTool : ICortexTool
 
         try
         {
-            // Collect elements based on scope
-            FilteredElementCollector collector;
-            switch (scope.ToLower())
-            {
-                case "active_view":
-                    collector = new FilteredElementCollector(doc, doc.ActiveView.Id);
-                    break;
-                case "selection":
-                    var uiDoc = new UIDocument(doc);
-                    var selectedIds = uiDoc.Selection.GetElementIds();
-                    if (selectedIds.Count == 0)
-                        return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                            "No elements selected in Revit",
-                            suggestion: "Select elements first, or use scope 'whole_model'");
-                    collector = new FilteredElementCollector(doc, selectedIds);
-                    break;
-                default:
-                    collector = new FilteredElementCollector(doc);
-                    break;
-            }
-
-            var allElements = collector.WhereElementIsNotElementType().ToList();
-
-            // Filter by categories if specified
-            List<Element> elements;
+            // Pre-resolve category IDs once (avoid repeated lookups)
+            var resolvedCatIds = new List<ElementId>();
             if (categories.Count > 0)
             {
-                elements = allElements
-                    .Where(e => categories.Any(cat => CategoryResolver.CategoryMatches(doc, e, cat)))
-                    .ToList();
+                foreach (var cat in categories)
+                {
+                    var catId = CategoryResolver.ResolveToId(doc, cat);
+                    if (catId != null && catId != ElementId.InvalidElementId)
+                        resolvedCatIds.Add(catId);
+                }
+                if (resolvedCatIds.Count == 0)
+                    return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                        $"None of the specified categories could be resolved: {string.Join(", ", categories)}");
+            }
+
+            // Collect elements using Revit API category filter (much faster than post-filter)
+            List<Element> elements;
+            if (resolvedCatIds.Count > 0)
+            {
+                elements = new List<Element>();
+                foreach (var catId in resolvedCatIds)
+                {
+                    FilteredElementCollector collector;
+                    switch (scope.ToLower())
+                    {
+                        case "active_view":
+                            collector = new FilteredElementCollector(doc, doc.ActiveView.Id);
+                            break;
+                        case "selection":
+                            var uiDoc = new UIDocument(doc);
+                            var selectedIds = uiDoc.Selection.GetElementIds();
+                            if (selectedIds.Count == 0)
+                                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                                    "No elements selected in Revit",
+                                    suggestion: "Select elements first, or use scope 'whole_model'");
+                            collector = new FilteredElementCollector(doc, selectedIds);
+                            break;
+                        default:
+                            collector = new FilteredElementCollector(doc);
+                            break;
+                    }
+                    elements.AddRange(collector.OfCategoryId(catId).WhereElementIsNotElementType().ToList());
+                }
+                // Deduplicate if multiple categories matched the same elements
+                if (resolvedCatIds.Count > 1)
+                    elements = elements.GroupBy(e => e.Id).Select(g => g.First()).ToList();
             }
             else
             {
-                elements = allElements;
+                // No category filter: collect all (original behavior)
+                FilteredElementCollector collector;
+                switch (scope.ToLower())
+                {
+                    case "active_view":
+                        collector = new FilteredElementCollector(doc, doc.ActiveView.Id);
+                        break;
+                    case "selection":
+                        var uiDoc2 = new UIDocument(doc);
+                        var selectedIds2 = uiDoc2.Selection.GetElementIds();
+                        if (selectedIds2.Count == 0)
+                            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                                "No elements selected in Revit",
+                                suggestion: "Select elements first, or use scope 'whole_model'");
+                        collector = new FilteredElementCollector(doc, selectedIds2);
+                        break;
+                    default:
+                        collector = new FilteredElementCollector(doc);
+                        break;
+                }
+                elements = collector.WhereElementIsNotElementType().ToList();
             }
 
-            // Filter by parameter value
+            // Filter by parameter value (with type element cache)
             var matchedElements = new List<object>();
+            var typeCache = new Dictionary<ElementId, Element?>();
+
             foreach (var elem in elements)
             {
-                string? paramValue = GetParameterValue(doc, elem, parameterName, parameterType);
+                string? paramValue = GetParameterValue(doc, elem, parameterName, parameterType, typeCache);
                 if (paramValue == null) continue;
 
                 if (!MatchesCondition(paramValue, value, condition, caseSensitive))
@@ -100,13 +138,15 @@ public class FilterByParameterValueTool : ICortexTool
 #endif
                     { "category", elem.Category?.Name ?? "Unknown" },
                     { "familyName", GetFamilyName(elem) },
-                    { "typeName", GetTypeName(doc, elem) },
+                    { "typeName", GetTypeName(doc, elem, typeCache) },
                     { "matchedValue", paramValue }
                 };
 
                 if (returnParameters.Count > 0)
                 {
                     var extraParams = new Dictionary<string, string>();
+                    // Reuse cached type element instead of re-fetching
+                    var typeElem = GetCachedTypeElement(doc, elem, typeCache);
                     foreach (var rpName in returnParameters)
                     {
                         var rp = elem.LookupParameter(rpName);
@@ -114,15 +154,11 @@ public class FilterByParameterValueTool : ICortexTool
                         {
                             extraParams[rpName] = rp.AsValueString() ?? rp.AsString() ?? "";
                         }
-                        else
+                        else if (typeElem != null)
                         {
-                            var typeElem = doc.GetElement(elem.GetTypeId());
-                            if (typeElem != null)
-                            {
-                                var tp = typeElem.LookupParameter(rpName);
-                                if (tp != null)
-                                    extraParams[rpName] = tp.AsValueString() ?? tp.AsString() ?? "";
-                            }
+                            var tp = typeElem.LookupParameter(rpName);
+                            if (tp != null)
+                                extraParams[rpName] = tp.AsValueString() ?? tp.AsString() ?? "";
                         }
                     }
                     elementData["parameters"] = extraParams;
@@ -148,7 +184,7 @@ public class FilterByParameterValueTool : ICortexTool
         }
     }
 
-    private static string? GetParameterValue(Document doc, Element elem, string paramName, string paramType)
+    private static string? GetParameterValue(Document doc, Element elem, string paramName, string paramType, Dictionary<ElementId, Element?> typeCache)
     {
         Parameter? param = null;
         bool checkInstance = paramType == "instance" || paramType == "both";
@@ -159,7 +195,7 @@ public class FilterByParameterValueTool : ICortexTool
 
         if (param == null && checkType)
         {
-            var typeElem = doc.GetElement(elem.GetTypeId());
+            var typeElem = GetCachedTypeElement(doc, elem, typeCache);
             if (typeElem != null)
                 param = typeElem.LookupParameter(paramName);
         }
@@ -204,9 +240,22 @@ public class FilterByParameterValueTool : ICortexTool
         return "";
     }
 
-    private static string GetTypeName(Document doc, Element elem)
+    private static string GetTypeName(Document doc, Element elem, Dictionary<ElementId, Element?> typeCache)
     {
-        var typeElem = doc.GetElement(elem.GetTypeId());
+        var typeElem = GetCachedTypeElement(doc, elem, typeCache);
         return typeElem?.Name ?? "";
+    }
+
+    private static Element? GetCachedTypeElement(Document doc, Element elem, Dictionary<ElementId, Element?> cache)
+    {
+        var typeId = elem.GetTypeId();
+        if (typeId == ElementId.InvalidElementId) return null;
+
+        if (cache.TryGetValue(typeId, out var cached))
+            return cached;
+
+        var typeElem = doc.GetElement(typeId);
+        cache[typeId] = typeElem;
+        return typeElem;
     }
 }

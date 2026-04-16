@@ -61,6 +61,9 @@ public class LinesPerViewCountTool : ICortexTool
             int totalLines = 0;
             int skippedViews = 0;
 
+            // Determine which categories to scan (combine into one filter if both)
+            bool scanBoth = includeDetailLines && includeModelLines;
+
             foreach (var view in views)
             {
                 try
@@ -68,15 +71,35 @@ public class LinesPerViewCountTool : ICortexTool
                     int detailLineCount = 0;
                     int modelLineCount = 0;
 
-                    if (includeDetailLines)
+                    if (scanBoth)
+                    {
+                        // Single collector with multi-category filter (faster than two separate collectors)
+                        var catFilter = new LogicalOrFilter(
+                            new ElementCategoryFilter(BuiltInCategory.OST_Lines),
+                            new ElementCategoryFilter(BuiltInCategory.OST_GenericLines));
+
+                        var allLines = new FilteredElementCollector(doc, view.Id)
+                            .WherePasses(catFilter)
+                            .WhereElementIsNotElementType();
+
+                        foreach (var lineElem in allLines)
+                        {
+                            if (lineElem.Category == null) continue;
+                            var bicId = lineElem.Category.BuiltInCategory;
+                            if (bicId == BuiltInCategory.OST_Lines)
+                                detailLineCount++;
+                            else
+                                modelLineCount++;
+                        }
+                    }
+                    else if (includeDetailLines)
                     {
                         detailLineCount = new FilteredElementCollector(doc, view.Id)
                             .OfCategory(BuiltInCategory.OST_Lines)
                             .WhereElementIsNotElementType()
                             .GetElementCount();
                     }
-
-                    if (includeModelLines)
+                    else if (includeModelLines)
                     {
                         modelLineCount = new FilteredElementCollector(doc, view.Id)
                             .OfCategory(BuiltInCategory.OST_GenericLines)

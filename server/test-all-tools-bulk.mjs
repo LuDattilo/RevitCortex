@@ -483,6 +483,45 @@ async function flowE() {
   const pp = await sendCommand("manage_project_parameters", { action: "list" });
   checkResult("manage_project_parameters (list) OK", pp);
 
+  section("E13b", "manage_global_parameters \u2014 list");
+  const gp = await sendCommand("manage_global_parameters", { action: "list" });
+  checkResult("manage_global_parameters (list) OK", gp);
+  console.log(`    ${gp.result?.parameterCount ?? 0} global parameters`);
+
+  section("E13c", "manage_project_units \u2014 get");
+  const pu = await sendCommand("manage_project_units", { action: "get" });
+  checkResult("manage_project_units (get) OK", pu);
+  if (pu.ok) console.log(`    ${pu.result?.specCount ?? 0} specs: ${(pu.result?.specs || []).map(s => s.specType + "=" + s.displayUnit).join(", ")}`);
+
+  section("E13d", "manage_project_units \u2014 list_valid_units (length)");
+  const vu = await sendCommand("manage_project_units", { action: "list_valid_units", specType: "length" });
+  checkResult("manage_project_units (list_valid_units) OK", vu);
+  if (vu.ok) console.log(`    ${vu.result?.unitCount ?? 0} valid length units`);
+
+  section("E13e", "manage_additional_settings \u2014 list_line_styles");
+  const als = await sendCommand("manage_additional_settings", { action: "list_line_styles" });
+  checkResult("manage_additional_settings (line_styles) OK", als);
+  if (als.ok) console.log(`    ${als.result?.styleCount ?? 0} line styles`);
+  ctx.firstLineStyle = als.result?.lineStyles?.[0]?.name;
+
+  section("E13f", "manage_additional_settings \u2014 list_fill_patterns");
+  const afp = await sendCommand("manage_additional_settings", { action: "list_fill_patterns" });
+  checkResult("manage_additional_settings (fill_patterns) OK", afp);
+  if (afp.ok) console.log(`    ${afp.result?.patternCount ?? 0} fill patterns (drafting+model)`);
+
+  section("E13g", "manage_additional_settings \u2014 list_line_patterns");
+  const alp = await sendCommand("manage_additional_settings", { action: "list_line_patterns" });
+  checkResult("manage_additional_settings (line_patterns) OK", alp);
+  if (alp.ok) console.log(`    ${alp.result?.patternCount ?? 0} line patterns`);
+
+  section("E13h", "manage_additional_settings \u2014 list_line_weights");
+  const alw = await sendCommand("manage_additional_settings", { action: "list_line_weights" });
+  checkResult("manage_additional_settings (line_weights) OK", alw);
+
+  section("E13i", "manage_additional_settings \u2014 get_halftone");
+  const ahl = await sendCommand("manage_additional_settings", { action: "get_halftone" });
+  checkTool("manage_additional_settings (get_halftone)", ahl);
+
   section("E14", "load_family \u2014 list");
   const lf = await sendCommand("load_family", { action: "list" });
   checkResult("load_family (list) OK", lf);
@@ -1594,7 +1633,8 @@ async function run() {
     "workflow_sheet_set","workflow_model_audit","workflow_data_roundtrip",
     "store_project_data","store_room_data","query_stored_data","analyze_journal",
     "create_material","duplicate_material","delete_material","get_compound_structure",
-    "set_compound_structure","duplicate_system_type"
+    "set_compound_structure","duplicate_system_type",
+    "manage_global_parameters","manage_project_units","manage_additional_settings"
   ];
 
   const covered = ALL_TOOLS.filter(t => toolCoverage.has(t));

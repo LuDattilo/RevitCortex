@@ -60,11 +60,14 @@ public class ExportElementsDataTool : ICortexTool
             bool truncated = elements.Count > maxElements;
             elements = elements.Take(maxElements).ToList();
 
+            // ── Type element cache (shared across column discovery and row building)
+            var typeCache = new Dictionary<ElementId, Element?>();
+
             // ── Resolve columns ────────────────────────────────────────────
-            var columns = BuildColumns(doc, elements, parameterNames, includeElementId, includeTypeParams);
+            var columns = BuildColumns(doc, elements, parameterNames, includeElementId, includeTypeParams, typeCache);
 
             // ── Build rows ─────────────────────────────────────────────────
-            var rows = BuildRows(doc, elements, columns, includeElementId, includeTypeParams, parameterNames);
+            var rows = BuildRows(doc, elements, columns, includeElementId, includeTypeParams, parameterNames, typeCache);
 
             // ── Format output ──────────────────────────────────────────────
             object data = outputFormat == "csv" ? BuildCsv(columns, rows) : (object)rows;
@@ -176,7 +179,8 @@ public class ExportElementsDataTool : ICortexTool
         List<Element> elements,
         string[] parameterNames,
         bool includeElementId,
-        bool includeTypeParams)
+        bool includeTypeParams,
+        Dictionary<ElementId, Element?> typeCache)
     {
         var columns = new List<string>();
 
@@ -192,7 +196,7 @@ public class ExportElementsDataTool : ICortexTool
         }
         else
         {
-            // Auto-discover from first 50 elements
+            // Auto-discover from first 50 elements (with type cache)
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var elem in elements.Take(50))
             {
@@ -204,17 +208,13 @@ public class ExportElementsDataTool : ICortexTool
 
                 if (includeTypeParams)
                 {
-                    var typeId = elem.GetTypeId();
-                    if (typeId != ElementId.InvalidElementId)
+                    var typeElem = GetCachedTypeElement(doc, elem, typeCache);
+                    if (typeElem != null)
                     {
-                        var typeElem = doc.GetElement(typeId);
-                        if (typeElem != null)
+                        foreach (Parameter param in typeElem.Parameters)
                         {
-                            foreach (Parameter param in typeElem.Parameters)
-                            {
-                                var defName = param.Definition?.Name;
-                                if (!string.IsNullOrEmpty(defName)) names.Add(defName!);
-                            }
+                            var defName = param.Definition?.Name;
+                            if (!string.IsNullOrEmpty(defName)) names.Add(defName!);
                         }
                     }
                 }
@@ -236,9 +236,13 @@ public class ExportElementsDataTool : ICortexTool
         List<string> columns,
         bool includeElementId,
         bool includeTypeParams,
-        string[] explicitParamNames)
+        string[] explicitParamNames,
+        Dictionary<ElementId, Element?> typeCache)
     {
         var rows = new List<Dictionary<string, object?>>();
+        bool hasExplicitParams = explicitParamNames != null && explicitParamNames.Length > 0;
+        // Cache ElementId→Name resolutions to avoid repeated doc.GetElement for display values
+        var elementIdNameCache = new Dictionary<ElementId, string>();
 
         foreach (var element in elements)
         {
@@ -250,52 +254,94 @@ public class ExportElementsDataTool : ICortexTool
             row["Category"] = element.Category?.Name ?? "";
             row["Name"]     = element.Name ?? "";
 
-            // Instance parameters
-            var instanceParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (Parameter param in element.Parameters)
+            if (includeTypeParams)
             {
-                var defName = param.Definition?.Name;
-                if (!string.IsNullOrEmpty(defName))
-                    instanceParams[defName!] = GetParameterDisplayValue(param, doc);
-            }
-
-            // Type parameters
-            var typeParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            bool needTypeParams = includeTypeParams || (explicitParamNames != null && explicitParamNames.Length > 0);
-            if (needTypeParams)
-            {
-                var typeId = element.GetTypeId();
-                if (typeId != ElementId.InvalidElementId)
+                // Full enumeration mode: extract all instance + type params
+                var instanceParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (Parameter param in element.Parameters)
                 {
-                    var typeElem = doc.GetElement(typeId);
-                    if (typeElem != null)
+                    var defName = param.Definition?.Name;
+                    if (!string.IsNullOrEmpty(defName))
+                        instanceParams[defName!] = GetParameterDisplayValueCached(param, doc, elementIdNameCache);
+                }
+
+                var typeParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var typeElem = GetCachedTypeElement(doc, element, typeCache);
+                if (typeElem != null)
+                {
+                    foreach (Parameter param in typeElem.Parameters)
                     {
-                        foreach (Parameter param in typeElem.Parameters)
-                        {
-                            var defName = param.Definition?.Name;
-                            if (!string.IsNullOrEmpty(defName))
-                                typeParams[defName!] = GetParameterDisplayValue(param, doc);
-                        }
+                        var defName = param.Definition?.Name;
+                        if (!string.IsNullOrEmpty(defName))
+                            typeParams[defName!] = GetParameterDisplayValueCached(param, doc, elementIdNameCache);
                     }
                 }
+
+                foreach (var col in columns)
+                {
+                    if (col is "ElementId" or "Category" or "Name") continue;
+                    if (instanceParams.TryGetValue(col, out string? iVal))
+                        row[col] = iVal;
+                    else if (typeParams.TryGetValue(col, out string? tVal))
+                        row[col] = tVal;
+                    else
+                        row[col] = "";
+                }
             }
-
-            foreach (var col in columns)
+            else if (hasExplicitParams)
             {
-                if (col is "ElementId" or "Category" or "Name") continue;
+                // Targeted mode: use LookupParameter for each requested name
+                var typeElem = GetCachedTypeElement(doc, element, typeCache);
+                foreach (var col in columns)
+                {
+                    if (col is "ElementId" or "Category" or "Name") continue;
 
-                if (instanceParams.TryGetValue(col, out string? iVal))
-                    row[col] = iVal;
-                else if (typeParams.TryGetValue(col, out string? tVal))
-                    row[col] = tVal;
-                else
-                    row[col] = "";
+                    var param = element.LookupParameter(col);
+                    if (param == null)
+                        param = typeElem?.LookupParameter(col);
+
+                    row[col] = param != null
+                        ? GetParameterDisplayValueCached(param, doc, elementIdNameCache)
+                        : (object)"";
+                }
+            }
+            else
+            {
+                // Instance-only enumeration (no type params requested)
+                var instanceParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (Parameter param in element.Parameters)
+                {
+                    var defName = param.Definition?.Name;
+                    if (!string.IsNullOrEmpty(defName))
+                        instanceParams[defName!] = GetParameterDisplayValueCached(param, doc, elementIdNameCache);
+                }
+
+                foreach (var col in columns)
+                {
+                    if (col is "ElementId" or "Category" or "Name") continue;
+                    row[col] = instanceParams.TryGetValue(col, out string? iVal) ? iVal : "";
+                }
             }
 
             rows.Add(row);
         }
 
         return rows;
+    }
+
+    // ── Type element cache helper ─────────────────────────────────────────
+
+    private static Element? GetCachedTypeElement(Document doc, Element element, Dictionary<ElementId, Element?> cache)
+    {
+        var typeId = element.GetTypeId();
+        if (typeId == ElementId.InvalidElementId) return null;
+
+        if (cache.TryGetValue(typeId, out var cached))
+            return cached;
+
+        var typeElem = doc.GetElement(typeId);
+        cache[typeId] = typeElem;
+        return typeElem;
     }
 
     // ── CSV output ─────────────────────────────────────────────────────────
@@ -328,7 +374,7 @@ public class ExportElementsDataTool : ICortexTool
 
     // ── Parameter value helpers ────────────────────────────────────────────
 
-    private static string GetParameterDisplayValue(Parameter param, Document doc)
+    private static string GetParameterDisplayValueCached(Parameter param, Document doc, Dictionary<ElementId, string> eidCache)
     {
         if (param == null) return "";
         try
@@ -359,8 +405,12 @@ public class ExportElementsDataTool : ICortexTool
                 case StorageType.ElementId:
                     var eid = param.AsElementId();
                     if (eid == null || eid == ElementId.InvalidElementId) return "";
+                    if (eidCache.TryGetValue(eid, out var cachedName))
+                        return cachedName;
                     var refElem = doc.GetElement(eid);
-                    return refElem?.Name ?? GetElementIdString(eid);
+                    var name = refElem?.Name ?? GetElementIdString(eid);
+                    eidCache[eid] = name;
+                    return name;
 
                 default:
                     return "";
@@ -374,8 +424,10 @@ public class ExportElementsDataTool : ICortexTool
 
     private static string? GetParameterRawValue(Element element, Document doc, string paramName)
     {
-        // Try direct lookup, then case-insensitive search on instance
+        // Try direct lookup first (fast path)
         var param = element.LookupParameter(paramName);
+
+        // Fallback: case-insensitive search on instance (only if LookupParameter missed)
         if (param == null)
         {
             foreach (Parameter p in element.Parameters)
@@ -388,23 +440,27 @@ public class ExportElementsDataTool : ICortexTool
             }
         }
 
-        // Fallback: type parameters
+        // Fallback: type parameters (with direct lookup, no full enumeration)
         if (param == null)
         {
             var typeId = element.GetTypeId();
             if (typeId != ElementId.InvalidElementId)
             {
                 var typeElem = doc.GetElement(typeId);
-                param = typeElem?.LookupParameter(paramName);
-
-                if (param == null && typeElem != null)
+                if (typeElem != null)
                 {
-                    foreach (Parameter p in typeElem.Parameters)
+                    param = typeElem.LookupParameter(paramName);
+
+                    // Case-insensitive fallback only if direct lookup failed
+                    if (param == null)
                     {
-                        if (p.Definition?.Name.Equals(paramName, StringComparison.OrdinalIgnoreCase) == true)
+                        foreach (Parameter p in typeElem.Parameters)
                         {
-                            param = p;
-                            break;
+                            if (p.Definition?.Name.Equals(paramName, StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                param = p;
+                                break;
+                            }
                         }
                     }
                 }

@@ -31,6 +31,8 @@ public class GetElementParametersTool : ICortexTool
                 "No active document in session");
 
         var results = new List<object>();
+        // Cache type elements to avoid repeated lookups when many elements share the same type
+        var typeCache = new Dictionary<ElementId, Element?>();
 
         foreach (var id in elementIds)
         {
@@ -54,13 +56,18 @@ public class GetElementParametersTool : ICortexTool
                 parameters.Add(ExtractParameter(param, isType: false));
             }
 
-            // Type parameters
+            // Type parameters (with cache)
             if (includeTypeParams)
             {
                 var typeId = element.GetTypeId();
                 if (typeId != ElementId.InvalidElementId)
                 {
-                    var typeElement = doc.GetElement(typeId);
+                    if (!typeCache.TryGetValue(typeId, out var typeElement))
+                    {
+                        typeElement = doc.GetElement(typeId);
+                        typeCache[typeId] = typeElement;
+                    }
+
                     if (typeElement != null)
                     {
                         foreach (Parameter param in typeElement.Parameters)

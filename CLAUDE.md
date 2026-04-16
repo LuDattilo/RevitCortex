@@ -73,7 +73,7 @@ MCP Server (C#) -> SocketService -> CortexRouter -> ICortexTool
 ```
 
 - **MCP Server (C#)** -- ModelContextProtocol SDK, stdio transport to Claude. Located in `src/RevitCortex.Server/`.
-- **SocketService (C#)** -- TCP listener, JSON-RPC framing between TS server and C# plugin.
+- **SocketService (C#)** -- TCP listener, JSON-RPC framing between C# MCP server and C# plugin.
 - **CortexRouter (C#)** -- Deserializes the JSON-RPC request, finds the matching ICortexTool by name, invokes it with CortexSession, returns CortexResult.
 - **ICortexTool (C#)** -- Unified interface for all tools.
 - **CortexSession (C#)** -- Shared state facade passed to every tool: session store, document capabilities, detected locale.
@@ -171,7 +171,7 @@ When DocumentAnalyzer scans a document:
 `tool-schemas.txt` in the project root contains compact one-line-per-tool signatures. Regenerate after adding/modifying tool schemas:
 
 ```bash
-node server/generate-tool-schemas.mjs
+node server/generate-tool-schemas-csharp.mjs
 ```
 
 ### Fundamental Rule

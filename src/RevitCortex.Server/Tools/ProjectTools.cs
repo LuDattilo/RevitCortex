@@ -384,4 +384,48 @@ public static class ProjectTools
         var result = await revit.ExecuteAsync("list_schedulable_fields", JObject.Parse(data), ct);
         return result.ToString();
     }
+
+    [McpServerTool(Name = "manage_project_units"), Description("Get or set project units (length, area, volume, angle, etc.). Actions: get, set, list_valid_units.")]
+    public static async Task<string> ManageProjectUnits(
+        RevitConnectionManager revit,
+        [Description("Action: get | set | list_valid_units")] string action = "get",
+        [Description("Spec type for set/list_valid_units: length, area, volume, angle, slope, number, currency, mass, force, speed, temperature")] string? specType = null,
+        [Description("Unit to set (e.g. meters, millimeters, feet, inches, degrees)")] string? unit = null,
+        [Description("Optional display accuracy (e.g. 0.01)")] double? accuracy = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["action"] = action };
+        if (specType != null) p["specType"] = specType;
+        if (unit     != null) p["unit"]     = unit;
+        if (accuracy != null) p["accuracy"] = accuracy;
+        var result = await revit.ExecuteAsync("manage_project_units", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "manage_additional_settings"), Description("Manage Additional Settings (Manage tab): line styles, line weights, line patterns, fill patterns, halftone/underlay.")]
+    public static async Task<string> ManageAdditionalSettings(
+        RevitConnectionManager revit,
+        [Description("Action: list_line_styles | create_line_style | set_line_style | list_line_weights | list_line_patterns | list_fill_patterns | get_halftone | set_halftone")] string action,
+        [Description("Name of the line style (for create/set)")] string? name = null,
+        [Description("Line weight number 1-16 (for create/set line style)")] int? lineWeight = null,
+        [Description("Line pattern name (for create/set line style, e.g. 'Solid', 'Dash')")] string? linePatternName = null,
+        [Description("Color red component 0-255")] int? colorR = null,
+        [Description("Color green component 0-255")] int? colorG = null,
+        [Description("Color blue component 0-255")] int? colorB = null,
+        [Description("Halftone brightness percent 0-100 (for set_halftone)")] int? halftonePercent = null,
+        [Description("Underlay brightness percent 0-100 (for set_halftone)")] int? underlayBrightness = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["action"] = action };
+        if (name            != null) p["name"]              = name;
+        if (lineWeight      != null) p["lineWeight"]        = lineWeight;
+        if (linePatternName != null) p["linePatternName"]   = linePatternName;
+        if (colorR          != null) p["colorR"]            = colorR;
+        if (colorG          != null) p["colorG"]            = colorG;
+        if (colorB          != null) p["colorB"]            = colorB;
+        if (halftonePercent    != null) p["halftonePercent"]    = halftonePercent;
+        if (underlayBrightness != null) p["underlayBrightness"] = underlayBrightness;
+        var result = await revit.ExecuteAsync("manage_additional_settings", p, ct);
+        return result.ToString();
+    }
 }

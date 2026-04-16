@@ -12,8 +12,9 @@
 4. [Discipline di progetto e categorie Revit](#discipline-di-progetto-e-categorie-revit)
 5. [Strumenti principali](#strumenti-principali)
 6. [Workflow consigliati](#workflow-consigliati)
-7. [Esecuzione di codice personalizzato](#esecuzione-di-codice-personalizzato)
-8. [Risoluzione dei problemi comuni](#risoluzione-dei-problemi-comuni)
+7. [Impostazioni di progetto avanzate](#impostazioni-di-progetto-avanzate)
+8. [Esecuzione di codice personalizzato](#esecuzione-di-codice-personalizzato)
+9. [Risoluzione dei problemi comuni](#risoluzione-dei-problemi-comuni)
 
 ---
 
@@ -198,7 +199,15 @@ Quando si devono creare/modificare centinaia di elementi, uno script C# eseguito
 | `add_shared_parameter` | Aggiunge parametro condiviso a categorie |
 | `sync_csv_parameters` | Importa valori da CSV |
 | `transfer_parameters` | Copia parametri tra elementi |
-| `manage_project_parameters` | Lista/rimuovi parametri di progetto |
+| `manage_project_parameters` | Lista/crea/elimina parametri di progetto |
+| `manage_global_parameters` | Gestisce i Global Parameters (azioni: list, get, create, set, delete) |
+
+### Impostazioni Progetto
+
+| Strumento | Scopo |
+|-----------|-------|
+| `manage_project_units` | Legge o imposta le unità di progetto (lunghezza, area, volume, angolo, ecc.) |
+| `manage_additional_settings` | Stili di linea, pesi linea, pattern linea, pattern di riempimento, halftone/underlay |
 
 ### Script e automazione
 
@@ -245,6 +254,64 @@ Oppure con pattern:
 
 ```
 "Esporta tutti i muri con area, tipo e livello in un Excel"
+```
+
+---
+
+---
+
+## Impostazioni di progetto avanzate
+
+### Unità di progetto (`manage_project_units`)
+
+```
+"Quali sono le unità di progetto attuali?"
+→ manage_project_units con action: "get"
+
+"Imposta le unità di lunghezza in millimetri"
+→ manage_project_units con action: "set", specType: "length", unit: "millimeters"
+
+"Quali unità sono disponibili per le aree?"
+→ manage_project_units con action: "list_valid_units", specType: "area"
+```
+
+Specifiche supportate: `length`, `area`, `volume`, `angle`, `slope`, `number`, `currency`, `mass`, `force`, `speed`, `temperature`.
+
+### Global Parameters (`manage_global_parameters`)
+
+I Global Parameters sono valori nominati a livello di progetto che possono pilotare quote e vincoli.
+
+```
+"Elenca tutti i parametri globali del progetto"
+→ manage_global_parameters con action: "list"
+
+"Crea un parametro globale 'AltezzaInterpiano' di tipo lunghezza con valore 3.0"
+→ manage_global_parameters con action: "create", name: "AltezzaInterpiano", dataType: "length", value: "3.0"
+
+"Imposta il valore di 'AltezzaInterpiano' a 3.2"
+→ manage_global_parameters con action: "set", name: "AltezzaInterpiano", value: "3.2"
+```
+
+### Impostazioni aggiuntive (`manage_additional_settings`)
+
+Corrisponde al menu **Manage → Additional Settings** di Revit.
+
+```
+"Elenca tutti gli stili di linea del progetto"
+→ manage_additional_settings con action: "list_line_styles"
+
+"Crea uno stile di linea 'RC_Taglio' rosso, peso 3"
+→ manage_additional_settings con action: "create_line_style",
+   name: "RC_Taglio", colorR: 255, colorG: 0, colorB: 0, lineWeight: 3
+
+"Elenca tutti i pattern di riempimento (drafting e model)"
+→ manage_additional_settings con action: "list_fill_patterns"
+
+"Elenca i pattern di linea disponibili"
+→ manage_additional_settings con action: "list_line_patterns"
+
+"Imposta la luminosità halftone al 70%"
+→ manage_additional_settings con action: "set_halftone", halftonePercent: 70
 ```
 
 ---

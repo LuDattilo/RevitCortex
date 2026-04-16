@@ -155,4 +155,21 @@ public static class ParameterTools
         var result = await revit.ExecuteAsync("export_shared_parameter_file", p, ct);
         return result.ToString();
     }
+
+    [McpServerTool(Name = "manage_global_parameters"), Description("List, create, read, update, or delete global parameters (project-level named values). Actions: list, get, create, set, delete.")]
+    public static async Task<string> ManageGlobalParameters(
+        RevitConnectionManager revit,
+        [Description("Action: list | get | create | set | delete")] string action = "list",
+        [Description("Parameter name (required for get/create/set/delete)")] string? name = null,
+        [Description("Data type for create: text, integer, number, length, area, volume, angle, yesno")] string? dataType = null,
+        [Description("Value to set (for create or set actions)")] string? value = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["action"] = action };
+        if (name     != null) p["name"]     = name;
+        if (dataType != null) p["dataType"] = dataType;
+        if (value    != null) p["value"]    = value;
+        var result = await revit.ExecuteAsync("manage_global_parameters", p, ct);
+        return result.ToString();
+    }
 }
