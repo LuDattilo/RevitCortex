@@ -64,8 +64,6 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Port -->
@@ -97,47 +95,31 @@
 
                 <Separator Grid.Row="3" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
 
-                <!-- Claude Model -->
-                <StackPanel Grid.Row="4" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
-                    <TextBlock Text="Chat Model" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
-                    <TextBlock Text="Claude model for built-in chat" FontSize="11" Foreground="#666" Margin="0,3,0,0"/>
-                </StackPanel>
-                <ComboBox x:Name="ModelComboBox" Grid.Row="4" Grid.Column="1"
-                          Margin="15,10,0,10" Padding="8,6" FontSize="14"
-                          VerticalAlignment="Center" Width="260" HorizontalAlignment="Left"
-                          BorderBrush="#E0E0E0" IsEditable="True">
-                    <ComboBoxItem Content="claude-sonnet-4-6"/>
-                    <ComboBoxItem Content="claude-haiku-4-5-20251001"/>
-                    <ComboBoxItem Content="claude-opus-4-6"/>
-                </ComboBox>
-
-                <Separator Grid.Row="5" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
-
                 <!-- Read-Only Mode -->
-                <StackPanel Grid.Row="6" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                <StackPanel Grid.Row="4" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
                     <TextBlock Text="Read-Only Mode" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
                     <TextBlock Text="Block all write operations" FontSize="11" Foreground="#666" Margin="0,3,0,0"/>
                 </StackPanel>
-                <CheckBox x:Name="ReadOnlyCheckBox" Grid.Row="6" Grid.Column="1"
+                <CheckBox x:Name="ReadOnlyCheckBox" Grid.Row="4" Grid.Column="1"
                           Margin="15,10,0,10" VerticalAlignment="Center"
                           Content="Enable read-only mode" FontSize="13" Foreground="#333"/>
 
-                <Separator Grid.Row="7" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
+                <Separator Grid.Row="5" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
 
                 <!-- Plugin Version -->
-                <StackPanel Grid.Row="8" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                <StackPanel Grid.Row="6" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
                     <TextBlock Text="Plugin Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
                 </StackPanel>
-                <TextBlock x:Name="PluginVersionText" Grid.Row="8" Grid.Column="1"
+                <TextBlock x:Name="PluginVersionText" Grid.Row="6" Grid.Column="1"
                            Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
 
-                <Separator Grid.Row="9" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
+                <Separator Grid.Row="7" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
 
                 <!-- Revit Version -->
-                <StackPanel Grid.Row="10" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                <StackPanel Grid.Row="8" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
                     <TextBlock Text="Revit Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
                 </StackPanel>
-                <TextBlock x:Name="RevitVersionText" Grid.Row="10" Grid.Column="1"
+                <TextBlock x:Name="RevitVersionText" Grid.Row="8" Grid.Column="1"
                            Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
             </Grid>
         </ScrollViewer>

@@ -12,7 +12,6 @@ public partial class GeneralSettingsPage : Page
 {
     private const int DefaultPort = 8080;
     private const string DefaultLogLevel = "Info";
-    private const string DefaultModel = "claude-sonnet-4-6";
     private int _originalPort;
 
     private static string SettingsFilePath => Path.Combine(
@@ -68,7 +67,6 @@ public partial class GeneralSettingsPage : Page
                     _originalPort = settings.Port;
                     PortTextBox.Text = settings.Port.ToString();
                     SetComboSelection(LogLevelComboBox, settings.LogLevel ?? DefaultLogLevel);
-                    SetComboText(ModelComboBox, settings.Model ?? DefaultModel);
                     ReadOnlyCheckBox.IsChecked = settings.ReadOnlyMode;
                     return;
                 }
@@ -111,7 +109,6 @@ public partial class GeneralSettingsPage : Page
         _originalPort = DefaultPort;
         PortTextBox.Text = DefaultPort.ToString();
         SetComboSelection(LogLevelComboBox, DefaultLogLevel);
-        SetComboText(ModelComboBox, DefaultModel);
     }
 
     private static void SetComboSelection(ComboBox combo, string value)
@@ -127,19 +124,6 @@ public partial class GeneralSettingsPage : Page
         combo.SelectedIndex = 1;
     }
 
-    private static void SetComboText(ComboBox combo, string value)
-    {
-        foreach (ComboBoxItem item in combo.Items)
-        {
-            if (item.Content?.ToString() == value)
-            {
-                combo.SelectedItem = item;
-                return;
-            }
-        }
-        combo.Text = value;
-    }
-
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         if (!int.TryParse(PortTextBox.Text.Trim(), out int port) || port < 1 || port > 65535)
@@ -150,8 +134,6 @@ public partial class GeneralSettingsPage : Page
         }
 
         string logLevel = (LogLevelComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? DefaultLogLevel;
-        string model = ModelComboBox.Text?.Trim();
-        if (string.IsNullOrEmpty(model)) model = DefaultModel;
 
         try
         {
@@ -159,7 +141,6 @@ public partial class GeneralSettingsPage : Page
             {
                 Port = port,
                 LogLevel = logLevel,
-                Model = model,
                 ReadOnlyMode = ReadOnlyCheckBox.IsChecked == true
             };
 
@@ -194,6 +175,5 @@ internal class CortexSettings
 {
     public int Port { get; set; } = 8080;
     public string? LogLevel { get; set; } = "Info";
-    public string? Model { get; set; } = "claude-sonnet-4-6";
     public bool ReadOnlyMode { get; set; }
 }
