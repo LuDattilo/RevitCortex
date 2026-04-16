@@ -1763,7 +1763,7 @@ def build_pdf():
         pdf.ln(1)
 
     # -- Save --
-    out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "RevitCortex_User_Guide.pdf")
+    out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "RevitCortex_User_Guide_IT.pdf")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     pdf.output(out_path)
     print(f"PDF generated: {out_path}")
