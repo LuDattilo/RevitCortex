@@ -99,4 +99,35 @@ public class CodeSandboxTests
 
         Assert.Null(CodeSandbox.Validate(code));
     }
+
+    // ── Regression tests for V2 (post-review) ─────────────────────────────
+
+    [Fact]
+    public void Validate_CommentMentionsProhibited_Allowed()
+    {
+        // V1 would have blocked this — V2 strips the comment before matching
+        var code = "// System.IO is prohibited in this project\nreturn document.Title;";
+        Assert.Null(CodeSandbox.Validate(code));
+    }
+
+    [Fact]
+    public void Validate_StringLiteralMentionsProhibited_Allowed()
+    {
+        var code = "var note = \"do not use System.IO\"; return note;";
+        Assert.Null(CodeSandbox.Validate(code));
+    }
+
+    [Fact]
+    public void Validate_TypeGetTypeReflectionBypass_Blocked()
+    {
+        var code = "var t = Type.GetType(\"System.IO.File\"); t.GetMethod(\"Delete\");";
+        Assert.NotNull(CodeSandbox.Validate(code));
+    }
+
+    [Fact]
+    public void Validate_ActivatorBypass_Blocked()
+    {
+        var code = "var obj = Activator.CreateInstance(someType);";
+        Assert.NotNull(CodeSandbox.Validate(code));
+    }
 }
