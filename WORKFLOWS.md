@@ -305,15 +305,19 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 ## Workaround: send_code_to_revit
 
-**Sequenza:** Scrivere codice C# usando `document` come variabile del documento
+**REGOLA FONDAMENTALE: non usare `send_code_to_revit` in autonomia.** Se un'operazione è massiva o complessa e potrebbe beneficiare di uno script, proporre entrambe le opzioni all'utente e attendere la scelta:
+
+> "Posso procedere con i tool standard (più chiamate, più tracciabile) oppure usare send_code_to_revit con uno script C# (più efficiente, ma bypassa le protezioni native). Quale preferisci?"
+
+**Sequenza quando l'utente sceglie lo script:** Scrivere codice C# usando `document` come variabile del documento
 **Parametri chiave:**
 - Variabile documento: `document` (NON `doc`, `Doc`, o `uidoc`)
 - Per UIDocument: `new UIDocument(document)`
 - ElementId: `.Value` su R2024+, `.IntegerValue` su R2023
 - Namespace proibiti: `System.IO`, `System.Net`, `System.Diagnostics.Process`, `Microsoft.Win32`, `System.Reflection.Emit`, `System.Runtime.InteropServices`
-**NON fare:** Non usare variabili diverse da `document`. Non usare namespace proibiti -- il sandbox li blocchera con `PermissionDenied`.
+**NON fare:** Non passare automaticamente allo script senza chiedere. Non usare namespace proibiti -- il sandbox restituisce `PermissionDenied`.
 
-**Fonte:** CLAUDE.md (Tool-Specific Corrections, Security Requirements)
+**Fonte:** CLAUDE.md (Tool-Specific Corrections, Handling User Input Situations)
 
 ---
 

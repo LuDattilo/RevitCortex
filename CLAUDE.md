@@ -365,6 +365,17 @@ Then use the corresponding column from the locale mapping tables below for ALL s
 - Example: `{"data": {"elementIds": [123], "action": "select"}}`
 
 ### `send_code_to_revit`
+
+**NEVER use autonomously for bulk/batch operations.** When an operation involves many elements or would benefit from a custom script, ALWAYS ask the user first:
+
+> "Posso usare `send_code_to_revit` per eseguire questa operazione in modo più efficiente con uno script C#, oppure preferisci che proceda con i tool standard (potrebbe richiedere più chiamate)?"
+
+Only proceed with `send_code_to_revit` after explicit user consent. Reasons to ask rather than assume:
+- Scripts bypass the native tool safety layer (dryRun, confirmation dialogs)
+- DLL conflicts (archintelligence, BIM360, other add-ins) can crash `send_code_to_revit` silently
+- The user may prefer full traceability via discrete tool calls
+
+Specific guidance:
 - Document variable is `document` (not `doc`, `Doc`, or `uidoc`)
 - For UIDocument: `new UIDocument(document)`
 - ElementId uses `.Value` on R2024+ and `.IntegerValue` on R2023
@@ -376,6 +387,7 @@ When a tool requires user selection or interaction that cannot be automated:
 2. **Use `get_selected_elements`** -- if the user says "selected elements", call this first. If empty, ask them to select
 3. **Cancelled operations** -- if a tool returns `cancelled: true`, acknowledge it and ask if they want to retry
 4. **dryRun pattern** -- for destructive operations, run with `dryRun: true` first to preview the results, then with `dryRun: false` to execute. The confirmation dialog will ask the user
+5. **Script escalation** -- if the task would benefit from `send_code_to_revit` (bulk ops, complex logic, 100+ elements), DO NOT switch automatically. Ask the user: propose the script approach AND the native-tool approach, explain the trade-offs, and wait for their choice. The native approach may require more tool calls but is always safer and more traceable.
 
 ## OST Category Codes (language-independent)
 
