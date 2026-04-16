@@ -64,14 +64,13 @@ public class ManageAdditionalSettingsTool : ICortexTool
     private static CortexResult<object> ListLineStyles(Document doc)
     {
         var linesCategory = doc.Settings.Categories.get_Item(BuiltInCategory.OST_Lines);
-        var styles = new List<object>();
 
-        foreach (Category sub in linesCategory.SubCategories)
-        {
-            styles.Add(BuildLineStyleInfo(doc, sub));
-        }
+        var sortedSubs = linesCategory.SubCategories
+            .Cast<Category>()
+            .OrderBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-        styles = styles.OrderBy(s => ((dynamic)s).name.ToString()).ToList();
+        var styles = sortedSubs.Select(sub => BuildLineStyleInfo(doc, sub)).ToList();
 
         return CortexResult<object>.Ok(new
         {
