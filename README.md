@@ -1,12 +1,12 @@
 # RevitCortex
 
-A next-generation **MCP (Model Context Protocol) server** for Autodesk Revit with 149 tools, typed errors, session state, and dynamic tool discovery. Pure C# — no Node.js required.
+A next-generation **MCP (Model Context Protocol) server** for Autodesk Revit with 157 tools, typed errors, session state, and dynamic tool discovery. Pure C# — no Node.js required.
 
 RevitCortex lets Claude (or any MCP-compatible LLM) read, create, modify, and analyze Revit models in real time -- from querying elements and parameters to creating views, sheets, schedules, and running full audit workflows.
 
 ## Features
 
-- **149 MCP tools** across 15 categories: Elements, Views, Sheets, Schedules, Parameters, Materials, Creation, Export, Audit, Workflows, IFC, Links, Journal, Code, and Meta
+- **157 MCP tools** across 15 categories: Elements, Views, Sheets, Schedules, Parameters, Materials, Creation, Export, Audit, Workflows, IFC, Links, Journal, Code, and Meta
 - **Pure C# architecture** -- MCP server and Revit plugin both in C#, no Node.js dependency
 - **Typed results** -- every tool returns `CortexResult<T>` with structured error codes, not raw strings
 - **Session state** -- `CortexSession` persists data across tool calls within a session
@@ -204,7 +204,7 @@ Before using any tool, ensure:
 
 ### Via MCP Client (Claude Desktop / Claude Code)
 
-Once configured, Claude has access to all 154 tools. Examples:
+Once configured, Claude has access to all 157 tools. Examples:
 
 | Request | Tools Used |
 |---------|-----------|
@@ -335,12 +335,13 @@ Use the `dryRun: true` parameter (where available) to preview changes without ap
 | `list_schedulable_fields` | List all available fields for a category |
 | `import_table` | Import a CSV/data table into a schedule |
 
-### Parameters (10 tools)
+### Parameters (11 tools)
 
 | Tool | Description |
 |------|-------------|
 | `add_shared_parameter` | Add a shared parameter to a category |
 | `manage_project_parameters` | Add, list, or remove project parameters |
+| `manage_global_parameters` | List, create, read, update, or delete global parameters |
 | `add_prefix_suffix` | Add prefix/suffix to parameter values |
 | `get_shared_parameters` | List all shared parameters in the project |
 | `bulk_modify_parameter_values` | Modify parameter values across multiple elements |
@@ -350,7 +351,7 @@ Use the `dryRun: true` parameter (where available) to preview changes without ap
 | `batch_rename` | Rename elements using pattern rules |
 | `sync_csv_parameters` | Sync parameter values from/to a CSV file |
 
-### Project (14 tools)
+### Project (16 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -368,6 +369,8 @@ Use the `dryRun: true` parameter (where available) to preview changes without ap
 | `tag_rooms` | Auto-tag all rooms in a view |
 | `tag_walls` | Auto-tag all walls in a view |
 | `duplicate_system_type` | Duplicate a wall/floor/roof/ceiling type |
+| `manage_project_units` | Get or set project units (length, area, volume, angle, etc.) |
+| `manage_additional_settings` | Manage line styles, line weights, line patterns, fill patterns, halftone/underlay |
 
 ### Materials (9 tools)
 
@@ -533,7 +536,7 @@ RevitCortex/
     Program.cs                   Server entry point (MCP hosting)
     Connection/
       RevitBridge.cs             TCP bridge to Plugin (JSON-RPC)
-    Tools/                       Tool definitions (149 tools across 9 files)
+    Tools/                       Tool definitions (157 tools across 9 files)
       MetaTools.cs               say_hello, get_project_info
       ElementTools.cs            Element CRUD, filtering, selection
       ViewTools.cs               Views, sheets, schedules
