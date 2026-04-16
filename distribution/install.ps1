@@ -118,6 +118,21 @@ New-Item -ItemType Directory -Path $serverTarget -Force | Out-Null
 Copy-Item "$serverSource\*" $serverTarget -Recurse -Force
 
 $serverExe = Join-Path $serverTarget "RevitCortex.Server.exe"
+
+# Remove Zone.Identifier ADS (marks files as "downloaded from internet") to prevent
+# SmartScreen and Windows Defender from blocking the executable on first launch.
+Get-ChildItem $serverTarget -Recurse -File | ForEach-Object {
+    Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue
+}
+Write-Host "  Unblocked files (Zone.Identifier removed)" -ForegroundColor Gray
+
+# Add Windows Defender exclusion for the server folder so real-time protection
+# does not quarantine the self-contained EXE (common false positive for new executables).
+if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
+    Add-MpPreference -ExclusionPath $serverTarget -ErrorAction SilentlyContinue
+    Write-Host "  Windows Defender exclusion added for server folder" -ForegroundColor Gray
+}
+
 Write-Host "  Server installed: $serverExe" -ForegroundColor Green
 
 # --- Step 4: Configure MCP Client ---
