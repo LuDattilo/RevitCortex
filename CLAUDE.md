@@ -215,6 +215,8 @@ When multiple tools can achieve the same goal, use the most targeted one.
 - Complex filter (ranges, AND/OR, multi-parameter) -> `ai_element_filter`
 - Current view elements -> `get_current_view_elements` with `fields` and `limit`
 - Elements in a room/volume -> `get_elements_in_spatial_volume` with `categoryFilter` and reduced `maxElementsPerVolume`
+- **Elements with empty custom parameter** -> NEVER guess parameter names. First: `get_element_parameters` on 1 sample element to discover exact names. Then: `export_elements_data` with `parameterNames` + `filter_by_parameter_value` with `condition: "is_empty"`. Do NOT use `send_code_to_revit` -- unnecessary and fragile with DLL conflicts (archintelligence, BIM360).
+- **Discover custom parameter names** (WBS_*, Code_*, etc.) -> `get_element_parameters` on 1 sample element ID; never assume name format.
 
 **Modifying parameters**:
 - 1 element, 1-3 parameters -> `set_element_parameters`

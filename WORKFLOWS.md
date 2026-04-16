@@ -317,6 +317,31 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 ---
 
+## Trovare Elementi con Parametri Personalizzati Vuoti (WBS / Codici)
+
+**Obiettivo:** trovare elementi di una o più categorie dove un parametro personalizzato (es. WBS_Activity, WBS_Phase) non è popolato, e creare un abaco Revit.
+
+**Sequenza:**
+1. `ai_element_filter` su una categoria con `maxElements: 1` → ottieni un ID campione
+2. `get_element_parameters` sull'ID campione con `includeTypeParameters: false` → scopri i nomi esatti dei parametri WBS_* presenti nel modello
+3. `export_elements_data` con `categories: [tutte le categorie richieste]`, `parameterNames: [lista nomi WBS_*]`, `maxElements: 500` → ottieni tutti gli elementi con i valori WBS
+4. Filtra lato client (o usa `filter_by_parameter_value` con `condition: "is_empty"`) per identificare quali elementi hanno WBS vuoti
+5. `create_schedule` con i campi WBS scoperti + filtro `is_empty` → abaco nativo in Revit già filtrato
+
+**Parametri chiave:**
+- Step 2: usare un elemento reale per scoprire i nomi — NON indovinare "WBS_Activity"
+- Step 3: specificare `parameterNames` espliciti — senza, `export_elements_data` restituisce tutti i parametri (troppi token)
+- Step 5: il filtro `is_empty` in `create_schedule` funziona anche per parametri condivisi personalizzati
+
+**NON fare:**
+- Non usare `send_code_to_revit` per questa operazione — non necessario e rischia conflitti DLL (archintelligence, BIM360)
+- Non usare solo `ai_element_filter` aspettandosi i parametri personalizzati — restituisce solo i campi base (Name, Id, Level)
+- Non creare l'abaco manualmente in Revit se è possibile usare `create_schedule`
+
+**Fonte:** Bug report sessione 2026-04-16 (modello Rd6, categorie OST_StructuralFraming + OST_StructuralColumns + OST_Walls + OST_Floors)
+
+---
+
 ## Workaround: get_compound_structure su Muri non Strutturali
 
 **Sequenza:** `get_compound_structure` restituisce `structuralLayerIndex: -1`
