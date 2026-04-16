@@ -106,7 +106,7 @@ public class ToolRegistrationTests
             $"If you removed tools intentionally, update this test.");
     }
 
-    [Fact]
+    [Fact(Skip = "Legacy: the TypeScript server has been superseded by the C# RevitCortex.Server. This parity check is no longer enforced.")]
     public void TypeScript_ToolRegistrations_MatchCSharp()
     {
         // Read register.ts and extract tool names
