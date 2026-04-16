@@ -93,6 +93,23 @@ public static class RoslynExecutor
             {
                 result = method.Invoke(null, new object[] { globals.document, globals.uiDocument, globals.app });
             }
+            else if (transactionMode == "group")
+            {
+                using var txGroup = new TransactionGroup(globals.document, "RevitCortex: Script Group");
+                txGroup.Start();
+                try
+                {
+                    result = method.Invoke(null, new object[] { globals.document, globals.uiDocument, globals.app });
+                    if (txGroup.GetStatus() == TransactionStatus.Started)
+                        txGroup.Assimilate();
+                }
+                catch
+                {
+                    if (txGroup.GetStatus() == TransactionStatus.Started)
+                        txGroup.RollBack();
+                    throw;
+                }
+            }
             else
             {
                 using var tx = new Transaction(globals.document, "RevitCortex: Script");
@@ -117,8 +134,8 @@ public static class RoslynExecutor
         {
             return CortexResult<object>.Fail(
                 CortexErrorCode.Unknown,
-                $"Runtime error: {ex.InnerException.Message}",
-                suggestion: "Check variable names, null references, and Revit API usage.");
+                $"Runtime error: {ex.InnerException}",
+                suggestion: "Check variable names, null references, and Revit API usage. Full stack trace above.");
         }
         catch (Exception ex)
         {
