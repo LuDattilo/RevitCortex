@@ -139,6 +139,28 @@ internal static class Localization
             ["en"] = "Unable to open the folder: {0}",
             ["it"] = "Impossibile aprire la cartella: {0}",
         },
+
+        // ── Update checker ──────────────────────────────────────────────
+        ["update.available_title"] = new()
+        {
+            ["en"] = "RevitCortex {0} is available",
+            ["it"] = "È disponibile RevitCortex {0}",
+        },
+        ["update.available_detail"] = new()
+        {
+            ["en"] = "You are on {0}. Click Download to get the new release.",
+            ["it"] = "Versione installata: {0}. Clicca Download per scaricare la nuova release.",
+        },
+        ["update.download_button"] = new()
+        {
+            ["en"] = "Download",
+            ["it"] = "Scarica",
+        },
+        ["update.open_browser_failed"] = new()
+        {
+            ["en"] = "Unable to open the download link: {0}",
+            ["it"] = "Impossibile aprire il link di download: {0}",
+        },
         ["support.cleanup.confirm_title"] = new()
         {
             ["en"] = "Delete all support reports?",

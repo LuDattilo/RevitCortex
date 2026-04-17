@@ -61,6 +61,11 @@ public class RevitCortexApp : IExternalApplication
             LoadReadOnlyMode();
             LoadPort();
 
+            // Fire-and-forget update check against the public metadata repo.
+            // Populates UpdateChecker.Latest for the Settings page banner.
+            // Silent on any failure — must never block Revit startup.
+            RevitCortex.Plugin.Updates.UpdateChecker.CheckInBackground();
+
             // Create socket service but do NOT start automatically
             _socketService = new SocketService(_router, _port);
 

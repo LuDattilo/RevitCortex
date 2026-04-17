@@ -9,6 +9,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -46,8 +47,28 @@
             </Grid>
         </Border>
 
+        <!-- Update Available Banner (hidden until UpdateChecker finds a newer version) -->
+        <Border Grid.Row="2" x:Name="UpdateBanner" CornerRadius="6" Padding="14,10"
+                Margin="0,0,0,15" Background="#FFF8E1" BorderThickness="1" BorderBrush="#FFB300"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock x:Name="UpdateTitle" FontSize="13" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock x:Name="UpdateDetail" FontSize="11" Foreground="#666" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Button x:Name="UpdateDownloadButton" Grid.Column="1" Content="Download"
+                        Padding="14,6" Margin="12,0,0,0" FontSize="13"
+                        Background="#FFB300" Foreground="White" BorderBrush="#FF8F00"
+                        Click="UpdateDownload_Click" Cursor="Hand"/>
+            </Grid>
+        </Border>
+
         <!-- Form -->
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
             <Grid Margin="0,0,20,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="200"/>
@@ -147,7 +168,7 @@
         </ScrollViewer>
 
         <!-- Footer -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
             <Button Content="Reset Defaults" Padding="15,8" Margin="0,0,10,0" FontSize="13"
                     Background="#F5F5F5" Foreground="#333" BorderBrush="#E0E0E0"
                     Click="ResetDefaults_Click" Cursor="Hand"/>

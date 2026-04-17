@@ -1,11 +1,13 @@
 using Newtonsoft.Json;
 using RevitCortex.Plugin.Commands;
+using RevitCortex.Plugin.Updates;
 using System;
 using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using TaskDialog = Autodesk.Revit.UI.TaskDialog;
 using TaskDialogCommonButtons = Autodesk.Revit.UI.TaskDialogCommonButtons;
 using TaskDialogResult = Autodesk.Revit.UI.TaskDialogResult;
@@ -30,6 +32,11 @@ public partial class GeneralSettingsPage : Page
         LoadSettings();
         LoadVersionInfo();
         RefreshConnectionStatus();
+        RefreshUpdateBanner();
+        // The update check runs once at plugin startup on a background thread;
+        // when the user opens Settings it may or may not have completed yet.
+        // Re-check every second for ~10 s to catch the late reply, then stop.
+        StartUpdateBannerPolling();
     }
 
     private void ApplyLocalizedStrings()
@@ -38,6 +45,60 @@ public partial class GeneralSettingsPage : Page
         SupportReportsSubtitle.Text = Localization.T("support.settings.subtitle");
         OpenReportsFolderButton.Content = Localization.T("support.settings.open_folder");
         DeleteAllReportsButton.Content = Localization.T("support.settings.delete_now");
+        UpdateDownloadButton.Content = Localization.T("update.download_button");
+    }
+
+    private void RefreshUpdateBanner()
+    {
+        var info = UpdateChecker.Latest;
+        if (info?.HasUpdate == true)
+        {
+            UpdateTitle.Text = Localization.T("update.available_title", info.RemoteVersion);
+            UpdateDetail.Text = Localization.T("update.available_detail", UpdateChecker.CurrentVersion);
+            UpdateBanner.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            UpdateBanner.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void StartUpdateBannerPolling()
+    {
+        if (UpdateChecker.Latest != null) return; // check already completed
+
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        int ticks = 0;
+        timer.Tick += (_, _) =>
+        {
+            ticks++;
+            if (UpdateChecker.Latest != null || ticks >= 10)
+            {
+                timer.Stop();
+                RefreshUpdateBanner();
+            }
+        };
+        timer.Start();
+    }
+
+    private void UpdateDownload_Click(object sender, RoutedEventArgs e)
+    {
+        var info = UpdateChecker.Latest;
+        if (info == null || string.IsNullOrWhiteSpace(info.DownloadUrl)) return;
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = info.DownloadUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            TaskDialog.Show(Localization.T("support.title"),
+                Localization.T("update.open_browser_failed", ex.Message));
+        }
     }
 
     private void RefreshConnectionStatus()
