@@ -25,7 +25,13 @@ public class SendSupportReport : IExternalCommand
     private const string SupportEmail = "luigi.dattilo@gpapartners.com";
     private const int DefaultKeepCount = 10;
 
+    // _running  = UI-thread reentrancy guard (this Execute() in flight)
+    // _workerBusy = set while the background Outlook STA worker is alive;
+    // stays 1 even after Execute() returns when Outlook timed out, so the
+    // next click sees "already running" until the zombie worker actually
+    // finishes instead of launching a second Outlook draft on top.
     private static int _running;
+    private static int _workerBusy;
 
     /// <summary>Folder where bug-report ZIPs are written and rotated.</summary>
     public static string ReportsFolder => Path.Combine(
@@ -36,7 +42,10 @@ public class SendSupportReport : IExternalCommand
     {
         var title = Localization.T("support.title");
 
-        if (System.Threading.Interlocked.CompareExchange(ref _running, 1, 0) != 0)
+        // Reject if either: (a) Execute is already on the UI thread stack, or
+        // (b) a previous Outlook worker is still alive after a timeout.
+        if (System.Threading.Volatile.Read(ref _workerBusy) == 1
+            || System.Threading.Interlocked.CompareExchange(ref _running, 1, 0) != 0)
         {
             TaskDialog.Show(title, Localization.T("support.already_running"));
             return Result.Succeeded;
@@ -52,7 +61,8 @@ public class SendSupportReport : IExternalCommand
             var body = BuildEmailBody(commandData, included, skipped);
             var subject = $"RevitCortex bug report - {Environment.UserName} - {DateTime.Now:yyyy-MM-dd HH:mm}";
 
-            bool outlookOk = TryOpenOutlookWithTimeout(subject, body, zipPath, TimeSpan.FromSeconds(10));
+            bool outlookOk = TryOpenOutlookWithTimeout(
+                subject, body, zipPath, TimeSpan.FromSeconds(10));
 
             if (outlookOk)
             {
@@ -189,10 +199,14 @@ public class SendSupportReport : IExternalCommand
         var included = new List<string>();
         var skipped = new List<string>();
 
-        // Candidate files (path, entryNameInZip, isOptional)
+        // Candidate files (path, entryNameInZip, isOptional).
+        // Token usage moved from JSONL to SQLite (usage-mcp.db) around 2026-04.
+        // The legacy JSONL is kept here in case pre-migration files still exist
+        // in the field for a while.
         var candidates = new List<(string src, string entry, bool optional)>
         {
             (Path.Combine(rcFolder, "audit.jsonl"),                      "audit.jsonl",                 false),
+            (Path.Combine(rcFolder, "usage-mcp.db"),                     "usage-mcp.db",                true),
             (Path.Combine(rcFolder, "logs", "token-usage.jsonl"),        "logs/token-usage.jsonl",      true),
             (Path.Combine(rcFolder, "settings.json"),                    "settings.json",               true),
         };
@@ -384,31 +398,44 @@ public class SendSupportReport : IExternalCommand
     /// Runs the Outlook COM call on a dedicated STA thread and waits up to
     /// <paramref name="timeout"/>. If Outlook is stuck (hidden modal dialog,
     /// profile prompt, slow startup), the Revit UI thread is never blocked.
+    /// When the timeout fires the worker keeps running (background STA thread
+    /// holds COM references until Outlook eventually settles), and flips
+    /// <see cref="_workerBusy"/> back to 0 in its finally. Subsequent clicks
+    /// on the ribbon read _workerBusy and refuse to start a second draft.
+    /// We never call Thread.Abort: not supported on net8 and unsafe on net48
+    /// with COM.
     /// </summary>
     private static bool TryOpenOutlookWithTimeout(string subject, string body,
         string attachmentPath, TimeSpan timeout)
     {
-        bool result = false;
+        int resultFlag = 0;
         var done = new ManualResetEventSlim(false);
+
+        System.Threading.Interlocked.Exchange(ref _workerBusy, 1);
 
         var thread = new Thread(() =>
         {
-            try { result = TryOpenOutlook(subject, body, attachmentPath); }
-            catch { result = false; }
-            finally { done.Set(); }
+            try
+            {
+                bool ok = false;
+                try { ok = TryOpenOutlook(subject, body, attachmentPath); }
+                catch { ok = false; }
+                System.Threading.Volatile.Write(ref resultFlag, ok ? 1 : 0);
+            }
+            finally
+            {
+                done.Set();
+                System.Threading.Interlocked.Exchange(ref _workerBusy, 0);
+            }
         });
         thread.IsBackground = true;
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
 
         if (!done.Wait(timeout))
-        {
-            // COM call is stuck. Abandon the thread (background → dies with process)
-            // and report failure so the caller uses the explorer fallback.
             return false;
-        }
 
-        return result;
+        return System.Threading.Volatile.Read(ref resultFlag) == 1;
     }
 
     private static bool TryOpenOutlook(string subject, string body, string attachmentPath)

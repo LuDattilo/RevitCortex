@@ -1,4 +1,5 @@
 using Autodesk.Revit.ApplicationServices;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -39,9 +40,16 @@ internal static class Localization
         return key;
     }
 
-    /// <summary>Translate and format ({0}, {1}, ...).</summary>
+    /// <summary>Translate and format ({0}, {1}, ...). If the translated
+    /// string has mismatched placeholders (locale error), returns the raw
+    /// template instead of throwing — the support flow must never crash on
+    /// a bad translation.</summary>
     public static string T(string key, params object?[] args)
-        => string.Format(T(key), args);
+    {
+        var fmt = T(key);
+        try { return string.Format(fmt, args); }
+        catch (FormatException) { return fmt; }
+    }
 
     private static string DetectLocale()
     {
