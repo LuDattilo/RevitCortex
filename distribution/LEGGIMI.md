@@ -1,4 +1,4 @@
-# RevitCortex v1.0.2 — Guida Installazione
+# RevitCortex v1.0.3 — Guida Installazione
 
 Assistente AI per Autodesk Revit (2023–2027). Server MCP in C# + plugin Revit.
 
@@ -10,7 +10,7 @@ Assistente AI per Autodesk Revit (2023–2027). Server MCP in C# + plugin Revit.
 
 ## Installazione — 3 passi
 
-1. **Estrai** `RevitCortex-v1.0.2.zip` in una cartella temporanea (es. `Desktop\RevitCortex-setup`).
+1. **Estrai** `RevitCortex-v1.0.3.zip` in una cartella temporanea (es. `Desktop\RevitCortex-setup`).
 2. **Tasto destro su `install.ps1` → Esegui con PowerShell**
    (se non appare l'opzione, apri PowerShell come Amministratore e lancia `powershell -ExecutionPolicy Bypass -File install.ps1`)
 3. L'installer chiede:
@@ -95,6 +95,11 @@ Dalle **Impostazioni → Support Reports** puoi:
 - cancellare tutti i report con un click
 
 Vedi `COME_INVIARE_BUG_REPORT.md` per dettagli.
+
+## Novità v1.0.3
+
+- **Banner aggiornamenti in-app**: al lancio di Revit il plugin controlla se è disponibile una versione più recente. Se sì, compare un banner giallo nella pagina Impostazioni con un pulsante "Scarica" che apre il link di download.
+- Controllo non invadente: una sola chiamata in background al boot, timeout 5 s, nessun popup, nessun blocco se offline.
 
 ## Novità v1.0.2
 
