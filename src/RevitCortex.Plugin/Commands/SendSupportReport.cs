@@ -5,9 +5,12 @@ using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using RevitCortex.Plugin.UI;
 
 namespace RevitCortex.Plugin.Commands;
 
@@ -20,23 +23,40 @@ namespace RevitCortex.Plugin.Commands;
 public class SendSupportReport : IExternalCommand
 {
     private const string SupportEmail = "luigi.dattilo@gpapartners.com";
+    private const int DefaultKeepCount = 10;
+
+    private static int _running;
+
+    /// <summary>Folder where bug-report ZIPs are written and rotated.</summary>
+    public static string ReportsFolder => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".revitcortex", "support-reports");
 
     public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
     {
+        var title = Localization.T("support.title");
+
+        if (System.Threading.Interlocked.CompareExchange(ref _running, 1, 0) != 0)
+        {
+            TaskDialog.Show(title, Localization.T("support.already_running"));
+            return Result.Succeeded;
+        }
+
         try
         {
+            Directory.CreateDirectory(ReportsFolder);
+            RotateOldReports(ReportsFolder, ReadKeepCount());
+
             var (zipPath, included, skipped) = BuildReportZip(commandData);
 
             var body = BuildEmailBody(commandData, included, skipped);
             var subject = $"RevitCortex bug report - {Environment.UserName} - {DateTime.Now:yyyy-MM-dd HH:mm}";
 
-            bool outlookOk = TryOpenOutlook(subject, body, zipPath);
+            bool outlookOk = TryOpenOutlookWithTimeout(subject, body, zipPath, TimeSpan.FromSeconds(10));
 
             if (outlookOk)
             {
-                TaskDialog.Show("RevitCortex",
-                    $"Bozza email aperta in Outlook con il file allegato:\n\n{zipPath}\n\n" +
-                    "Controlla il contenuto, aggiungi eventuali note e clicca Invia.");
+                TaskDialog.Show(title, Localization.T("support.outlook_opened", zipPath));
             }
             else
             {
@@ -47,19 +67,111 @@ public class SendSupportReport : IExternalCommand
                 }
                 catch { /* non critico */ }
 
-                TaskDialog.Show("RevitCortex",
-                    $"Outlook non disponibile. Il pacchetto diagnostico è stato creato qui:\n\n{zipPath}\n\n" +
-                    $"Invialo manualmente a {SupportEmail} (email, Teams, OneDrive...).");
+                TaskDialog.Show(title, Localization.T("support.outlook_unavailable", zipPath, SupportEmail));
             }
 
             return Result.Succeeded;
         }
         catch (Exception ex)
         {
-            message = $"Impossibile creare il pacchetto diagnostico: {ex.Message}";
-            TaskDialog.Show("RevitCortex", message);
+            message = Localization.T("support.package_failed", ex.Message);
+            TaskDialog.Show(title, message);
             return Result.Failed;
         }
+        finally
+        {
+            System.Threading.Interlocked.Exchange(ref _running, 0);
+        }
+    }
+
+    // ── Settings + rotation ────────────────────────────────────────────────
+
+    private static int ReadKeepCount()
+    {
+        try
+        {
+            string settingsPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".revitcortex", "settings.json");
+            if (!File.Exists(settingsPath)) return DefaultKeepCount;
+
+            var json = File.ReadAllText(settingsPath);
+            var obj = Newtonsoft.Json.Linq.JObject.Parse(json);
+            var n = obj["SupportReportKeepCount"]?.ToObject<int?>();
+            if (n is int v && v >= 1 && v <= 200) return v;
+        }
+        catch { /* fall through */ }
+        return DefaultKeepCount;
+    }
+
+    private static void RotateOldReports(string folder, int keep)
+    {
+        try
+        {
+            var zips = new DirectoryInfo(folder)
+                .EnumerateFiles("RevitCortex-BugReport-*.zip", SearchOption.TopDirectoryOnly)
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .ToList();
+
+            for (int i = keep; i < zips.Count; i++)
+            {
+                try { zips[i].Delete(); } catch { /* ignore locked files */ }
+            }
+        }
+        catch { /* non fatal */ }
+    }
+
+    /// <summary>
+    /// Deletes all *.zip reports in <see cref="ReportsFolder"/>. Returns
+    /// (deleted, failed). Called from the settings page's "Delete all now"
+    /// button after user confirmation.
+    /// </summary>
+    public static (int deleted, int failed, long bytesFreed) DeleteAllReports()
+    {
+        int deleted = 0, failed = 0;
+        long bytes = 0;
+        try
+        {
+            if (!Directory.Exists(ReportsFolder)) return (0, 0, 0);
+            foreach (var f in new DirectoryInfo(ReportsFolder)
+                .EnumerateFiles("RevitCortex-BugReport-*.zip", SearchOption.TopDirectoryOnly))
+            {
+                try
+                {
+                    long len = f.Length;
+                    f.Delete();
+                    deleted++;
+                    bytes += len;
+                }
+                catch { failed++; }
+            }
+        }
+        catch { /* ignore enumerate errors */ }
+        return (deleted, failed, bytes);
+    }
+
+    public static int CountReports()
+    {
+        try
+        {
+            if (!Directory.Exists(ReportsFolder)) return 0;
+            return new DirectoryInfo(ReportsFolder)
+                .EnumerateFiles("RevitCortex-BugReport-*.zip", SearchOption.TopDirectoryOnly)
+                .Count();
+        }
+        catch { return 0; }
+    }
+
+    public static long TotalReportsBytes()
+    {
+        try
+        {
+            if (!Directory.Exists(ReportsFolder)) return 0;
+            return new DirectoryInfo(ReportsFolder)
+                .EnumerateFiles("RevitCortex-BugReport-*.zip", SearchOption.TopDirectoryOnly)
+                .Sum(f => f.Length);
+        }
+        catch { return 0; }
     }
 
     // ── Zip building ────────────────────────────────────────────────────────
@@ -69,9 +181,10 @@ public class SendSupportReport : IExternalCommand
     {
         string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string rcFolder = Path.Combine(userProfile, ".revitcortex");
-        string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        string zipPath = Path.Combine(desktop, $"RevitCortex-BugReport-{Environment.UserName}-{stamp}.zip");
+        string reportsDir = ReportsFolder;
+        Directory.CreateDirectory(reportsDir);
+        string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
+        string zipPath = Path.Combine(reportsDir, $"RevitCortex-BugReport-{Environment.UserName}-{stamp}.zip");
 
         var included = new List<string>();
         var skipped = new List<string>();
@@ -220,9 +333,10 @@ public class SendSupportReport : IExternalCommand
         }
 
         w.WriteLine();
+        var pluginVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
+        // Machine-readable key (used by rclog to match known-issues with reporter_version_max).
+        w.WriteLine($"plugin_version: {pluginVersion}");
         w.WriteLine("Plugin assembly: " + System.Reflection.Assembly.GetExecutingAssembly().Location);
-        w.WriteLine("Plugin version:  " +
-            System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
     }
 
     // ── Email body ──────────────────────────────────────────────────────────
@@ -265,6 +379,37 @@ public class SendSupportReport : IExternalCommand
     }
 
     // ── Outlook COM automation ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Runs the Outlook COM call on a dedicated STA thread and waits up to
+    /// <paramref name="timeout"/>. If Outlook is stuck (hidden modal dialog,
+    /// profile prompt, slow startup), the Revit UI thread is never blocked.
+    /// </summary>
+    private static bool TryOpenOutlookWithTimeout(string subject, string body,
+        string attachmentPath, TimeSpan timeout)
+    {
+        bool result = false;
+        var done = new ManualResetEventSlim(false);
+
+        var thread = new Thread(() =>
+        {
+            try { result = TryOpenOutlook(subject, body, attachmentPath); }
+            catch { result = false; }
+            finally { done.Set(); }
+        });
+        thread.IsBackground = true;
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+
+        if (!done.Wait(timeout))
+        {
+            // COM call is stuck. Abandon the thread (background → dies with process)
+            // and report failure so the caller uses the explorer fallback.
+            return false;
+        }
+
+        return result;
+    }
 
     private static bool TryOpenOutlook(string subject, string body, string attachmentPath)
     {
