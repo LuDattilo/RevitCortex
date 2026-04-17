@@ -1,6 +1,6 @@
 {
   "$schema": "https://revitcortex.dev/known-issues.schema.json",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "issues": [
     {
       "id": "RC-001",

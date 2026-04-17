@@ -1,4 +1,4 @@
-# RevitCortex v1.0.1 — Guida Installazione
+# RevitCortex v1.0.2 — Guida Installazione
 
 Assistente AI per Autodesk Revit (2023–2027). Server MCP in C# + plugin Revit.
 
@@ -10,7 +10,7 @@ Assistente AI per Autodesk Revit (2023–2027). Server MCP in C# + plugin Revit.
 
 ## Installazione — 3 passi
 
-1. **Estrai** `RevitCortex-v1.0.1.zip` in una cartella temporanea (es. `Desktop\RevitCortex-setup`).
+1. **Estrai** `RevitCortex-v1.0.2.zip` in una cartella temporanea (es. `Desktop\RevitCortex-setup`).
 2. **Tasto destro su `install.ps1` → Esegui con PowerShell**
    (se non appare l'opzione, apri PowerShell come Amministratore e lancia `powershell -ExecutionPolicy Bypass -File install.ps1`)
 3. L'installer chiede:
@@ -85,9 +85,25 @@ Sostituisci `<tuoNome>` con il tuo nome utente Windows. Se il file contiene già
 
 Riavvia Claude Desktop dopo aver salvato.
 
-## Segnalazione bug (nuovo in v1.0.2)
+## Segnalazione bug
 
-Se incontri un problema, usa il bottone **"Send log to support"** nella tab RevitCortex del ribbon: raccoglie automaticamente log e contesto, apre una mail precompilata verso il supporto. Vedi `COME_INVIARE_BUG_REPORT.md` per dettagli.
+Se incontri un problema, usa il bottone **"Send log to support"** nella tab RevitCortex del ribbon: raccoglie automaticamente log e contesto in uno ZIP, apre una mail precompilata verso il supporto. I report vengono salvati in `%USERPROFILE%\.revitcortex\support-reports\` (ultimi N conservati, configurabile dalle Impostazioni).
+
+Dalle **Impostazioni → Support Reports** puoi:
+- impostare quanti report conservare (default 10)
+- aprire la cartella dei report
+- cancellare tutti i report con un click
+
+Vedi `COME_INVIARE_BUG_REPORT.md` per dettagli.
+
+## Novità v1.0.2
+
+- **Fix**: il doppio click su "Send log to support" non blocca più Revit (chiamata COM a Outlook su thread dedicato con timeout)
+- Report di supporto spostati dal Desktop in `%USERPROFILE%\.revitcortex\support-reports\` con rotazione automatica
+- Nuove impostazioni: numero di report da conservare, bottoni "Apri cartella" / "Elimina tutti adesso"
+- UI e dialog tradotti automaticamente in base alla lingua di Revit (EN / IT)
+- ZIP di supporto include ora anche `usage-mcp.db` (DB token usage post-migrazione SQLite)
+- Campo `plugin_version` in `context.txt` per filtraggio automatico dei known-issues
 
 ## Novità v1.0.1
 
