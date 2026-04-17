@@ -116,4 +116,4 @@ Vedi `COME_INVIARE_BUG_REPORT.md` per dettagli.
 
 ## Supporto
 
-Luigi Dattilo — GPA Ingegneria Srl
+Luigi Dattilo
