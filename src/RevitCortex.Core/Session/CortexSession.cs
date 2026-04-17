@@ -27,16 +27,30 @@ public class CortexSession
     /// <summary>
     /// When true, all subsequent confirmations are auto-approved until timeout.
     /// Set by "Yes to All" in the confirmation dialog. Expires after 120 seconds.
+    /// The flag+timestamp pair must be read/written as a unit, otherwise a
+    /// reader on a different thread can see the flag flipped to true while
+    /// the timestamp is still the default DateTime.MinValue — which makes
+    /// <c>(now - timestamp).TotalSeconds</c> huge and the check misfires.
     /// </summary>
     public bool ApproveAll
     {
-        get => _approveAll && (DateTime.UtcNow - _approveAllTimestamp).TotalSeconds < 120;
+        get
+        {
+            lock (_approveAllLock)
+            {
+                return _approveAll && (DateTime.UtcNow - _approveAllTimestamp).TotalSeconds < 120;
+            }
+        }
         set
         {
-            _approveAll = value;
-            if (value) _approveAllTimestamp = DateTime.UtcNow;
+            lock (_approveAllLock)
+            {
+                _approveAll = value;
+                if (value) _approveAllTimestamp = DateTime.UtcNow;
+            }
         }
     }
+    private readonly object _approveAllLock = new();
     private bool _approveAll;
     private DateTime _approveAllTimestamp;
 
