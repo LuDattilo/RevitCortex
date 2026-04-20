@@ -77,7 +77,7 @@ public class ManageGlobalParametersTool : ICortexTool
         if (string.IsNullOrEmpty(name))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "name is required");
 
-        var gp = FindByName(doc, name);
+        var gp = FindByName(doc, name!);
         if (gp == null)
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
                 $"Global parameter '{name}' not found");
@@ -91,7 +91,7 @@ public class ManageGlobalParametersTool : ICortexTool
         if (string.IsNullOrEmpty(name))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "name is required");
 
-        if (FindByName(doc, name) != null)
+        if (FindByName(doc, name!) != null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"A global parameter named '{name}' already exists");
 
@@ -108,7 +108,7 @@ public class ManageGlobalParametersTool : ICortexTool
 #endif
 
         if (!string.IsNullOrEmpty(initialValue))
-            ApplyStringValue(gp, initialValue);
+            ApplyStringValue(gp, initialValue!);
 
         tx.Commit();
 
@@ -131,7 +131,7 @@ public class ManageGlobalParametersTool : ICortexTool
         if (value == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "value is required");
 
-        var gp = FindByName(doc, name);
+        var gp = FindByName(doc, name!);
         if (gp == null)
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
                 $"Global parameter '{name}' not found");
@@ -154,7 +154,7 @@ public class ManageGlobalParametersTool : ICortexTool
         if (string.IsNullOrEmpty(name))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "name is required");
 
-        var gp = FindByName(doc, name);
+        var gp = FindByName(doc, name!);
         if (gp == null)
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
                 $"Global parameter '{name}' not found");

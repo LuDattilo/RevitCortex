@@ -158,7 +158,7 @@ public static class CodeDomExecutor
     private static object SerializeResult(object result)
     {
         if (result == null)
-            return new { result = (object)null };
+            return new { result = (object?)null };
 
         if (result is string || result is int || result is long || result is double || result is float || result is bool)
             return new { result };

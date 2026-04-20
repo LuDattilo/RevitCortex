@@ -191,7 +191,7 @@ public class AIElementFilterTool : ICortexTool
         // 1. Category filter
         if (!string.IsNullOrWhiteSpace(filterCategory))
         {
-            var catId = CategoryResolver.ResolveToId(doc, filterCategory);
+            var catId = CategoryResolver.ResolveToId(doc, filterCategory!);
             if (catId == null || catId == ElementId.InvalidElementId)
                 throw new ArgumentException(
                     $"'{filterCategory}' is not a recognized category. Use OST_* codes (e.g. OST_Walls), English friendly names (Walls, Foundations), or the localized display name.");

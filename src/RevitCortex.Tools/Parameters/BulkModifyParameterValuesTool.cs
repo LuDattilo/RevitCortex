@@ -58,7 +58,7 @@ public class BulkModifyParameterValuesTool : ICortexTool
             }
             else if (!string.IsNullOrEmpty(categoryName))
             {
-                var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryName);
+                var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryName!);
                 if (catId == ElementId.InvalidElementId)
                     return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, $"Category not found: {categoryName}");
                 elements = new FilteredElementCollector(doc).OfCategoryId(catId).WhereElementIsNotElementType();
@@ -79,12 +79,12 @@ public class BulkModifyParameterValuesTool : ICortexTool
 
                 using var tx = new Transaction(doc, "RevitCortex: Bulk Modify Parameters");
                 tx.Start();
-                ProcessElements(elementList, parameterName, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped);
+                ProcessElements(elementList, parameterName!, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped);
                 tx.Commit();
             }
             else
             {
-                ProcessElements(elementList, parameterName, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped, true);
+                ProcessElements(elementList, parameterName!, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped, true);
             }
 
             return CortexResult<object>.Ok(new

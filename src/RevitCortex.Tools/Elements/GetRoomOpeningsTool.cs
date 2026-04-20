@@ -214,7 +214,10 @@ public class GetRoomOpeningsTool : ICortexTool
             {
                 var param = elem.LookupParameter(name);
                 if (param != null && param.HasValue)
-                    dict[name] = GetParamValue(param);
+                {
+                    var val = GetParamValue(param);
+                    if (val != null) dict[name] = val;
+                }
             }
         }
         else

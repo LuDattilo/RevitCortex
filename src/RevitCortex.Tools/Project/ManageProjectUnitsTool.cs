@@ -104,13 +104,13 @@ public class ManageProjectUnitsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "unit is required (e.g. meters, millimeters, feet)");
 
-        var specEntry = Specs.FirstOrDefault(s => s.key == specType.ToLowerInvariant());
+        var specEntry = Specs.FirstOrDefault(s => s.key == specType!.ToLowerInvariant());
         if (specEntry.specId == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Unknown specType '{specType}'",
                 suggestion: "Use: " + string.Join(", ", Specs.Select(s => s.key)));
 
-        var unitTypeId = ResolveUnitTypeId(unit);
+        var unitTypeId = ResolveUnitTypeId(unit!);
         if (unitTypeId == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Unknown unit '{unit}'. Use list_valid_units to see available options for this spec.");

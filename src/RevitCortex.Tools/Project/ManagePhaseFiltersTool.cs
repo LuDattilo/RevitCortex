@@ -220,7 +220,7 @@ public class ManagePhaseFiltersTool : ICortexTool
     private static PhaseStatusPresentation? ResolvePresentation(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return null;
-        var n = raw.Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "");
+        var n = raw!.Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "");
         return n switch
         {
             "showbycategory" or "bycategory" or "category"    => PhaseStatusPresentation.ShowByCategory,

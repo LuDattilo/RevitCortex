@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using RevitCortex.Core.Tools;
@@ -10,8 +9,7 @@ namespace RevitCortex.Tests.Tools;
 
 /// <summary>
 /// Structural tests that verify tool correctness without requiring Revit.
-/// These ensure all ICortexTool implementations follow conventions and
-/// that C# and TypeScript tool sets stay in sync.
+/// These ensure all ICortexTool implementations follow conventions.
 /// </summary>
 public class ToolRegistrationTests
 {
@@ -106,62 +104,4 @@ public class ToolRegistrationTests
             $"If you removed tools intentionally, update this test.");
     }
 
-    [Fact(Skip = "Legacy: the TypeScript server has been superseded by the C# RevitCortex.Server. This parity check is no longer enforced.")]
-    public void TypeScript_ToolRegistrations_MatchCSharp()
-    {
-        // Read register.ts and extract tool names
-        var registerTsPath = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..",
-            "server", "src", "tools", "register.ts");
-
-        // Try to find the file from the repo root
-        var repoRoot = FindRepoRoot();
-        if (repoRoot == null)
-        {
-            // Skip if we can't find the repo root (e.g., in CI without full checkout)
-            return;
-        }
-
-        registerTsPath = Path.Combine(repoRoot, "server", "src", "tools", "register.ts");
-        if (!File.Exists(registerTsPath))
-            return; // Skip if TS server not present
-
-        var registerContent = File.ReadAllText(registerTsPath);
-
-        var csharpToolNames = AllToolTypes
-            .Select(t => ((ICortexTool)Activator.CreateInstance(t)!).Name)
-            .OrderBy(n => n)
-            .ToList();
-
-        // Extract tool names from register.ts entries like: { name: "tool_name",
-        var tsToolNames = new List<string>();
-        foreach (var line in registerContent.Split('\n'))
-        {
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("{ name:") || trimmed.StartsWith("{name:"))
-            {
-                var start = trimmed.IndexOf('"') + 1;
-                var end = trimmed.IndexOf('"', start);
-                if (start > 0 && end > start)
-                    tsToolNames.Add(trimmed.Substring(start, end - start));
-            }
-        }
-        tsToolNames.Sort();
-
-        // Every C# tool should have a TS registration
-        var missingInTs = csharpToolNames.Except(tsToolNames).ToList();
-        Assert.Empty(missingInTs);
-    }
-
-    private static string? FindRepoRoot()
-    {
-        var dir = AppDomain.CurrentDomain.BaseDirectory;
-        while (dir != null)
-        {
-            if (Directory.Exists(Path.Combine(dir, ".git")))
-                return dir;
-            dir = Directory.GetParent(dir)?.FullName;
-        }
-        return null;
-    }
 }

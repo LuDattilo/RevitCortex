@@ -37,7 +37,7 @@ public class AuditFamiliesTool : ICortexTool
             ElementId? filterCatId = null;
             if (!string.IsNullOrEmpty(categoryFilter))
             {
-                filterCatId = Utilities.CategoryResolver.ResolveToId(doc, categoryFilter);
+                filterCatId = Utilities.CategoryResolver.ResolveToId(doc, categoryFilter!);
                 if (filterCatId == null || filterCatId.Equals(ElementId.InvalidElementId)) filterCatId = null;
             }
 

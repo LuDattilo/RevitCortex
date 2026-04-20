@@ -161,7 +161,7 @@ public class ManageAdditionalSettingsTool : ICortexTool
         var patternName = input["linePatternName"]?.Value<string>();
         if (!string.IsNullOrEmpty(patternName))
         {
-            var patternId = FindLinePatternId(doc, patternName);
+            var patternId = FindLinePatternId(doc, patternName!);
             if (patternId != null)
                 style.SetLinePatternId(patternId, GraphicsStyleType.Projection);
         }

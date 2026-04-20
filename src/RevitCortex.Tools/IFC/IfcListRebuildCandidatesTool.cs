@@ -34,7 +34,7 @@ public class IfcListRebuildCandidatesTool : ICortexTool
         // No cached results — run a fresh lightweight analysis
         BuiltInCategory? builtInCat = null;
         if (!string.IsNullOrWhiteSpace(categoryFilter))
-            builtInCat = CategoryResolver.Resolve(categoryFilter);
+            builtInCat = CategoryResolver.Resolve(categoryFilter!);
 
         var directShapes = IfcGeometryHelper.GetDirectShapes(doc!, builtInCat);
         var candidates = new List<object>();

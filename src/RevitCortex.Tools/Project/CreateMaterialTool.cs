@@ -62,7 +62,7 @@ public class CreateMaterialTool : ICortexTool
 
                 if (!string.IsNullOrEmpty(colorHex))
                 {
-                    var c = ParseColor(colorHex);
+                    var c = ParseColor(colorHex!);
                     if (c != null) mat.Color = c;
                 }
 

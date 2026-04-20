@@ -49,7 +49,7 @@ public class SendCodeToRevitTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "code is required");
 
         // Gate 2: sandbox validation on cleaned code (comments/strings stripped first)
-        var sandboxResult = CodeSandbox.Validate(code);
+        var sandboxResult = CodeSandbox.Validate(code!);
         if (sandboxResult != null)
         {
             _audit.Log(Name, "BLOCKED: sandbox violation", success: false,
@@ -74,9 +74,9 @@ public class SendCodeToRevitTool : ICortexTool
 
         CortexResult<object> result;
 #if REVIT2025_OR_GREATER
-        result = RoslynExecutor.Execute(code, globals, transactionMode);
+        result = RoslynExecutor.Execute(code!, globals, transactionMode);
 #else
-        result = CodeDomExecutor.Execute(code, globals, transactionMode);
+        result = CodeDomExecutor.Execute(code!, globals, transactionMode);
 #endif
 
         // Audit: always log code execution attempts with a bounded summary of the code

@@ -76,7 +76,7 @@ public class GetCompoundStructureTool : ICortexTool
             // Option 3: from type name + category
             else if (!string.IsNullOrWhiteSpace(typeName))
             {
-                hostType = FindTypeByName(doc, typeName, category);
+                hostType = FindTypeByName(doc, typeName!, category);
                 resolvedFrom = "typeName";
 
                 if (hostType == null)

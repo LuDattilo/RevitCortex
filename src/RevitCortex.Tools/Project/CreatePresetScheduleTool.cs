@@ -55,7 +55,7 @@ public class CreatePresetScheduleTool : ICortexTool
                 {
                     if (string.IsNullOrEmpty(categoryName))
                         return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "categoryName required for material_takeoff");
-                    var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryName);
+                    var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryName!);
                     if (catId == ElementId.InvalidElementId)
                         return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, $"Category not found: {categoryName}");
                     schedule = ViewSchedule.CreateMaterialTakeoff(doc, catId);
