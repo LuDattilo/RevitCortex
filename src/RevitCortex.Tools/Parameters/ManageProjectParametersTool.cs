@@ -235,20 +235,26 @@ public class ManageProjectParametersTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "categories array is required for modify action");
 
-        var bindingMap = doc.ParameterBindings;
-        var iterator = bindingMap.ForwardIterator();
-        Definition? targetDef = null;
-        ElementBinding? existingBinding = null;
-
-        while (iterator.MoveNext())
+        // Collect all (Definition, ElementBinding) pairs up-front: the BindingMap iterator
+        // must not be alive when we mutate the map (Insert/Remove/ReInsert), otherwise Revit
+        // silently rejects the mutation and returns false.
+        var allDefs = new List<Definition>();
+        var allBindings = new Dictionary<string, ElementBinding>(StringComparer.Ordinal);
         {
-            if (iterator.Key.Name == parameterName)
+            var map = doc.ParameterBindings;
+            var iter = map.ForwardIterator();
+            while (iter.MoveNext())
             {
-                targetDef = iterator.Key;
-                existingBinding = iterator.Current as ElementBinding;
-                break;
+                var d = iter.Key;
+                if (d == null) continue;
+                allDefs.Add(d);
+                if (iter.Current is ElementBinding eb)
+                    allBindings[d.Name] = eb;
             }
         }
+
+        Definition? targetDef = allDefs.FirstOrDefault(d => d.Name == parameterName);
+        ElementBinding? existingBinding = targetDef != null && allBindings.TryGetValue(targetDef.Name, out var b) ? b : null;
 
         if (targetDef == null || existingBinding == null)
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
@@ -262,71 +268,83 @@ public class ManageProjectParametersTool : ICortexTool
 
         if (categoriesMode == "replace")
         {
-            newCategorySet = app.Create.NewCategorySet();
-            foreach (var catName in requestedCategories)
-            {
-                var catId = CategoryResolver.ResolveToId(doc, catName);
-                if (catId == null) continue;
-                var cat = Autodesk.Revit.DB.Category.GetCategory(doc, catId);
-                if (cat != null && cat.AllowsBoundParameters && !newCategorySet.Contains(cat))
-                {
-                    newCategorySet.Insert(cat);
-                    addedCategories.Add(cat.Name);
-                }
-            }
-
+            newCategorySet = BuildCategorySet(doc, app, requestedCategories);
             if (newCategorySet.Size == 0)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     "No valid categories resolved for replace");
+            foreach (Category c in newCategorySet) addedCategories.Add(c.Name);
         }
         else
         {
-            newCategorySet = app.Create.NewCategorySet();
-            foreach (Category existing in existingBinding.Categories)
-                newCategorySet.Insert(existing);
+            // Build the target category set from category NAMES (not Category objects
+            // lifted off the existing binding). Category instances re-fetched via
+            // doc.Settings.Categories are the canonical entries the BindingMap uses
+            // for equality; copying from existingBinding.Categories has been observed
+            // to leave the bindingMap mutation in an inconsistent state in Revit 2025.
+            var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Category c in existingBinding.Categories) existingNames.Add(c.Name);
 
             if (categoriesMode == "add")
             {
+                // Start with existing names, add the new ones, resolve each from doc.Settings.
+                var resultNames = new List<string>(existingNames);
                 foreach (var catName in requestedCategories)
                 {
                     var catId = CategoryResolver.ResolveToId(doc, catName);
                     if (catId == null) continue;
                     var cat = Autodesk.Revit.DB.Category.GetCategory(doc, catId);
-                    if (cat != null && cat.AllowsBoundParameters && !newCategorySet.Contains(cat))
+                    if (cat == null || !cat.AllowsBoundParameters) continue;
+                    if (!existingNames.Contains(cat.Name))
                     {
-                        newCategorySet.Insert(cat);
+                        resultNames.Add(cat.Name);
                         addedCategories.Add(cat.Name);
+                        existingNames.Add(cat.Name);
                     }
                 }
+                newCategorySet = BuildCategorySet(doc, app, resultNames);
             }
             else // remove
             {
+                var toRemoveNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var catName in requestedCategories)
                 {
                     var catId = CategoryResolver.ResolveToId(doc, catName);
                     if (catId == null) continue;
                     var cat = Autodesk.Revit.DB.Category.GetCategory(doc, catId);
-                    if (cat != null && newCategorySet.Contains(cat))
+                    if (cat == null) continue;
+                    if (existingNames.Contains(cat.Name))
                     {
-                        newCategorySet.Erase(cat);
+                        toRemoveNames.Add(cat.Name);
                         removedCategories.Add(cat.Name);
                     }
                 }
-
-                if (newCategorySet.Size == 0)
+                var keptNames = existingNames.Where(n => !toRemoveNames.Contains(n)).ToList();
+                if (keptNames.Count == 0)
                     return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                         "Refusing to remove all categories: a project parameter must remain bound to at least one category. Use 'delete' action to remove the parameter entirely.");
+                newCategorySet = BuildCategorySet(doc, app, keptNames);
             }
         }
 
-        ElementBinding newBinding = existingBinding is InstanceBinding
+        bool isInstance = existingBinding is InstanceBinding;
+        ElementBinding newBinding = isInstance
             ? (ElementBinding)app.Create.NewInstanceBinding(newCategorySet)
             : (ElementBinding)app.Create.NewTypeBinding(newCategorySet);
 
+        // Fresh BindingMap reference inside the transaction and collect-then-mutate pattern
+        // (see the collection loop above): iterating while holding a BindingMap reference and
+        // then mutating via the same reference silently fails. ReInsert against a built-in
+        // Revit-owned parameter (e.g. 'Material') returns false by design.
         using var tx = new Transaction(doc, "RevitCortex: Modify Project Parameter");
         tx.Start();
-        bindingMap.ReInsert(targetDef, newBinding);
+        var freshMap = doc.ParameterBindings;
+        bool persistReInsert = freshMap.ReInsert(targetDef, newBinding);
         tx.Commit();
+
+        if (!persistReInsert)
+            return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
+                $"Revit rejected the modification of parameter '{parameterName}'. This usually means the parameter is built-in or owned by Revit/an add-in and its category bindings cannot be changed via the API.",
+                suggestion: "Try the modification on a user-created project parameter instead.");
 
         var allCategories = newCategorySet.Cast<Category>().Select(c => c.Name).ToList();
 
@@ -339,6 +357,20 @@ public class ManageProjectParametersTool : ICortexTool
             removedCategories,
             totalCategories = allCategories
         });
+    }
+
+    private static CategorySet BuildCategorySet(Document doc, Autodesk.Revit.ApplicationServices.Application app, IEnumerable<string> categoryNames)
+    {
+        var set = app.Create.NewCategorySet();
+        foreach (var name in categoryNames)
+        {
+            var catId = CategoryResolver.ResolveToId(doc, name);
+            if (catId == null) continue;
+            var cat = Autodesk.Revit.DB.Category.GetCategory(doc, catId);
+            if (cat != null && cat.AllowsBoundParameters && !set.Contains(cat))
+                set.Insert(cat);
+        }
+        return set;
     }
 
 #if REVIT2023_OR_GREATER
