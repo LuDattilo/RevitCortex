@@ -102,6 +102,36 @@ public static class ProjectTools
         return result.ToString();
     }
 
+    [McpServerTool(Name = "manage_phase_filters"), Description("List, set, or create Revit Phase Filters. Actions: list | set | create. The 'set' action changes one presentation (New | Demolished | Existing | Temporary) on one filter and preserves the other three. Presentations: None | ByCategory | Overridden | NotDisplayed.")]
+    public static async Task<string> ManagePhaseFilters(
+        RevitConnectionManager revit,
+        [Description("Action: list | set | create. Default: list")] string? action = null,
+        [Description("Filter name (for set/create)")] string? filterName = null,
+        [Description("Filter element ID (alternative to filterName for set)")] long? filterId = null,
+        [Description("Phase status to modify (for set): New | Demolished | Existing | Temporary")] string? status = null,
+        [Description("Presentation value (for set): None | ByCategory | Overridden | NotDisplayed")] string? presentation = null,
+        [Description("Name of the new filter (for create)")] string? name = null,
+        [Description("New-phase presentation (for create). Default: ByCategory")] string? newStatus = null,
+        [Description("Existing-phase presentation (for create). Default: ByCategory")] string? existingStatus = null,
+        [Description("Demolished-phase presentation (for create). Default: ByCategory")] string? demolishedStatus = null,
+        [Description("Temporary-phase presentation (for create). Default: ByCategory")] string? temporaryStatus = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (filterName != null) p["filterName"] = filterName;
+        if (filterId != null) p["filterId"] = filterId;
+        if (status != null) p["status"] = status;
+        if (presentation != null) p["presentation"] = presentation;
+        if (name != null) p["name"] = name;
+        if (newStatus != null) p["newStatus"] = newStatus;
+        if (existingStatus != null) p["existingStatus"] = existingStatus;
+        if (demolishedStatus != null) p["demolishedStatus"] = demolishedStatus;
+        if (temporaryStatus != null) p["temporaryStatus"] = temporaryStatus;
+        var result = await revit.ExecuteAsync("manage_phase_filters", p, ct);
+        return result.ToString();
+    }
+
     [McpServerTool(Name = "purge_unused"), Description("Purge unused elements from the Revit project.")]
     public static async Task<string> PurgeUnused(
         RevitConnectionManager revit,
