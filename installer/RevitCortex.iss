@@ -56,6 +56,12 @@ Name: "r25"; Description: "Plugin Revit 2025"; Types: full; Check: RevitDirExist
 Name: "r26"; Description: "Plugin Revit 2026"; Types: full; Check: RevitDirExists('2026')
 Name: "r27"; Description: "Plugin Revit 2027"; Types: full; Check: RevitDirExists('2027')
 
+[InstallDelete]
+; Wipe previous server folder before writing new files. Prevents hybrid deploys
+; (mismatched runtimeconfig.json over stale self-contained runtime DLLs) from
+; corrupting the exe launch. Safe: no user data lives under server/.
+Type: filesandordirs; Name: "{userappdata}\.revitcortex\server"
+
 [Files]
 ; MCP Server (self-contained C# EXE — no Node.js dependency)
 Source: "..\release\server\*"; DestDir: "{userappdata}\.revitcortex\server"; Components: server; Flags: ignoreversion recursesubdirs createallsubdirs
