@@ -38,13 +38,15 @@ public class AuditFamiliesTool : ICortexTool
             if (!string.IsNullOrEmpty(categoryFilter))
             {
                 filterCatId = Utilities.CategoryResolver.ResolveToId(doc, categoryFilter);
-                if (filterCatId == ElementId.InvalidElementId) filterCatId = null;
+                if (filterCatId == null || filterCatId.Equals(ElementId.InvalidElementId)) filterCatId = null;
             }
 
             // ── Loadable families ─────────────────────────────────────────
             var families = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>();
             if (filterCatId != null)
-                families = families.Where(f => f.FamilyCategory?.Id == filterCatId);
+                // Use .Equals() because ElementId does NOT overload == on net48 (R2023/R2024) —
+                // reference equality there silently excludes every family.
+                families = families.Where(f => f.FamilyCategory?.Id.Equals(filterCatId) == true);
 
             // Count instances per family (loadable)
             var instanceCounts = new FilteredElementCollector(doc)
@@ -76,27 +78,31 @@ public class AuditFamiliesTool : ICortexTool
             // In Revit a "system family" is not a Family element; it's the implicit
             // grouping of all ElementTypes sharing a subclass (WallType, FloorType, ...).
             // We surface each subclass+category as one row, with a typeCount and an
-            // aggregated instanceCount obtained by walking the concrete instance class.
+            // aggregated instanceCount obtained by walking every instance of the category.
+            // Note: we enumerate instances via OfCategory(OST_*) rather than OfClass(instanceClass)
+            // because RoofBase is abstract (cannot be passed to OfClass) and because the OST
+            // filter captures all concrete subclasses (FootPrintRoof + ExtrusionRoof, etc.).
             if (includeSystemFamilies)
             {
-                var systemGroups = new (Type typeClass, Type instanceClass, string name)[]
+                var systemGroups = new (Type typeClass, BuiltInCategory bic, string name)[]
                 {
-                    (typeof(WallType),     typeof(Wall),     "Walls"),
-                    (typeof(FloorType),    typeof(Floor),    "Floors"),
-                    (typeof(RoofType),     typeof(RoofBase), "Roofs"),
-                    (typeof(CeilingType),  typeof(Ceiling),  "Ceilings"),
+                    (typeof(WallType),     BuiltInCategory.OST_Walls,    "Walls"),
+                    (typeof(FloorType),    BuiltInCategory.OST_Floors,   "Floors"),
+                    (typeof(RoofType),     BuiltInCategory.OST_Roofs,    "Roofs"),
+                    (typeof(CeilingType),  BuiltInCategory.OST_Ceilings, "Ceilings"),
                 };
 
-                foreach (var (typeClass, instanceClass, displayName) in systemGroups)
+                foreach (var (typeClass, bic, displayName) in systemGroups)
                 {
                     var types = new FilteredElementCollector(doc).OfClass(typeClass).Cast<ElementType>().ToList();
                     if (filterCatId != null)
-                        types = types.Where(t => t.Category?.Id == filterCatId).ToList();
+                        // .Equals() — see comment at loadable filter above.
+                        types = types.Where(t => t.Category?.Id.Equals(filterCatId) == true).ToList();
                     if (types.Count == 0) continue;
 
-                    // Count instances per type id by walking the instance class once.
+                    // Count instances per type id by walking all elements of the category.
                     var typeInstanceCounts = new FilteredElementCollector(doc)
-                        .OfClass(instanceClass)
+                        .OfCategory(bic)
                         .WhereElementIsNotElementType()
                         .GroupBy(e => e.GetTypeId())
                         .Where(g => g.Key != ElementId.InvalidElementId)
@@ -112,7 +118,7 @@ public class AuditFamiliesTool : ICortexTool
 
                         familyList.Add(new
                         {
-                            id = (long)0,
+                            id = (long)-1,   // synthetic row — no Family element backs it
                             name = $"[System] {catGroup.Key}",
                             category = (string?)catGroup.Key,
                             kind = "system",

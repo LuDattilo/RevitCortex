@@ -45,6 +45,13 @@ public class FilterByParameterValueTool : ICortexTool
 
         try
         {
+            // Pre-validate active_view scope — doc.ActiveView can be null when the request
+            // arrives without a UI context (socket handler marshalling, document load, etc.).
+            if (scope.Equals("active_view", StringComparison.OrdinalIgnoreCase) && doc.ActiveView == null)
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    "scope='active_view' but there is no active view in the document.",
+                    suggestion: "Activate a view in Revit, or use scope='whole_model'.");
+
             // Pre-resolve category IDs once (avoid repeated lookups)
             var resolvedCatIds = new List<ElementId>();
             if (categories.Count > 0)

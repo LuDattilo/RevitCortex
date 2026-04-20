@@ -13,7 +13,7 @@ public static class ViewTools
     public static async Task<string> CreateView(
         RevitConnectionManager revit,
         [Description("Type of view to create: FloorPlan, Section, ThreeD, Elevation")] string viewType,
-        [Description("Level element ID (required for floor plans)")] int? levelId = null,
+        [Description("Level element ID (required for floor plans)")] long? levelId = null,
         [Description("Name for the new view")] string? name = null,
         CancellationToken ct = default)
     {
@@ -27,7 +27,7 @@ public static class ViewTools
     [McpServerTool(Name = "duplicate_view"), Description("Duplicate an existing view in Revit.")]
     public static async Task<string> DuplicateView(
         RevitConnectionManager revit,
-        [Description("Element ID of the view to duplicate")] int viewId,
+        [Description("Element ID of the view to duplicate")] long viewId,
         [Description("Duplicate option: Duplicate, AsDependent, WithDetailing")] string? duplicateOption = "Duplicate",
         CancellationToken ct = default)
     {
@@ -116,7 +116,7 @@ public static class ViewTools
         RevitConnectionManager revit,
         [Description("Sheet number (e.g. A101)")] string sheetNumber,
         [Description("Sheet name")] string sheetName,
-        [Description("Title block type element ID")] int? titleBlockId = null,
+        [Description("Title block type element ID")] long? titleBlockId = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -132,8 +132,8 @@ public static class ViewTools
     [McpServerTool(Name = "place_viewport"), Description("Place a view on a sheet as a viewport.")]
     public static async Task<string> PlaceViewport(
         RevitConnectionManager revit,
-        [Description("Sheet element ID")] int sheetId,
-        [Description("View element ID to place")] int viewId,
+        [Description("Sheet element ID")] long sheetId,
+        [Description("View element ID to place")] long viewId,
         [Description("X coordinate for viewport center")] double? x = null,
         [Description("Y coordinate for viewport center")] double? y = null,
         CancellationToken ct = default)
@@ -170,7 +170,7 @@ public static class ViewTools
     [McpServerTool(Name = "get_schedule_data"), Description("Export schedule data as JSON from an existing schedule view.")]
     public static async Task<string> GetScheduleData(
         RevitConnectionManager revit,
-        [Description("Schedule view element ID")] int scheduleId,
+        [Description("Schedule view element ID")] long scheduleId,
         CancellationToken ct = default)
     {
         var p = new JObject { ["scheduleId"] = scheduleId };
@@ -353,7 +353,7 @@ public static class ViewTools
     [McpServerTool(Name = "duplicate_sheet_with_content"), Description("Duplicate a sheet including annotations and detail items")]
     public static async Task<string> DuplicateSheetWithContent(
         RevitConnectionManager revit,
-        [Description("Element ID of the sheet to duplicate")] int sheetId,
+        [Description("Element ID of the sheet to duplicate")] long sheetId,
         [Description("New sheet number")] string? newNumber = null,
         [Description("New sheet name")] string? newName = null,
         CancellationToken ct = default)
@@ -393,7 +393,7 @@ public static class ViewTools
     [McpServerTool(Name = "delete_schedule"), Description("Delete a schedule by ID or name")]
     public static async Task<string> DeleteSchedule(
         RevitConnectionManager revit,
-        [Description("Schedule element ID")] int? scheduleId = null,
+        [Description("Schedule element ID")] long? scheduleId = null,
         [Description("Schedule name")] string? scheduleName = null,
         CancellationToken ct = default)
     {
@@ -407,7 +407,7 @@ public static class ViewTools
     [McpServerTool(Name = "duplicate_schedule"), Description("Duplicate a schedule with a new name")]
     public static async Task<string> DuplicateSchedule(
         RevitConnectionManager revit,
-        [Description("Schedule element ID to duplicate")] int scheduleId,
+        [Description("Schedule element ID to duplicate")] long scheduleId,
         [Description("Name for the duplicated schedule")] string newName,
         CancellationToken ct = default)
     {

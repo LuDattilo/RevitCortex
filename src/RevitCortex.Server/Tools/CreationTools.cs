@@ -45,7 +45,7 @@ public static class CreationTools
     [McpServerTool(Name = "create_floor"), Description("Create a floor element from boundary points, type name, and level.")]
     public static async Task<string> CreateFloor(
         RevitConnectionManager revit,
-        [Description("Level element ID")] int levelId,
+        [Description("Level element ID")] long levelId,
         [Description("JSON array of boundary points [{x, y, z}]")] string boundaryPoints,
         [Description("Floor type name")] string? typeName = null,
         CancellationToken ct = default)
@@ -64,7 +64,7 @@ public static class CreationTools
     public static async Task<string> ChangeElementType(
         RevitConnectionManager revit,
         [Description("Element IDs to change")] int[] elementIds,
-        [Description("Target type element ID")] int? targetTypeId = null,
+        [Description("Target type element ID")] long? targetTypeId = null,
         [Description("Target type name")] string? targetTypeName = null,
         CancellationToken ct = default)
     {
@@ -116,7 +116,7 @@ public static class CreationTools
         RevitConnectionManager revit,
         [Description("Category name (e.g. Walls, Doors)")] string category,
         [Description("Color as hex string (e.g. #FF0000)")] string color,
-        [Description("View element ID. Uses active view if not specified")] int? viewId = null,
+        [Description("View element ID. Uses active view if not specified")] long? viewId = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -346,7 +346,7 @@ public static class CreationTools
     [McpServerTool(Name = "export_schedule"), Description("Export schedule to CSV/TSV or JSON")]
     public static async Task<string> ExportSchedule(
         RevitConnectionManager revit,
-        [Description("Schedule element ID")] int scheduleId,
+        [Description("Schedule element ID")] long scheduleId,
         [Description("Export format (csv, tsv, json). Default: csv")] string? format = "csv",
         CancellationToken ct = default)
     {

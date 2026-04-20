@@ -36,7 +36,7 @@ public static class MaterialTools
     [McpServerTool(Name = "get_compound_structure"), Description("Get wall/floor/roof/ceiling layer structure by type ID or name.")]
     public static async Task<string> GetCompoundStructure(
         RevitConnectionManager revit,
-        [Description("Type element ID")] int? typeId = null,
+        [Description("Type element ID")] long? typeId = null,
         [Description("Type name")] string? typeName = null,
         CancellationToken ct = default)
     {
@@ -50,7 +50,7 @@ public static class MaterialTools
     [McpServerTool(Name = "set_compound_structure"), Description("Set or replace compound structure layers on a wall/floor/roof/ceiling type.")]
     public static async Task<string> SetCompoundStructure(
         RevitConnectionManager revit,
-        [Description("Type element ID")] int typeId,
+        [Description("Type element ID")] long typeId,
         [Description("Layer definitions as JSON array: [{function, materialName, widthMm}]")] string layers,
         [Description("Preview changes without applying")] bool dryRun = true,
         CancellationToken ct = default)

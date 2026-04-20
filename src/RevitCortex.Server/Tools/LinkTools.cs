@@ -42,7 +42,7 @@ public static class LinkTools
     [McpServerTool(Name = "get_link_transform"), Description("Returns the full transform of a linked file instance.")]
     public static async Task<string> GetLinkTransform(
         RevitConnectionManager revit,
-        [Description("Element ID of the link instance")] int linkInstanceId,
+        [Description("Element ID of the link instance")] long linkInstanceId,
         CancellationToken ct = default)
     {
         var p = new JObject { ["linkInstanceId"] = linkInstanceId };
@@ -92,7 +92,7 @@ public static class LinkTools
     public static async Task<string> ManageLinks(
         RevitConnectionManager revit,
         [Description("Action to perform: list, reload, unload")] string action = "list",
-        [Description("Link element ID (required for reload/unload)")] int? linkId = null,
+        [Description("Link element ID (required for reload/unload)")] long? linkId = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["action"] = action };

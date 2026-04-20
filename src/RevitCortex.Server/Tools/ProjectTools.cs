@@ -160,7 +160,7 @@ public static class ProjectTools
     [McpServerTool(Name = "create_room"), Description("Create a new room in the Revit project.")]
     public static async Task<string> CreateRoom(
         RevitConnectionManager revit,
-        [Description("Level element ID where the room will be placed")] int levelId,
+        [Description("Level element ID where the room will be placed")] long levelId,
         [Description("X coordinate for room placement")] double x,
         [Description("Y coordinate for room placement")] double y,
         [Description("Room name")] string? name = null,
@@ -196,7 +196,7 @@ public static class ProjectTools
     [McpServerTool(Name = "duplicate_system_type"), Description("Duplicate an existing system type with a new name.")]
     public static async Task<string> DuplicateSystemType(
         RevitConnectionManager revit,
-        [Description("Element ID of the source type to duplicate")] int sourceTypeId,
+        [Description("Element ID of the source type to duplicate")] long sourceTypeId,
         [Description("Name for the new duplicated type")] string newName,
         CancellationToken ct = default)
     {
@@ -288,7 +288,7 @@ public static class ProjectTools
     public static async Task<string> WipeEmptyTags(
         RevitConnectionManager revit,
         [Description("Preview changes without applying. Default: true")] bool dryRun = true,
-        [Description("View element ID to search in")] int? viewId = null,
+        [Description("View element ID to search in")] long? viewId = null,
         [Description("JSON array of category names to filter")] string? categories = null,
         CancellationToken ct = default)
     {

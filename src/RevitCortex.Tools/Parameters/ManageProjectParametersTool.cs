@@ -326,6 +326,15 @@ public class ManageProjectParametersTool : ICortexTool
             }
         }
 
+        // Post-build sanity: BuildCategorySet silently drops categories that fail
+        // AllowsBoundParameters, so a 'replace' with only-invalid categories can reach
+        // here with an empty set. Reject explicitly so the caller sees InvalidInput
+        // rather than the misleading PermissionDenied that ReInsert would surface.
+        if (newCategorySet.Size == 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "Resolved category set is empty (none of the requested categories allow parameter binding).",
+                suggestion: "Check the category names and ensure they support bound parameters.");
+
         bool isInstance = existingBinding is InstanceBinding;
         ElementBinding newBinding = isInstance
             ? (ElementBinding)app.Create.NewInstanceBinding(newCategorySet)

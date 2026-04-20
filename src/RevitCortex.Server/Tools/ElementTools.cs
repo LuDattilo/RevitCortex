@@ -11,13 +11,13 @@ public static class ElementTools
     [McpServerTool(Name = "get_element_parameters"), Description("Get all parameters of specific elements by their Revit element IDs.")]
     public static async Task<string> GetElementParameters(
         RevitConnectionManager revit,
-        [Description("Array of Revit element IDs to query")] int[] elementIds,
+        [Description("Array of Revit element IDs to query")] long[] elementIds,
         [Description("Include type-level parameters. Default: true")] bool includeTypeParameters = true,
         CancellationToken ct = default)
     {
         var p = new JObject
         {
-            ["elementIds"] = new JArray(elementIds.Select(id => (object)id).ToArray()),
+            ["elementIds"] = new JArray(elementIds.Cast<object>().ToArray()),
             ["includeTypeParameters"] = includeTypeParameters,
         };
         var result = await revit.ExecuteAsync("get_element_parameters", p, ct);
@@ -56,13 +56,13 @@ public static class ElementTools
     [McpServerTool(Name = "operate_element"), Description("Select, highlight, isolate, hide, or zoom to elements. Actions: select, selectionbox, setcolor, settransparency, hide, temphide, isolate, unhide, resetisolate, delete.")]
     public static async Task<string> OperateElement(
         RevitConnectionManager revit,
-        [Description("Element IDs to operate on")] int[] elementIds,
+        [Description("Element IDs to operate on")] long[] elementIds,
         [Description("Action to perform")] string action,
         CancellationToken ct = default)
     {
         var data = new JObject
         {
-            ["elementIds"] = new JArray(elementIds.Select(id => (object)id).ToArray()),
+            ["elementIds"] = new JArray(elementIds.Cast<object>().ToArray()),
             ["action"] = action,
         };
         var p = new JObject { ["data"] = data };
@@ -109,7 +109,7 @@ public static class ElementTools
     public static async Task<string> FindUndimensionedElements(
         RevitConnectionManager revit,
         [Description("Category to filter (e.g. Walls, Doors)")] string? category = null,
-        [Description("View element ID to search in")] int? viewId = null,
+        [Description("View element ID to search in")] long? viewId = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
@@ -123,7 +123,7 @@ public static class ElementTools
     public static async Task<string> FindUntaggedElements(
         RevitConnectionManager revit,
         [Description("Category to filter (e.g. Walls, Doors)")] string? category = null,
-        [Description("View element ID to search in")] int? viewId = null,
+        [Description("View element ID to search in")] long? viewId = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
@@ -228,11 +228,11 @@ public static class ElementTools
     [McpServerTool(Name = "section_box_from_selection"), Description("Create a 3D section box from selected elements")]
     public static async Task<string> SectionBoxFromSelection(
         RevitConnectionManager revit,
-        [Description("Element IDs to create section box from")] int[]? elementIds = null,
+        [Description("Element IDs to create section box from")] long[]? elementIds = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
-        if (elementIds != null) p["elementIds"] = new JArray(elementIds.Select(id => (object)id).ToArray());
+        if (elementIds != null) p["elementIds"] = new JArray(elementIds.Cast<object>().ToArray());
         var result = await revit.ExecuteAsync("section_box_from_selection", p, ct);
         return result.ToString();
     }
