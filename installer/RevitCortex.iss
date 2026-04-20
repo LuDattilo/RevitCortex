@@ -1,8 +1,13 @@
 ; RevitCortex Inno Setup Installer
-; Generates a single-file .exe installer from the release/ folder
+; Generates a single-file .exe installer from the release/ folder.
+;
+; The heavy lifting (Claude Desktop JSON merge, Revit addin deploy with ACL fallback,
+; Git auto-install) lives in PowerShell helpers under dist-lib/. The Inno step just
+; copies binaries and invokes the shared scripts so that .exe and .zip installs
+; behave identically.
 ;
 ; Usage:
-;   1. Run build-release.ps1 -Version "1.0.0" first
+;   1. Run build-release.ps1 -Version "1.0.0" first.
 ;   2. Then: "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\RevitCortex.iss
 ;   Output: installer\Output\RevitCortex-Setup.exe
 
@@ -52,7 +57,7 @@ Name: "r26"; Description: "Plugin Revit 2026"; Types: full; Check: RevitDirExist
 Name: "r27"; Description: "Plugin Revit 2027"; Types: full; Check: RevitDirExists('2027')
 
 [Files]
-; MCP Server
+; MCP Server (self-contained C# EXE — no Node.js dependency)
 Source: "..\release\server\*"; DestDir: "{userappdata}\.revitcortex\server"; Components: server; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Plugin DLLs per version
@@ -69,9 +74,12 @@ Source: "..\release\RevitCortex.addin"; DestDir: "{commonappdata}\Autodesk\Revit
 Source: "..\release\RevitCortex.addin"; DestDir: "{commonappdata}\Autodesk\Revit\Addins\2026"; Components: r26; Flags: ignoreversion
 Source: "..\release\RevitCortex.addin"; DestDir: "{commonappdata}\Autodesk\Revit\Addins\2027"; Components: r27; Flags: ignoreversion
 
-; Install/uninstall scripts (for manual use)
-Source: "..\release\install.ps1"; DestDir: "{userappdata}\.revitcortex"; Flags: ignoreversion
-Source: "..\release\uninstall.ps1"; DestDir: "{userappdata}\.revitcortex"; Flags: ignoreversion
+; Shared PowerShell helpers (reused by both .zip and .exe install paths)
+Source: "..\distribution\lib\*"; DestDir: "{userappdata}\.revitcortex\dist-lib"; Components: server; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Install/uninstall scripts (installed for manual re-run)
+Source: "..\distribution\install.ps1"; DestDir: "{userappdata}\.revitcortex"; Flags: ignoreversion
+Source: "..\distribution\uninstall.ps1"; DestDir: "{userappdata}\.revitcortex"; Flags: ignoreversion
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{commonappdata}\Autodesk\Revit\Addins\2023\RevitCortex"
@@ -85,43 +93,34 @@ Type: files; Name: "{commonappdata}\Autodesk\Revit\Addins\2025\RevitCortex.addin
 Type: files; Name: "{commonappdata}\Autodesk\Revit\Addins\2026\RevitCortex.addin"
 Type: files; Name: "{commonappdata}\Autodesk\Revit\Addins\2027\RevitCortex.addin"
 Type: filesandordirs; Name: "{userappdata}\.revitcortex\server"
+Type: filesandordirs; Name: "{userappdata}\.revitcortex\dist-lib"
 
 [Run]
-; npm install after server files are copied
-Filename: "cmd.exe"; Parameters: "/c cd /d ""{userappdata}\.revitcortex\server"" && npm install --production --silent 2>nul"; StatusMsg: "Installazione dipendenze server..."; Flags: runhidden waituntilterminated; Components: server
-; Configure Claude Desktop
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""& {{ $sp = Join-Path $env:USERPROFILE '.revitcortex\server\build\index.js'; $cp = Join-Path $env:APPDATA 'Claude\claude_desktop_config.json'; $cd = Split-Path $cp; if (!(Test-Path $cd)) {{ New-Item -ItemType Directory -Path $cd -Force | Out-Null }}; $entry = @{{ command='node'; args=@($sp) }}; if (Test-Path $cp) {{ try {{ $c = Get-Content $cp -Raw | ConvertFrom-Json; if (!$c.mcpServers) {{ $c | Add-Member -NotePropertyName mcpServers -NotePropertyValue @{{}} -Force }}; $c.mcpServers | Add-Member -NotePropertyName revitcortex -NotePropertyValue $entry -Force; $c | ConvertTo-Json -Depth 10 | Set-Content $cp -Encoding UTF8 }} catch {{ @{{ mcpServers = @{{ revitcortex = $entry }} }} | ConvertTo-Json -Depth 10 | Set-Content $cp -Encoding UTF8 }} }} else {{ @{{ mcpServers = @{{ revitcortex = $entry }} }} | ConvertTo-Json -Depth 10 | Set-Content $cp -Encoding UTF8 }} }}"""; StatusMsg: "Configurazione Claude Desktop..."; Flags: runhidden waituntilterminated; Components: server
+; Best-effort Git install (winget first, then Git-for-Windows release as fallback).
+; Shared GitInstall.ps1 handles arch detection. Non-fatal on failure.
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& {{ . '{userappdata}\.revitcortex\dist-lib\GitInstall.ps1'; Ensure-Git | Out-Null }}"""; \
+  StatusMsg: "Verifica/installazione Git..."; \
+  Flags: runhidden waituntilterminated; \
+  Components: server
+
+; Claude Desktop configuration via the same JSON-safe helper used by install.ps1.
+; This replaces the old inline one-liner that overwrote existing mcpServers entries.
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& {{ . '{userappdata}\.revitcortex\dist-lib\ClaudeConfig.ps1'; $exe = Join-Path $env:USERPROFILE '.revitcortex\server\RevitCortex.Server.exe'; $cfg = Join-Path $env:APPDATA 'Claude\claude_desktop_config.json'; try {{ Merge-ClaudeMcpServer -ConfigPath $cfg -ServerName 'revitcortex' -Command $exe | Out-Null }} catch {{ Write-Host ('Claude Desktop config update failed: ' + $_) }} }}"""; \
+  StatusMsg: "Configurazione Claude Desktop..."; \
+  Flags: runhidden waituntilterminated; \
+  Components: server
 
 [UninstallRun]
-; Remove Claude Desktop config entry
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""& {{ $cp = Join-Path $env:APPDATA 'Claude\claude_desktop_config.json'; if (Test-Path $cp) {{ try {{ $c = Get-Content $cp -Raw | ConvertFrom-Json; if ($c.mcpServers -and $c.mcpServers.revitcortex) {{ $c.mcpServers.PSObject.Properties.Remove('revitcortex'); $c | ConvertTo-Json -Depth 10 | Set-Content $cp -Encoding UTF8 }} }} catch {{}} }} }}"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveClaudeDesktop"
+; Remove revitcortex entry from Claude Desktop without touching other MCP servers.
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& {{ . '{userappdata}\.revitcortex\dist-lib\ClaudeConfig.ps1'; $cfg = Join-Path $env:APPDATA 'Claude\claude_desktop_config.json'; try {{ Remove-ClaudeMcpServer -ConfigPath $cfg -ServerName 'revitcortex' | Out-Null }} catch {{}} }}"""; \
+  Flags: runhidden waituntilterminated; \
+  RunOnceId: "RemoveClaudeDesktop"
 
 [Code]
-var
-  GlobalResultCode: Integer;
-
 function RevitDirExists(Version: String): Boolean;
 begin
   Result := DirExists(ExpandConstant('{commonappdata}\Autodesk\Revit\Addins\' + Version));
-end;
-
-function NodeJsInstalled(): Boolean;
-var
-  RC: Integer;
-begin
-  Result := Exec('cmd.exe', '/c node --version', '', SW_HIDE, ewWaitUntilTerminated, RC) and (RC = 0);
-end;
-
-function InitializeSetup(): Boolean;
-begin
-  Result := True;
-  if not NodeJsInstalled() then
-  begin
-    if MsgBox('Node.js non trovato. E'' necessario per il server MCP.'#13#10#13#10'Vuoi aprire la pagina di download di Node.js?'#13#10'Dopo l''installazione di Node.js, riesegui questo installer.',
-              mbConfirmation, MB_YESNO) = IDYES then
-    begin
-      ShellExec('open', 'https://nodejs.org', '', '', SW_SHOWNORMAL, ewNoWait, GlobalResultCode);
-    end;
-    Result := False;
-  end;
 end;

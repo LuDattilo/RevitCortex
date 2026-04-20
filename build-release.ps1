@@ -79,6 +79,11 @@ Copy-Item (Join-Path $RepoRoot "distribution\install.bat") $ReleaseDir
 Copy-Item (Join-Path $RepoRoot "distribution\uninstall.ps1") $ReleaseDir
 Copy-Item (Join-Path $RepoRoot "distribution\README.txt") $ReleaseDir
 
+# Shared PowerShell helpers (JSON-safe Claude config, Revit ACL fallback, Git install)
+$libTarget = Join-Path $ReleaseDir "lib"
+New-Item -ItemType Directory -Path $libTarget -Force | Out-Null
+Copy-Item (Join-Path $RepoRoot "distribution\lib\*") $libTarget -Recurse -Force
+
 # .addin manifest
 Copy-Item (Join-Path $RepoRoot "src\RevitCortex.Plugin\RevitCortex.addin") $ReleaseDir
 
