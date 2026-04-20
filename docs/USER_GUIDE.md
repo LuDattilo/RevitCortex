@@ -147,6 +147,8 @@ Quando si devono creare/modificare centinaia di elementi, uno script C# eseguito
 
 ## Strumenti principali
 
+> Per la firma completa (parametri, default, enum) di ogni tool consulta [`tool-schemas.txt`](../tool-schemas.txt) nella root del repository. Il file è aggiornato ad ogni release e viene rigenerato con `node server/generate-tool-schemas-csharp.mjs`.
+
 ### Lettura e ricerca
 
 | Strumento | Scopo |
@@ -199,7 +201,7 @@ Quando si devono creare/modificare centinaia di elementi, uno script C# eseguito
 | `add_shared_parameter` | Aggiunge parametro condiviso a categorie |
 | `sync_csv_parameters` | Importa valori da CSV |
 | `transfer_parameters` | Copia parametri tra elementi |
-| `manage_project_parameters` | Lista/crea/elimina parametri di progetto |
+| `manage_project_parameters` | Lista, crea, elimina o modifica parametri di progetto. L'azione `modify` supporta `categoriesMode: add\|remove\|replace` per gestire le categorie associate (aggiungere, scollegare o sostituire l'intero set). |
 | `manage_global_parameters` | Gestisce i Global Parameters (azioni: list, get, create, set, delete) |
 
 ### Impostazioni Progetto

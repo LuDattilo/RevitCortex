@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -115,11 +116,13 @@ public class ExportElementsDataTool : ICortexTool
         var result = new List<Element>();
         foreach (var cat in categories)
         {
-            if (!Enum.TryParse<BuiltInCategory>(cat, ignoreCase: true, out var bic))
-                throw new ArgumentException($"'{cat}' is not a valid BuiltInCategory. Use OST_* codes.");
+            var catId = CategoryResolver.ResolveToId(doc, cat);
+            if (catId == null || catId == ElementId.InvalidElementId)
+                throw new ArgumentException(
+                    $"'{cat}' is not a recognized category. Use OST_* codes (e.g. OST_Walls), English friendly names (Walls, Foundations), or the localized display name.");
 
             var found = new FilteredElementCollector(doc)
-                .WherePasses(new ElementCategoryFilter(bic))
+                .OfCategoryId(catId)
                 .WhereElementIsNotElementType()
                 .ToList();
             result.AddRange(found);

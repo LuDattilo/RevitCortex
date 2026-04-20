@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using ModelContextProtocol.Server;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Server.Connection;
@@ -64,53 +65,81 @@ public static class MaterialTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "get_material_properties"), Description("Get detailed material properties including structural and thermal data")]
+    [McpServerTool(Name = "get_material_properties"), Description("Get detailed material properties (physical, thermal, appearance) by material ID or name.")]
     public static async Task<string> GetMaterialProperties(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Material element ID (alternative to materialName)")] long? materialId = null,
+        [Description("Material name (alternative to materialId)")] string? materialName = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("get_material_properties", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (materialId != null) p["materialId"] = materialId;
+        if (materialName != null) p["materialName"] = materialName;
+        var result = await revit.ExecuteAsync("get_material_properties", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "get_material_quantities"), Description("Calculate material area and volume across elements")]
+    [McpServerTool(Name = "get_material_quantities"), Description("Calculate material area and volume across elements, optionally filtered by category or restricted to the current selection.")]
     public static async Task<string> GetMaterialQuantities(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Category filters (e.g. Walls, Floors)")] string[]? categoryFilters = null,
+        [Description("Restrict to the current Revit selection. Default: false")] bool? selectedElementsOnly = null,
+        [Description("Max rows returned. Default: 50")] int? maxResults = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("get_material_quantities", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (categoryFilters != null) p["categoryFilters"] = new JArray(categoryFilters);
+        if (selectedElementsOnly != null) p["selectedElementsOnly"] = selectedElementsOnly;
+        if (maxResults != null) p["maxResults"] = maxResults;
+        var result = await revit.ExecuteAsync("get_material_quantities", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "delete_material"), Description("Delete a material from the project")]
+    [McpServerTool(Name = "delete_material"), Description("Delete a material from the project by ID or name.")]
     public static async Task<string> DeleteMaterial(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Material element ID (alternative to materialName)")] long? materialId = null,
+        [Description("Material name (alternative to materialId)")] string? materialName = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("delete_material", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (materialId != null) p["materialId"] = materialId;
+        if (materialName != null) p["materialName"] = materialName;
+        var result = await revit.ExecuteAsync("delete_material", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "duplicate_material"), Description("Duplicate an existing material with a new name")]
+    [McpServerTool(Name = "duplicate_material"), Description("Duplicate an existing material with a new name.")]
     public static async Task<string> DuplicateMaterial(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("New material name")] string newName,
+        [Description("Source material element ID (alternative to sourceMaterialName)")] long? sourceMaterialId = null,
+        [Description("Source material name (alternative to sourceMaterialId)")] string? sourceMaterialName = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("duplicate_material", JObject.Parse(data), ct);
+        var p = new JObject { ["newName"] = newName };
+        if (sourceMaterialId != null) p["sourceMaterialId"] = sourceMaterialId;
+        if (sourceMaterialName != null) p["sourceMaterialName"] = sourceMaterialName;
+        var result = await revit.ExecuteAsync("duplicate_material", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "duplicate_family_type"), Description("Duplicate a loadable family type with a new name")]
+    [McpServerTool(Name = "duplicate_family_type"), Description("Duplicate a loadable family type with a new name and optional parameter overrides.")]
     public static async Task<string> DuplicateFamilyType(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("New type name")] string newName,
+        [Description("Source type element ID (alternative to sourceTypeName + familyName)")] long? sourceTypeId = null,
+        [Description("Source type name (used with familyName)")] string? sourceTypeName = null,
+        [Description("Family name (used with sourceTypeName)")] string? familyName = null,
+        [Description("Parameter overrides as JSON object: {paramName: value, ...}")] string? parameterOverrides = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("duplicate_family_type", JObject.Parse(data), ct);
+        var p = new JObject { ["newName"] = newName };
+        if (sourceTypeId != null) p["sourceTypeId"] = sourceTypeId;
+        if (sourceTypeName != null) p["sourceTypeName"] = sourceTypeName;
+        if (familyName != null) p["familyName"] = familyName;
+        if (parameterOverrides != null) p["parameterOverrides"] = JObject.Parse(parameterOverrides);
+        var result = await revit.ExecuteAsync("duplicate_family_type", p, ct);
         return result.ToString();
     }
 }

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using ModelContextProtocol.Server;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Server.Connection;
@@ -71,10 +72,12 @@ public static class ParameterTools
     [McpServerTool(Name = "sync_csv_parameters"), Description("Synchronize parameter values from CSV data into Revit elements.")]
     public static async Task<string> SyncCsvParameters(
         RevitConnectionManager revit,
-        [Description("CSV data as a string")] string data,
+        [Description("JSON array of rows: [{elementId, paramName1: value, paramName2: value, ...}]")] string data,
+        [Description("Preview changes without applying. Default: true")] bool? dryRun = true,
         CancellationToken ct = default)
     {
-        var p = JObject.Parse(data);
+        var p = new JObject { ["data"] = JArray.Parse(data) };
+        if (dryRun != null) p["dryRun"] = dryRun;
         var result = await revit.ExecuteAsync("sync_csv_parameters", p, ct);
         return result.ToString();
     }
@@ -117,30 +120,63 @@ public static class ParameterTools
     [McpServerTool(Name = "add_shared_parameter"), Description("Add a shared parameter to project categories")]
     public static async Task<string> AddSharedParameter(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Name of the shared parameter")] string parameterName,
+        [Description("Categories to bind to (OST_* codes or display names)")] string[] categories,
+        [Description("Group name in the shared parameter file. Default: RevitCortex")] string? groupName = null,
+        [Description("Instance (true) or type (false) binding. Default: true")] bool? isInstance = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("add_shared_parameter", JObject.Parse(data), ct);
+        var p = new JObject
+        {
+            ["parameterName"] = parameterName,
+            ["categories"] = new JArray(categories),
+        };
+        if (groupName != null) p["groupName"] = groupName;
+        if (isInstance != null) p["isInstance"] = isInstance;
+        var result = await revit.ExecuteAsync("add_shared_parameter", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "manage_project_parameters"), Description("List, create, delete, or modify project parameters")]
+    [McpServerTool(Name = "manage_project_parameters"), Description("List, create, delete, or modify project parameters. Modify supports add/remove/replace on the category bindings.")]
     public static async Task<string> ManageProjectParameters(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Action: list | create | delete | modify")] string action = "list",
+        [Description("Parameter name (required for create/delete/modify)")] string? parameterName = null,
+        [Description("Data type for create: Text | Integer | Number | Length | Area | Volume | Angle | YesNo | URL")] string? dataType = null,
+        [Description("Instance (true) or type (false) binding — only used on create")] bool? isInstance = null,
+        [Description("Categories list (OST_* codes or display names) — for create/modify")] string[]? categories = null,
+        [Description("How modify applies 'categories': add (default, union), remove (unbind listed), replace (set to exactly the listed). Ignored for other actions.")] string? categoriesMode = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("manage_project_parameters", JObject.Parse(data), ct);
+        var p = new JObject { ["action"] = action };
+        if (parameterName != null) p["parameterName"] = parameterName;
+        if (dataType != null) p["dataType"] = dataType;
+        if (isInstance != null) p["isInstance"] = isInstance;
+        if (categories != null) p["categories"] = new JArray(categories);
+        if (categoriesMode != null) p["categoriesMode"] = categoriesMode;
+        var result = await revit.ExecuteAsync("manage_project_parameters", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "transfer_parameters"), Description("Copy parameter values from source to target elements")]
+    [McpServerTool(Name = "transfer_parameters"), Description("Copy parameter values from source element to one or more target elements.")]
     public static async Task<string> TransferParameters(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Source element ID")] long sourceElementId,
+        [Description("Target element IDs (array of long)")] long[] targetElementIds,
+        [Description("Parameter names to copy; if empty, copies all writable parameters")] string[]? parameterNames = null,
+        [Description("Also copy type-level parameters. Default: false")] bool? includeType = null,
+        [Description("Preview changes without applying. Default: true")] bool? dryRun = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("transfer_parameters", JObject.Parse(data), ct);
+        var p = new JObject
+        {
+            ["sourceElementId"] = sourceElementId,
+            ["targetElementIds"] = new JArray(targetElementIds.Cast<object>().ToArray()),
+        };
+        if (parameterNames != null) p["parameterNames"] = new JArray(parameterNames);
+        if (includeType != null) p["includeType"] = includeType;
+        if (dryRun != null) p["dryRun"] = dryRun;
+        var result = await revit.ExecuteAsync("transfer_parameters", p, ct);
         return result.ToString();
     }
 

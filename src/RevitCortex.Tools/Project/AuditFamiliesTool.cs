@@ -20,7 +20,7 @@ public class AuditFamiliesTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Comprehensive family audit with health scores, unused detection, in-place identification, and instance counts. Merges audit_families and check_family_health.";
+    public string Description => "Family audit with instance counts, unused detection, and in-place identification. Covers loadable (.rfa) families by default; set includeSystemFamilies=true to also list system-family types (wall/floor/roof/ceiling types).";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -30,19 +30,23 @@ public class AuditFamiliesTool : ICortexTool
         var includeUnused = input["includeUnused"]?.Value<bool>() ?? true;
         var categoryFilter = input["categoryFilter"]?.Value<string>();
         var sortBy = input["sortBy"]?.Value<string>() ?? "instance_count";
+        var includeSystemFamilies = input["includeSystemFamilies"]?.Value<bool>() ?? false;
 
         try
         {
-            var families = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>();
-
+            ElementId? filterCatId = null;
             if (!string.IsNullOrEmpty(categoryFilter))
             {
-                var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryFilter);
-                if (catId != ElementId.InvalidElementId)
-                    families = families.Where(f => f.FamilyCategory?.Id == catId);
+                filterCatId = Utilities.CategoryResolver.ResolveToId(doc, categoryFilter);
+                if (filterCatId == ElementId.InvalidElementId) filterCatId = null;
             }
 
-            // Count instances per family
+            // ── Loadable families ─────────────────────────────────────────
+            var families = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>();
+            if (filterCatId != null)
+                families = families.Where(f => f.FamilyCategory?.Id == filterCatId);
+
+            // Count instances per family (loadable)
             var instanceCounts = new FilteredElementCollector(doc)
                 .WhereElementIsNotElementType()
                 .Where(e => e is FamilyInstance)
@@ -59,6 +63,7 @@ public class AuditFamiliesTool : ICortexTool
                     id = ToolHelpers.GetElementIdValue(f.Id),
                     name = f.Name,
                     category = f.FamilyCategory?.Name,
+                    kind = "loadable",
                     isInPlace = f.IsInPlace,
                     isEditable = f.IsEditable,
                     instanceCount = count,
@@ -66,6 +71,60 @@ public class AuditFamiliesTool : ICortexTool
                     isUnused = count == 0 && f.IsEditable
                 };
             }).ToList();
+
+            // ── System families (opt-in) ─────────────────────────────────
+            // In Revit a "system family" is not a Family element; it's the implicit
+            // grouping of all ElementTypes sharing a subclass (WallType, FloorType, ...).
+            // We surface each subclass+category as one row, with a typeCount and an
+            // aggregated instanceCount obtained by walking the concrete instance class.
+            if (includeSystemFamilies)
+            {
+                var systemGroups = new (Type typeClass, Type instanceClass, string name)[]
+                {
+                    (typeof(WallType),     typeof(Wall),     "Walls"),
+                    (typeof(FloorType),    typeof(Floor),    "Floors"),
+                    (typeof(RoofType),     typeof(RoofBase), "Roofs"),
+                    (typeof(CeilingType),  typeof(Ceiling),  "Ceilings"),
+                };
+
+                foreach (var (typeClass, instanceClass, displayName) in systemGroups)
+                {
+                    var types = new FilteredElementCollector(doc).OfClass(typeClass).Cast<ElementType>().ToList();
+                    if (filterCatId != null)
+                        types = types.Where(t => t.Category?.Id == filterCatId).ToList();
+                    if (types.Count == 0) continue;
+
+                    // Count instances per type id by walking the instance class once.
+                    var typeInstanceCounts = new FilteredElementCollector(doc)
+                        .OfClass(instanceClass)
+                        .WhereElementIsNotElementType()
+                        .GroupBy(e => e.GetTypeId())
+                        .Where(g => g.Key != ElementId.InvalidElementId)
+                        .ToDictionary(g => g.Key, g => g.Count());
+
+                    // Group rows by category so the output mirrors loadable families:
+                    // one row = one system "family" (category), with typeCount and instance sum.
+                    var byCat = types.GroupBy(t => t.Category?.Name ?? displayName);
+                    foreach (var catGroup in byCat)
+                    {
+                        int totalInstances = catGroup.Sum(t =>
+                            typeInstanceCounts.TryGetValue(t.Id, out var c) ? c : 0);
+
+                        familyList.Add(new
+                        {
+                            id = (long)0,
+                            name = $"[System] {catGroup.Key}",
+                            category = (string?)catGroup.Key,
+                            kind = "system",
+                            isInPlace = false,
+                            isEditable = true,
+                            instanceCount = totalInstances,
+                            typeCount = catGroup.Count(),
+                            isUnused = totalInstances == 0
+                        });
+                    }
+                }
+            }
 
             if (!includeUnused)
                 familyList = familyList.Where(f => !f.isUnused).ToList();
@@ -80,6 +139,8 @@ public class AuditFamiliesTool : ICortexTool
             var summary = new
             {
                 totalFamilies = familyList.Count,
+                loadableCount = familyList.Count(f => f.kind == "loadable"),
+                systemCount = familyList.Count(f => f.kind == "system"),
                 unusedCount = familyList.Count(f => f.isUnused),
                 inPlaceCount = familyList.Count(f => f.isInPlace),
                 totalInstances = familyList.Sum(f => f.instanceCount),
@@ -93,6 +154,7 @@ public class AuditFamiliesTool : ICortexTool
             return CortexResult<object>.Ok(new
             {
                 summary,
+                includeSystemFamilies,
                 families = familyList.Take(200).ToList()
             });
         }

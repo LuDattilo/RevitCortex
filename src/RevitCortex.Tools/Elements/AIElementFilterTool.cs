@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -190,10 +191,11 @@ public class AIElementFilterTool : ICortexTool
         // 1. Category filter
         if (!string.IsNullOrWhiteSpace(filterCategory))
         {
-            if (!Enum.TryParse<BuiltInCategory>(filterCategory, ignoreCase: true, out var bic))
+            var catId = CategoryResolver.ResolveToId(doc, filterCategory);
+            if (catId == null || catId == ElementId.InvalidElementId)
                 throw new ArgumentException(
-                    $"'{filterCategory}' is not a valid BuiltInCategory. Use OST_* codes.");
-            filters.Add(new ElementCategoryFilter(bic));
+                    $"'{filterCategory}' is not a recognized category. Use OST_* codes (e.g. OST_Walls), English friendly names (Walls, Foundations), or the localized display name.");
+            filters.Add(new ElementCategoryFilter(catId));
         }
 
         // 2. Element-class filter

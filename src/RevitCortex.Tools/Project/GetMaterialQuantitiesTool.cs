@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -49,15 +50,15 @@ public class GetMaterialQuantitiesTool : ICortexTool
 
                 if (categoryFilters.Count > 0)
                 {
-                    var builtInCats = new List<BuiltInCategory>();
+                    var catIds = new List<ElementId>();
                     foreach (var catName in categoryFilters)
                     {
-                        string bicName = catName.StartsWith("OST_") ? catName : "OST_" + catName;
-                        if (Enum.TryParse<BuiltInCategory>(bicName, true, out var bic))
-                            builtInCats.Add(bic);
+                        var catId = CategoryResolver.ResolveToId(doc, catName);
+                        if (catId != null && catId != ElementId.InvalidElementId)
+                            catIds.Add(catId);
                     }
-                    if (builtInCats.Count > 0)
-                        collector = collector.WherePasses(new ElementMulticategoryFilter(builtInCats));
+                    if (catIds.Count > 0)
+                        collector = collector.WherePasses(new ElementMulticategoryFilter(catIds, false));
                 }
 
                 elements = collector.ToList();

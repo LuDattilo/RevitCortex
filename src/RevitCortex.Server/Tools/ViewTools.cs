@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using ModelContextProtocol.Server;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Server.Connection;
@@ -83,13 +84,29 @@ public static class ViewTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "override_graphics"), Description("Override element graphics in a view (colors, line weights, patterns, transparency). Pass a JSON string with override parameters.")]
+    [McpServerTool(Name = "override_graphics"), Description("Override element graphics in a view (colors, transparency, halftone, line weight).")]
     public static async Task<string> OverrideGraphics(
         RevitConnectionManager revit,
-        [Description("JSON string with override parameters (e.g. {\"viewId\":123, \"elementIds\":[1,2], \"color\":\"#FF0000\", \"transparency\":50})")] string data,
+        [Description("Element IDs to override")] long[] elementIds,
+        [Description("Action: set | reset. Default: set")] string? action = null,
+        [Description("View ID (optional; uses active view when 0)")] long? viewId = null,
+        [Description("Color red channel 0-255")] int? colorR = null,
+        [Description("Color green channel 0-255")] int? colorG = null,
+        [Description("Color blue channel 0-255")] int? colorB = null,
+        [Description("Transparency 0-100")] int? transparency = null,
+        [Description("Apply halftone")] bool? isHalftone = null,
+        [Description("Projection line weight 1-16")] int? projectionLineWeight = null,
         CancellationToken ct = default)
     {
-        var p = JObject.Parse(data);
+        var p = new JObject { ["elementIds"] = new JArray(elementIds.Cast<object>().ToArray()) };
+        if (action != null) p["action"] = action;
+        if (viewId != null) p["viewId"] = viewId;
+        if (colorR != null) p["colorR"] = colorR;
+        if (colorG != null) p["colorG"] = colorG;
+        if (colorB != null) p["colorB"] = colorB;
+        if (transparency != null) p["transparency"] = transparency;
+        if (isHalftone != null) p["isHalftone"] = isHalftone;
+        if (projectionLineWeight != null) p["projectionLineWeight"] = projectionLineWeight;
         var result = await revit.ExecuteAsync("override_graphics", p, ct);
         return result.ToString();
     }
@@ -195,43 +212,77 @@ public static class ViewTools
 
     // ── Viewport & View Template tools ──────────────────────────────────
 
-    [McpServerTool(Name = "align_viewports"), Description("Align viewports across sheets by position")]
+    [McpServerTool(Name = "align_viewports"), Description("Align viewports across sheets by reference placement.")]
     public static async Task<string> AlignViewports(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Reference viewport element ID")] long sourceViewportId,
+        [Description("Viewport IDs to align to the reference")] long[] targetViewportIds,
+        [Description("Alignment mode: placement | center | label. Default: placement")] string? alignMode = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("align_viewports", JObject.Parse(data), ct);
+        var p = new JObject
+        {
+            ["sourceViewportId"] = sourceViewportId,
+            ["targetViewportIds"] = new JArray(targetViewportIds.Cast<object>().ToArray()),
+        };
+        if (alignMode != null) p["alignMode"] = alignMode;
+        var result = await revit.ExecuteAsync("align_viewports", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "apply_view_template"), Description("List, apply, or remove view templates from views")]
+    [McpServerTool(Name = "apply_view_template"), Description("List, apply, or remove view templates from views. action=list|apply|remove.")]
     public static async Task<string> ApplyViewTemplate(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Action: list | apply | remove. Default: apply")] string? action = null,
+        [Description("View IDs to apply/remove template on")] long[]? viewIds = null,
+        [Description("Template element ID (for apply)")] long? templateId = null,
+        [Description("Template name (alternative to templateId)")] string? templateName = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("apply_view_template", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (viewIds != null) p["viewIds"] = new JArray(viewIds.Cast<object>().ToArray());
+        if (templateId != null) p["templateId"] = templateId;
+        if (templateName != null) p["templateName"] = templateName;
+        var result = await revit.ExecuteAsync("apply_view_template", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "batch_modify_view_range"), Description("Modify view range offsets for multiple views")]
+    [McpServerTool(Name = "batch_modify_view_range"), Description("Modify view range offsets (top, cut plane, bottom, view depth) for multiple views. Offsets are in mm.")]
     public static async Task<string> BatchModifyViewRange(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("View IDs to modify")] long[] viewIds,
+        [Description("Top offset in mm")] double? topOffset = null,
+        [Description("Cut plane offset in mm")] double? cutPlaneOffset = null,
+        [Description("Bottom offset in mm")] double? bottomOffset = null,
+        [Description("View depth offset in mm")] double? viewDepthOffset = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("batch_modify_view_range", JObject.Parse(data), ct);
+        var p = new JObject { ["viewIds"] = new JArray(viewIds.Cast<object>().ToArray()) };
+        if (topOffset != null) p["topOffset"] = topOffset;
+        if (cutPlaneOffset != null) p["cutPlaneOffset"] = cutPlaneOffset;
+        if (bottomOffset != null) p["bottomOffset"] = bottomOffset;
+        if (viewDepthOffset != null) p["viewDepthOffset"] = viewDepthOffset;
+        var result = await revit.ExecuteAsync("batch_modify_view_range", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_views_from_rooms"), Description("Create callout, section, or elevation views from rooms")]
+    [McpServerTool(Name = "create_views_from_rooms"), Description("Create callout, section, or elevation views from rooms with a naming pattern.")]
     public static async Task<string> CreateViewsFromRooms(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Room element IDs")] long[] roomIds,
+        [Description("View type: callout | section | elevation. Default: callout")] string? viewType = null,
+        [Description("Boundary offset in mm. Default: 500")] double? offset = null,
+        [Description("View scale denominator (e.g. 50 for 1:50). Default: 50")] int? scale = null,
+        [Description("Naming pattern with {RoomNumber} and {RoomName} placeholders. Default: '{RoomNumber} - {RoomName}'")] string? namingPattern = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("create_views_from_rooms", JObject.Parse(data), ct);
+        var p = new JObject { ["roomIds"] = new JArray(roomIds.Cast<object>().ToArray()) };
+        if (viewType != null) p["viewType"] = viewType;
+        if (offset != null) p["offset"] = offset;
+        if (scale != null) p["scale"] = scale;
+        if (namingPattern != null) p["namingPattern"] = namingPattern;
+        var result = await revit.ExecuteAsync("create_views_from_rooms", p, ct);
         return result.ToString();
     }
 
@@ -246,35 +297,56 @@ public static class ViewTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "manage_view_templates"), Description("List, duplicate, delete, or rename view templates")]
+    [McpServerTool(Name = "manage_view_templates"), Description("List, duplicate, delete, or rename view templates. action=list|duplicate|delete|rename.")]
     public static async Task<string> ManageViewTemplates(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Action: list | duplicate | delete | rename. Default: list")] string? action = null,
+        [Description("Filter templates by view type (for list)")] string? filterViewType = null,
+        [Description("Template IDs (for duplicate/delete)")] long[]? templateIds = null,
+        [Description("Template ID (for rename)")] long? templateId = null,
+        [Description("New name (for rename or duplicate)")] string? newName = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("manage_view_templates", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (filterViewType != null) p["filterViewType"] = filterViewType;
+        if (templateIds != null) p["templateIds"] = new JArray(templateIds.Cast<object>().ToArray());
+        if (templateId != null) p["templateId"] = templateId;
+        if (newName != null) p["newName"] = newName;
+        var result = await revit.ExecuteAsync("manage_view_templates", p, ct);
         return result.ToString();
     }
 
     // ── Sheet tools ─────────────────────────────────────────────────────
 
-    [McpServerTool(Name = "batch_create_sheets"), Description("Create multiple sheets with title blocks and optional view placement")]
+    [McpServerTool(Name = "batch_create_sheets"), Description("Create multiple sheets with title blocks and optional view placement. sheets is a JSON array: [{number, name, titleBlockName?, viewIds?}].")]
     public static async Task<string> BatchCreateSheets(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("JSON array of sheet specs: [{number, name, titleBlockName?, viewIds?}]")] string sheets,
+        [Description("Default title block family-type name used when a sheet spec omits titleBlockName")] string? defaultTitleBlockName = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("batch_create_sheets", JObject.Parse(data), ct);
+        var p = new JObject { ["sheets"] = JArray.Parse(sheets) };
+        if (defaultTitleBlockName != null) p["defaultTitleBlockName"] = defaultTitleBlockName;
+        var result = await revit.ExecuteAsync("batch_create_sheets", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_placeholder_sheets"), Description("Create, list, convert, or delete placeholder sheets")]
+    [McpServerTool(Name = "create_placeholder_sheets"), Description("Create, list, convert, or delete placeholder sheets. action=create|list|convert|delete.")]
     public static async Task<string> CreatePlaceholderSheets(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Action: create | list | convert | delete. Default: create")] string? action = null,
+        [Description("JSON array of sheet specs for create: [{number, name}]")] string? sheets = null,
+        [Description("Sheet IDs (for convert/delete)")] long[]? sheetIds = null,
+        [Description("Title block type element ID (for convert)")] long? titleBlockId = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("create_placeholder_sheets", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (sheets != null) p["sheets"] = JArray.Parse(sheets);
+        if (sheetIds != null) p["sheetIds"] = new JArray(sheetIds.Cast<object>().ToArray());
+        if (titleBlockId != null) p["titleBlockId"] = titleBlockId;
+        var result = await revit.ExecuteAsync("create_placeholder_sheets", p, ct);
         return result.ToString();
     }
 
@@ -293,13 +365,26 @@ public static class ViewTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "duplicate_sheet_with_views"), Description("Duplicate a sheet with configurable view duplication options")]
+    [McpServerTool(Name = "duplicate_sheet_with_views"), Description("Duplicate a sheet N times with configurable view duplication options.")]
     public static async Task<string> DuplicateSheetWithViews(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Sheet element ID to duplicate")] long sheetId,
+        [Description("Number of copies. Default: 1")] int? copies = null,
+        [Description("Duplicate placed views as well. Default: true")] bool? duplicateViews = null,
+        [Description("Keep legends on the new sheets. Default: true")] bool? keepLegends = null,
+        [Description("Keep schedules on the new sheets. Default: true")] bool? keepSchedules = null,
+        [Description("Prefix applied to new sheet numbers")] string? newSheetNumberPrefix = null,
+        [Description("View duplicate option: Duplicate | DuplicateWithDetailing | DuplicateAsDependent. Default: DuplicateWithDetailing")] string? viewDuplicateOption = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("duplicate_sheet_with_views", JObject.Parse(data), ct);
+        var p = new JObject { ["sheetId"] = sheetId };
+        if (copies != null) p["copies"] = copies;
+        if (duplicateViews != null) p["duplicateViews"] = duplicateViews;
+        if (keepLegends != null) p["keepLegends"] = keepLegends;
+        if (keepSchedules != null) p["keepSchedules"] = keepSchedules;
+        if (newSheetNumberPrefix != null) p["newSheetNumberPrefix"] = newSheetNumberPrefix;
+        if (viewDuplicateOption != null) p["viewDuplicateOption"] = viewDuplicateOption;
+        var result = await revit.ExecuteAsync("duplicate_sheet_with_views", p, ct);
         return result.ToString();
     }
 

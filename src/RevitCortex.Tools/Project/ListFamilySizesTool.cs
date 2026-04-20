@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -44,13 +45,13 @@ public class ListFamilySizesTool : ICortexTool
                 var catIds = new HashSet<long>();
                 foreach (var cat in categories)
                 {
-                    string bicName = cat.StartsWith("OST_") ? cat : "OST_" + cat;
-                    if (Enum.TryParse<BuiltInCategory>(bicName, true, out var bic))
+                    var catId = CategoryResolver.ResolveToId(doc, cat);
+                    if (catId != null && catId != ElementId.InvalidElementId)
                     {
 #if REVIT2024_OR_GREATER
-                        catIds.Add(new ElementId(bic).Value);
+                        catIds.Add(catId.Value);
 #else
-                        catIds.Add((long)new ElementId(bic).IntegerValue);
+                        catIds.Add((long)catId.IntegerValue);
 #endif
                     }
                 }

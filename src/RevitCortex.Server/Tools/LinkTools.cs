@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using ModelContextProtocol.Server;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Server.Connection;
@@ -8,24 +9,32 @@ namespace RevitCortex.Server.Tools;
 [McpServerToolType]
 public static class LinkTools
 {
-    [McpServerTool(Name = "add_linked_file"), Description("Adds a new Revit linked file from a file path and optionally places an instance.")]
+    [McpServerTool(Name = "add_linked_file"), Description("Adds a new Revit linked file from a file path and optionally places an instance at the given position.")]
     public static async Task<string> AddLinkedFile(
         RevitConnectionManager revit,
-        [Description("JSON parameters (e.g. {\"filePath\":\"C:\\\\path\\\\to\\\\file.rvt\", \"positionMode\":\"shared\"})")] string data,
+        [Description("Path to the .rvt file to link")] string filePath,
+        [Description("Initial X position in mm. Default: 0")] double? positionX = null,
+        [Description("Initial Y position in mm. Default: 0")] double? positionY = null,
+        [Description("Initial Z position in mm. Default: 0")] double? positionZ = null,
         CancellationToken ct = default)
     {
-        var p = JObject.Parse(data);
+        var p = new JObject { ["filePath"] = filePath };
+        if (positionX != null) p["positionX"] = positionX;
+        if (positionY != null) p["positionY"] = positionY;
+        if (positionZ != null) p["positionZ"] = positionZ;
         var result = await revit.ExecuteAsync("add_linked_file", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "align_link_to_host"), Description("Aligns a link instance to the host project's internal origin or shared coordinates.")]
+    [McpServerTool(Name = "align_link_to_host"), Description("Aligns a link instance to the host project's internal origin, shared coordinates, or project base point.")]
     public static async Task<string> AlignLinkToHost(
         RevitConnectionManager revit,
-        [Description("JSON parameters (e.g. {\"linkInstanceId\":12345, \"coordinateSystem\":\"shared\"})")] string data,
+        [Description("Link instance element ID")] long instanceId,
+        [Description("Alignment mode: origin | shared | base. Default: origin")] string? alignMode = null,
         CancellationToken ct = default)
     {
-        var p = JObject.Parse(data);
+        var p = new JObject { ["instanceId"] = instanceId };
+        if (alignMode != null) p["alignMode"] = alignMode;
         var result = await revit.ExecuteAsync("align_link_to_host", p, ct);
         return result.ToString();
     }
@@ -59,13 +68,22 @@ public static class LinkTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "highlight_linked_element"), Description("Highlights an element inside a linked model with section box.")]
+    [McpServerTool(Name = "highlight_linked_element"), Description("Highlights an element inside a linked model with an optional section box.")]
     public static async Task<string> HighlightLinkedElement(
         RevitConnectionManager revit,
-        [Description("JSON parameters (e.g. {\"linkInstanceId\":123, \"elementId\":456, \"zoomToFit\":true})")] string data,
+        [Description("Link instance element ID")] long instanceId,
+        [Description("Linked element ID inside the linked model")] long linkedElementId,
+        [Description("Create a section box around the element. Default: true")] bool? createSectionBox = null,
+        [Description("Section box padding in mm. Default: 1000")] double? offset = null,
         CancellationToken ct = default)
     {
-        var p = JObject.Parse(data);
+        var p = new JObject
+        {
+            ["instanceId"] = instanceId,
+            ["linkedElementId"] = linkedElementId,
+        };
+        if (createSectionBox != null) p["createSectionBox"] = createSectionBox;
+        if (offset != null) p["offset"] = offset;
         var result = await revit.ExecuteAsync("highlight_linked_element", p, ct);
         return result.ToString();
     }
@@ -83,13 +101,21 @@ public static class LinkTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "move_link_instance"), Description("Moves a linked file instance by delta offset or to absolute position.")]
+    [McpServerTool(Name = "move_link_instance"), Description("Moves a linked file instance. mode=delta applies (x,y,z) as an offset; mode=absolute places the origin at (x,y,z). Values are in mm.")]
     public static async Task<string> MoveLinkInstance(
         RevitConnectionManager revit,
-        [Description("JSON parameters (e.g. {\"linkInstanceId\":123, \"deltaX\":10.0, \"deltaY\":0, \"deltaZ\":0})")] string data,
+        [Description("Link instance element ID")] long instanceId,
+        [Description("X value in mm (delta or absolute depending on mode)")] double? x = null,
+        [Description("Y value in mm")] double? y = null,
+        [Description("Z value in mm")] double? z = null,
+        [Description("Mode: delta | absolute. Default: delta")] string? mode = null,
         CancellationToken ct = default)
     {
-        var p = JObject.Parse(data);
+        var p = new JObject { ["instanceId"] = instanceId };
+        if (x != null) p["x"] = x;
+        if (y != null) p["y"] = y;
+        if (z != null) p["z"] = z;
+        if (mode != null) p["mode"] = mode;
         var result = await revit.ExecuteAsync("move_link_instance", p, ct);
         return result.ToString();
     }
@@ -97,10 +123,12 @@ public static class LinkTools
     [McpServerTool(Name = "pin_unpin_link_instance"), Description("Pins or unpins linked file instances.")]
     public static async Task<string> PinUnpinLinkInstance(
         RevitConnectionManager revit,
-        [Description("JSON parameters (e.g. {\"linkInstanceIds\":[123,456], \"pin\":true})")] string data,
+        [Description("Link instance element IDs")] long[] instanceIds,
+        [Description("true to pin, false to unpin. Default: true")] bool? pin = null,
         CancellationToken ct = default)
     {
-        var p = JObject.Parse(data);
+        var p = new JObject { ["instanceIds"] = new JArray(instanceIds.Cast<object>().ToArray()) };
+        if (pin != null) p["pin"] = pin;
         var result = await revit.ExecuteAsync("pin_unpin_link_instance", p, ct);
         return result.ToString();
     }
@@ -108,21 +136,33 @@ public static class LinkTools
     [McpServerTool(Name = "reload_linked_file_from"), Description("Reloads a linked Revit file from a different file path.")]
     public static async Task<string> ReloadLinkedFileFrom(
         RevitConnectionManager revit,
-        [Description("JSON parameters (e.g. {\"linkId\":123, \"newFilePath\":\"C:\\\\new\\\\path.rvt\"})")] string data,
+        [Description("Link TYPE element ID (not the instance ID)")] long linkTypeId,
+        [Description("New file path to reload the link from")] string newPath,
         CancellationToken ct = default)
     {
-        var p = JObject.Parse(data);
+        var p = new JObject
+        {
+            ["linkTypeId"] = linkTypeId,
+            ["newPath"] = newPath,
+        };
         var result = await revit.ExecuteAsync("reload_linked_file_from", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "cad_link_cleanup"), Description("Analyze and clean up imported/linked CAD files.")]
+    [McpServerTool(Name = "cad_link_cleanup"), Description("Analyze and clean up imported/linked CAD files. action=list|delete.")]
     public static async Task<string> CadLinkCleanup(
         RevitConnectionManager revit,
-        [Description("JSON parameters (e.g. {\"action\":\"analyze\", \"deleteUnused\":false})")] string data,
+        [Description("Action: list | delete. Default: list")] string? action = null,
+        [Description("Delete imported CAD instances. Default: false")] bool? deleteImports = null,
+        [Description("Delete linked CAD instances. Default: false")] bool? deleteLinks = null,
+        [Description("Specific element IDs to target (optional)")] long[]? elementIds = null,
         CancellationToken ct = default)
     {
-        var p = JObject.Parse(data);
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (deleteImports != null) p["deleteImports"] = deleteImports;
+        if (deleteLinks != null) p["deleteLinks"] = deleteLinks;
+        if (elementIds != null) p["elementIds"] = new JArray(elementIds.Cast<object>().ToArray());
         var result = await revit.ExecuteAsync("cad_link_cleanup", p, ct);
         return result.ToString();
     }

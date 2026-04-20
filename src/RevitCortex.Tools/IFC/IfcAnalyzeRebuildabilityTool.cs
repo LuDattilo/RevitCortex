@@ -32,10 +32,7 @@ public class IfcAnalyzeRebuildabilityTool : ICortexTool
 
         BuiltInCategory? builtInCat = null;
         if (!string.IsNullOrWhiteSpace(categoryFilter))
-        {
-            if (Enum.TryParse<BuiltInCategory>(categoryFilter, out var parsed))
-                builtInCat = parsed;
-        }
+            builtInCat = CategoryResolver.Resolve(categoryFilter);
 
         var directShapes = IfcGeometryHelper.GetDirectShapes(doc!, builtInCat);
         if (directShapes.Count == 0)
