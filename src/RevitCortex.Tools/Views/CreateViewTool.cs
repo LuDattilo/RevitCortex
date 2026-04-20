@@ -33,6 +33,7 @@ public class CreateViewTool : ICortexTool
         var scale = input["scale"]?.Value<int?>() ?? 100;
         var levelElevationMm = input["levelElevation"]?.Value<double?>();
         var levelId = input["levelId"]?.Value<long>() ?? 0;
+        var levelName = input["levelName"]?.Value<string>();
 
         try
         {
@@ -45,11 +46,11 @@ public class CreateViewTool : ICortexTool
             {
                 case "floorplan":
                 case "floor":
-                    createdView = CreatePlanView(doc, ViewFamily.FloorPlan, levelId, levelElevationMm);
+                    createdView = CreatePlanView(doc, ViewFamily.FloorPlan, levelId, levelElevationMm, levelName);
                     break;
                 case "ceilingplan":
                 case "ceiling":
-                    createdView = CreatePlanView(doc, ViewFamily.CeilingPlan, levelId, levelElevationMm);
+                    createdView = CreatePlanView(doc, ViewFamily.CeilingPlan, levelId, levelElevationMm, levelName);
                     break;
                 case "3d":
                 case "isometric":
@@ -78,7 +79,7 @@ public class CreateViewTool : ICortexTool
             var detailLevel = input["detailLevel"]?.Value<string>();
             if (!string.IsNullOrEmpty(detailLevel))
             {
-                createdView.DetailLevel = detailLevel.ToLowerInvariant() switch
+                createdView.DetailLevel = detailLevel!.ToLowerInvariant() switch
                 {
                     "fine" => ViewDetailLevel.Fine,
                     "medium" => ViewDetailLevel.Medium,
@@ -102,11 +103,13 @@ public class CreateViewTool : ICortexTool
         }
     }
 
-    private static ViewPlan? CreatePlanView(Document doc, ViewFamily family, long levelIdLong, double? levelElevationMm)
+    private static ViewPlan? CreatePlanView(Document doc, ViewFamily family, long levelIdLong, double? levelElevationMm, string? levelName)
     {
         var vft = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
             .FirstOrDefault(v => v.ViewFamily == family);
         if (vft == null) return null;
+
+        var allLevels = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().ToList();
 
         Level? level = null;
         if (levelIdLong > 0)
@@ -117,11 +120,11 @@ public class CreateViewTool : ICortexTool
             level = doc.GetElement(new ElementId((int)levelIdLong)) as Level;
 #endif
         }
-        level ??= levelElevationMm.HasValue
-            ? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
-                .OrderBy(l => Math.Abs(l.Elevation - levelElevationMm.Value / MmPerFoot)).FirstOrDefault()
-            : new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
-                .OrderBy(l => l.Elevation).FirstOrDefault();
+        level ??= !string.IsNullOrEmpty(levelName)
+            ? allLevels.FirstOrDefault(l => string.Equals(l.Name, levelName, StringComparison.OrdinalIgnoreCase))
+            : levelElevationMm.HasValue
+                ? allLevels.OrderBy(l => Math.Abs(l.Elevation - levelElevationMm.Value / MmPerFoot)).FirstOrDefault()
+                : null;
 
         return level != null ? ViewPlan.Create(doc, vft.Id, level.Id) : null;
     }

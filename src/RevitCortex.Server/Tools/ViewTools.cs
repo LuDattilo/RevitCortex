@@ -13,13 +13,19 @@ public static class ViewTools
     public static async Task<string> CreateView(
         RevitConnectionManager revit,
         [Description("Type of view to create: FloorPlan, Section, ThreeD, Elevation")] string viewType,
-        [Description("Level element ID (required for floor plans)")] long? levelId = null,
+        [Description("Level name (e.g. 'L1 - Block 43') — preferred for floor plans")] string? levelName = null,
+        [Description("Level element ID (alternative to levelName)")] long? levelId = null,
         [Description("Name for the new view")] string? name = null,
+        [Description("View scale denominator, e.g. 100 for 1:100. Default: 100")] int? scale = null,
+        [Description("Detail level: Coarse, Medium, Fine. Default: Coarse")] string? detailLevel = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["viewType"] = viewType };
+        if (levelName != null) p["levelName"] = levelName;
         if (levelId != null) p["levelId"] = levelId;
         if (name != null) p["name"] = name;
+        if (scale != null) p["scale"] = scale;
+        if (detailLevel != null) p["detailLevel"] = detailLevel;
         var result = await revit.ExecuteAsync("create_view", p, ct);
         return result.ToString();
     }
