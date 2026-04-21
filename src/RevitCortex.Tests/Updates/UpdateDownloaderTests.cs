@@ -48,7 +48,10 @@ public class UpdateDownloaderTests : IDisposable
         var client = MakeClient(zipBytes);
         var destPath = Path.Combine(_tempDir, "update.zip");
         var progressEvents = new List<(long, long)>();
-        var progress = new Progress<(long, long)>(p => progressEvents.Add(p));
+        // Use a synchronous IProgress<T> implementation so the callback fires inline
+        // (Progress<T> posts to SynchronizationContext which may be null in xUnit and
+        // defers the callback until after the assertion.)
+        var progress = new SyncProgress<(long, long)>(p => progressEvents.Add(p));
 
         var result = await UpdateDownloader.DownloadAsync(
             "http://fake/latest.zip", destPath, progress, CancellationToken.None, client);
@@ -112,6 +115,13 @@ public class UpdateDownloaderTests : IDisposable
 
         await Assert.ThrowsAsync<InvalidDataException>(() =>
             UpdateDownloader.ExtractAsync(zipPath, _tempDir, CancellationToken.None));
+    }
+
+    // Synchronous IProgress<T> — invokes callback inline on the calling thread
+    // so assertions can safely check events immediately after await.
+    private class SyncProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        public void Report(T value) => callback(value);
     }
 
     // Minimal fake HTTP handler
