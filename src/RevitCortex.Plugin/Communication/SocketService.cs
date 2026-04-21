@@ -16,8 +16,15 @@ public class SocketService
     private Thread? _listenerThread;
     private readonly CortexRouter _router;
     private readonly int _port;
+    private int _activeConnections;
 
     public bool IsRunning => _isRunning;
+
+    /// <summary>
+    /// Fired on a background thread when a second client connects while one is already active.
+    /// Caller must marshal to the UI thread if showing UI.
+    /// </summary>
+    public event Action? MultipleClientsConnected;
 
     public SocketService(CortexRouter router, int port = 8080)
     {
@@ -70,6 +77,9 @@ public class SocketService
     private void HandleClient(object? state)
     {
         var client = (TcpClient)state!;
+        int count = Interlocked.Increment(ref _activeConnections);
+        if (count > 1)
+            MultipleClientsConnected?.Invoke();
         try
         {
             using var stream = client.GetStream();
@@ -89,6 +99,7 @@ public class SocketService
         }
         finally
         {
+            Interlocked.Decrement(ref _activeConnections);
             client.Close();
         }
     }

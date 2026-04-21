@@ -101,6 +101,7 @@ public class RevitCortexApp : IExternalApplication
 
             // Create socket service but do NOT start automatically
             _socketService = new SocketService(_router, _port);
+            _socketService.MultipleClientsConnected += OnMultipleClientsConnected;
 
             // Listen for document events
             application.ControlledApplication.DocumentOpened += OnDocumentOpened;
@@ -437,6 +438,20 @@ public class RevitCortexApp : IExternalApplication
             }
             catch { }
         }
+    }
+
+    private void OnMultipleClientsConnected()
+    {
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke((System.Action)(() =>
+        {
+            System.Windows.MessageBox.Show(
+                "Attenzione: due client AI (es. Claude e Codex) sono connessi contemporaneamente a RevitCortex.\n\n" +
+                "I comandi inviati da entrambi potrebbero incrociarsi e produrre risultati inattesi.\n" +
+                "Si consiglia di usare un solo client AI alla volta.",
+                "RevitCortex — Connessione multipla rilevata",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+        }));
     }
 
     private Assembly? LoadToolsAssembly()
