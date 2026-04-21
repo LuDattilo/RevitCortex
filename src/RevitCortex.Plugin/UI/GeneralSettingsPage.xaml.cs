@@ -39,6 +39,24 @@ public partial class GeneralSettingsPage : Page
         // when the user opens Settings it may or may not have completed yet.
         // Re-check every second for ~10 s to catch the late reply, then stop.
         StartUpdateBannerPolling();
+
+        // Subscribe to real-time server state changes so the status banner
+        // updates immediately when the user clicks Cortex Switch.
+        if (RevitCortexApp.Instance != null)
+            RevitCortexApp.Instance.ServiceStateChanged += OnServiceStateChanged;
+
+        Unloaded += (_, _) =>
+        {
+            if (RevitCortexApp.Instance != null)
+                RevitCortexApp.Instance.ServiceStateChanged -= OnServiceStateChanged;
+        };
+    }
+
+    private void OnServiceStateChanged()
+    {
+        // The event may fire from the Revit main thread or a background thread.
+        // Dispatcher.Invoke ensures we update WPF controls on the UI thread.
+        Dispatcher.Invoke(RefreshConnectionStatus);
     }
 
     private void ApplyLocalizedStrings()

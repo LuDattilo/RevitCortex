@@ -24,6 +24,12 @@ public class RevitCortexApp : IExternalApplication
     public static RevitCortexApp? Instance { get; private set; }
 
     /// <summary>
+    /// Fired on the calling thread whenever the server starts, stops, or crashes.
+    /// Subscribers must marshal to the UI thread themselves if needed.
+    /// </summary>
+    public event Action? ServiceStateChanged;
+
+    /// <summary>
     /// Returns true only if the socket service flag is set AND a live TCP
     /// connection to localhost:port succeeds. This catches cases where the
     /// listener thread died unexpectedly while the flag remained true.
@@ -152,6 +158,7 @@ public class RevitCortexApp : IExternalApplication
 
             _socketService.Start();
             UpdateConnectionButtonIcon();
+            ServiceStateChanged?.Invoke();
         }
     }
 
@@ -159,6 +166,7 @@ public class RevitCortexApp : IExternalApplication
     {
         _socketService?.Stop();
         UpdateConnectionButtonIcon();
+        ServiceStateChanged?.Invoke();
     }
 
     private void UpdateConnectionButtonIcon()
@@ -236,6 +244,7 @@ public class RevitCortexApp : IExternalApplication
             {
                 _socketService.Stop();
                 UpdateConnectionButtonIcon();
+                ServiceStateChanged?.Invoke();
                 System.Diagnostics.Trace.WriteLine(
                     "[RevitCortex] Server stopped: document closing");
             }
