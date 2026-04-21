@@ -239,11 +239,11 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "batch_rename"), Description("Batch rename elements in the Revit project.")]
+    [McpServerTool(Name = "batch_rename"), Description("Batch rename elements or system types in the Revit project. Supports both loadable-family elements and system types (wall/floor/ceiling/roof types).")]
     public static async Task<string> BatchRename(
         RevitConnectionManager revit,
-        [Description("Array of element IDs to rename")] int[]? elementIds = null,
-        [Description("Target category for batch rename")] string? targetCategory = null,
+        [Description("Array of element IDs to rename. Use this when you already have specific IDs.")] int[]? elementIds = null,
+        [Description("Target category to rename. Valid values: views | sheets | levels | grids | rooms | walltypes | floortypes | ceilingtypes | rooftypes. Use 'floortypes' to rename system floor types.")] string? targetCategory = null,
         [Description("Text to find")] string? findText = null,
         [Description("Replacement text")] string? replaceText = null,
         [Description("Prefix to add")] string? prefix = null,
