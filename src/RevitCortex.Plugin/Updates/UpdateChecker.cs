@@ -39,10 +39,21 @@ public static class UpdateChecker
 
     public enum DownloadState { Idle, Downloading, Ready, Installing, Done, Error }
 
-    public static DownloadState State { get; private set; } = DownloadState.Idle;
-    public static string? DownloadError { get; private set; }
-    public static string? ExtractedPath { get; private set; }
-    public static (long Received, long Total) DownloadProgress { get; private set; }
+    private static volatile DownloadState _state = DownloadState.Idle;
+    public static DownloadState State => _state;
+
+    private static volatile string? _downloadError;
+    public static string? DownloadError => _downloadError;
+
+    private static volatile string? _extractedPath;
+    public static string? ExtractedPath => _extractedPath;
+
+    private static readonly object _progressLock = new();
+    private static (long Received, long Total) _downloadProgress;
+    public static (long Received, long Total) DownloadProgress
+    {
+        get { lock (_progressLock) return _downloadProgress; }
+    }
 
     private static CancellationTokenSource? _cts;
     private static readonly string TempZipPath =
@@ -107,12 +118,14 @@ public static class UpdateChecker
     /// </summary>
     public static void StartDownloadAsync()
     {
-        if (State != DownloadState.Idle || Latest?.HasUpdate != true) return;
+        if (_state != DownloadState.Idle || Latest?.HasUpdate != true) return;
 
+        _cts?.Cancel();
+        _cts?.Dispose();
         _cts = new CancellationTokenSource();
-        State = DownloadState.Downloading;
-        DownloadError = null;
-        DownloadProgress = (0, 0);
+        _state = DownloadState.Downloading;
+        _downloadError = null;
+        lock (_progressLock) { _downloadProgress = (0, 0); }
 
         var url = Latest.DownloadUrl;
         var ct = _cts.Token;
@@ -121,28 +134,28 @@ public static class UpdateChecker
         {
             try
             {
-                var progress = new Progress<(long, long)>(p => DownloadProgress = p);
+                var progress = new Progress<(long, long)>(p => { lock (_progressLock) { _downloadProgress = p; } });
                 var result = await UpdateDownloader.DownloadAsync(url, TempZipPath, progress, ct);
 
                 if (!result.Success)
                 {
-                    State = DownloadState.Error;
-                    DownloadError = result.ErrorMessage;
+                    _state = DownloadState.Error;
+                    _downloadError = result.ErrorMessage;
                     return;
                 }
 
                 var extractedPath = await UpdateDownloader.ExtractAsync(TempZipPath, TempExtractPath, ct);
-                ExtractedPath = extractedPath;
-                State = DownloadState.Ready;
+                _extractedPath = extractedPath;
+                _state = DownloadState.Ready;
             }
             catch (OperationCanceledException)
             {
-                State = DownloadState.Idle;
+                // CancelDownload() already set _state = Idle on the caller thread
             }
             catch (Exception ex)
             {
-                State = DownloadState.Error;
-                DownloadError = ex.Message;
+                _state = DownloadState.Error;
+                _downloadError = ex.Message;
                 System.Diagnostics.Trace.WriteLine($"[RevitCortex] Download failed: {ex.Message}");
             }
         }, ct);
@@ -152,9 +165,10 @@ public static class UpdateChecker
     public static void CancelDownload()
     {
         _cts?.Cancel();
+        _cts?.Dispose();
         _cts = null;
-        State = DownloadState.Idle;
-        DownloadProgress = (0, 0);
+        _state = DownloadState.Idle;
+        lock (_progressLock) { _downloadProgress = (0, 0); }
     }
 
     /// <summary>
@@ -163,13 +177,13 @@ public static class UpdateChecker
     /// </summary>
     public static void LaunchInstaller()
     {
-        if (State != DownloadState.Ready || string.IsNullOrEmpty(ExtractedPath)) return;
+        if (_state != DownloadState.Ready || string.IsNullOrEmpty(_extractedPath)) return;
 
-        var script = Path.Combine(ExtractedPath, "install.ps1");
+        var script = Path.Combine(_extractedPath, "install.ps1");
         if (!File.Exists(script))
         {
-            State = DownloadState.Error;
-            DownloadError = $"install.ps1 not found in {ExtractedPath}";
+            _state = DownloadState.Error;
+            _downloadError = $"install.ps1 not found in {_extractedPath}";
             return;
         }
 
@@ -182,7 +196,7 @@ public static class UpdateChecker
                 Verb = "runas",
                 UseShellExecute = true,
             });
-            State = DownloadState.Installing;
+            _state = DownloadState.Installing;
         }
         catch (Exception ex)
         {
@@ -195,11 +209,12 @@ public static class UpdateChecker
     public static void ResetDownload()
     {
         _cts?.Cancel();
+        _cts?.Dispose();
         _cts = null;
-        State = DownloadState.Idle;
-        DownloadError = null;
-        DownloadProgress = (0, 0);
-        ExtractedPath = null;
+        _state = DownloadState.Idle;
+        _downloadError = null;
+        lock (_progressLock) { _downloadProgress = (0, 0); }
+        _extractedPath = null;
     }
 }
 
