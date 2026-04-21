@@ -22,7 +22,32 @@ public class RevitCortexApp : IExternalApplication
     private Autodesk.Revit.UI.PushButton? _connectButton;
 
     public static RevitCortexApp? Instance { get; private set; }
-    public bool IsServiceRunning => _socketService?.IsRunning ?? false;
+
+    /// <summary>
+    /// Returns true only if the socket service flag is set AND a live TCP
+    /// connection to localhost:port succeeds. This catches cases where the
+    /// listener thread died unexpectedly while the flag remained true.
+    /// </summary>
+    public bool IsServiceRunning
+    {
+        get
+        {
+            if (_socketService?.IsRunning != true) return false;
+            try
+            {
+                using var probe = new System.Net.Sockets.TcpClient();
+                probe.Connect("127.0.0.1", _port);
+                return true;
+            }
+            catch
+            {
+                // Listener is gone — sync internal flag so next call is fast
+                _socketService.Stop();
+                return false;
+            }
+        }
+    }
+
     public int Port => _port;
     public UIApplication? UiApplication => _uiApplication;
     public CortexRouter? Router => _router;
@@ -207,6 +232,7 @@ public class RevitCortexApp : IExternalApplication
             if (_socketService != null && _socketService.IsRunning)
             {
                 _socketService.Stop();
+                UpdateConnectionButtonIcon();
                 System.Diagnostics.Trace.WriteLine(
                     "[RevitCortex] Server stopped: document closing");
             }

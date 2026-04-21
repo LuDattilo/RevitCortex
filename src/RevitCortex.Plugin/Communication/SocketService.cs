@@ -53,6 +53,15 @@ public class SocketService
             }
             catch (SocketException) when (!_isRunning)
             {
+                // Normal shutdown via Stop() — exit cleanly.
+                break;
+            }
+            catch (Exception ex)
+            {
+                // Unexpected listener crash — reset flag so IsRunning reflects reality.
+                _isRunning = false;
+                System.Diagnostics.Trace.WriteLine(
+                    $"[RevitCortex] Listener crashed unexpectedly: {ex.Message}");
                 break;
             }
         }
