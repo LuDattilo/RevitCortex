@@ -97,7 +97,8 @@ public static class IfcTools
         if (exportBaseQuantities != null) p["exportBaseQuantities"] = exportBaseQuantities;
         if (wallAndColumnSplitting != null) p["wallAndColumnSplitting"] = wallAndColumnSplitting;
         if (spaceBoundaryLevel != null) p["spaceBoundaryLevel"] = spaceBoundaryLevel;
-        var result = await revit.ExecuteAsync("ifc_export_basic", p, ct);
+        // IFC export on large models can take several minutes — use 15 min timeout.
+        var result = await revit.ExecuteAsync("ifc_export_basic", p, commandTimeoutSeconds: 900, ct);
         return result.ToString();
     }
 
@@ -119,7 +120,8 @@ public static class IfcTools
         if (fileName != null) p["fileName"] = fileName;
         if (filterViewId != null) p["filterViewId"] = filterViewId;
         if (overrides != null) p["overrides"] = JObject.Parse(overrides);
-        var result = await revit.ExecuteAsync("ifc_export_with_configuration", p, ct);
+        // IFC export on large models can take several minutes — use 15 min timeout.
+        var result = await revit.ExecuteAsync("ifc_export_with_configuration", p, commandTimeoutSeconds: 900, ct);
         return result.ToString();
     }
 

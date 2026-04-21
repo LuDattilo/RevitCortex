@@ -134,11 +134,18 @@ public sealed class RevitConnectionManager
     }
 
     public async Task<JToken> ExecuteAsync(string method, JObject parameters, CancellationToken ct = default)
+        => await ExecuteAsync(method, parameters, commandTimeoutSeconds: 300, ct);
+
+    /// <summary>
+    /// Overload with explicit command timeout — use for long-running operations
+    /// such as IFC export on large models.
+    /// </summary>
+    public async Task<JToken> ExecuteAsync(string method, JObject parameters, int commandTimeoutSeconds, CancellationToken ct = default)
     {
         await _mutex.WaitAsync(ct);
         try
         {
-            using var bridge = new RevitBridge(port: _port);
+            using var bridge = new RevitBridge(port: _port, commandTimeoutSeconds: commandTimeoutSeconds);
             return await bridge.SendCommandAsync(method, parameters, ct);
         }
         finally

@@ -9,16 +9,19 @@ namespace RevitCortex.Server.Tools;
 [McpServerToolType]
 public static class ParameterTools
 {
-    [McpServerTool(Name = "set_element_parameters"), Description("Set parameter values on one or more elements. Each request specifies an element ID, parameter name, and new value.")]
+    [McpServerTool(Name = "set_element_parameters"), Description("Set parameter values on one or more elements. Pass requests as a JSON-encoded array string. Note: type-level parameters (e.g. structural thickness on floors) cannot be set on instances — identify instance vs type params with get_element_parameters first, then set type params on the type ElementId instead.")]
     public static async Task<string> SetElementParameters(
         RevitConnectionManager revit,
-        [Description("JSON array of requests: [{elementId, parameterName, value}]")] string requests,
+        [Description("JSON-encoded array of set requests — pass as a string. Each item must have: elementId (long), parameterName (string), value (string or number). Example: \"[{\\\"elementId\\\": 123, \\\"parameterName\\\": \\\"Comments\\\", \\\"value\\\": \\\"test\\\"}]\"")] string requests,
         CancellationToken ct = default)
     {
-        var p = new JObject
+        JArray parsed;
+        try { parsed = JArray.Parse(requests); }
+        catch (Exception ex)
         {
-            ["requests"] = JArray.Parse(requests),
-        };
+            return $"{{\"error\": \"requests must be a JSON array encoded as a string. Parse failed: {ex.Message}. Example: [{{\\\"elementId\\\": 123, \\\"parameterName\\\": \\\"Comments\\\", \\\"value\\\": \\\"test\\\"}}]\"}}";
+        }
+        var p = new JObject { ["requests"] = parsed };
         var result = await revit.ExecuteAsync("set_element_parameters", p, ct);
         return result.ToString();
     }
