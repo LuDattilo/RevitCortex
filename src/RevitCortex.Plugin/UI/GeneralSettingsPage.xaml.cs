@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RevitCortex.Plugin.Commands;
 using RevitCortex.Plugin.Updates;
 using System;
@@ -337,23 +338,25 @@ public partial class GeneralSettingsPage : Page
 
         try
         {
-            var settings = new CortexSettings
-            {
-                Port = port,
-                LogLevel = logLevel,
-                ReadOnlyMode = ReadOnlyCheckBox.IsChecked == true,
-                SupportReportKeepCount = keep
-            };
+            // Merge-write: preserve keys managed by other pages (e.g. EnableCodeExecution,
+            // DisabledTools) by loading the existing JSON first and updating only our fields.
+            JObject settings = File.Exists(SettingsFilePath)
+                ? JObject.Parse(File.ReadAllText(SettingsFilePath))
+                : new JObject();
+
+            settings["Port"] = port;
+            settings["LogLevel"] = logLevel;
+            settings["ReadOnlyMode"] = ReadOnlyCheckBox.IsChecked == true;
+            settings["SupportReportKeepCount"] = keep;
 
             string dir = Path.GetDirectoryName(SettingsFilePath)!;
             if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
-            File.WriteAllText(SettingsFilePath,
-                JsonConvert.SerializeObject(settings, Formatting.Indented));
+            File.WriteAllText(SettingsFilePath, settings.ToString(Formatting.Indented));
 
             // Apply read-only mode immediately (no restart needed)
             if (RevitCortexApp.Instance?.Router != null)
-                RevitCortexApp.Instance.Router.ReadOnlyMode = settings.ReadOnlyMode;
+                RevitCortexApp.Instance.Router.ReadOnlyMode = ReadOnlyCheckBox.IsChecked == true;
 
             if (port != _originalPort)
             {

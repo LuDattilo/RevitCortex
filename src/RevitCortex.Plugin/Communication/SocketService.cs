@@ -117,7 +117,8 @@ public class SocketService
                 return JsonConvert.SerializeObject(
                     JsonRpcResponse.Fail(request.Id,
                         (int)result.Error!.Code,
-                        JsonConvert.SerializeObject(result.Error)));
+                        result.Error.Message,
+                        JToken.FromObject(result.Error)));
             }
         }
         catch (Exception ex)
