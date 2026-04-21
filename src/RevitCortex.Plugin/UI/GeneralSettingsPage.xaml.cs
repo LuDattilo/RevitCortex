@@ -108,18 +108,18 @@ public partial class GeneralSettingsPage : Page
 
             case UpdateChecker.DownloadState.Ready:
                 UpdateTitle.Text = "Pronto per l'installazione";
-                UpdateDetail.Text = "Si aprirà il prompt di amministratore — approva per installare";
+                UpdateDetail.Text = "⚠ Revit verrà chiuso automaticamente — salva il lavoro prima di continuare.";
                 UpdateProgressGrid.Visibility = Visibility.Collapsed;
-                SetActionButton("Install ora", "#388E3C", "#2E7D32", isEnabled: true);
+                SetActionButton("Installa e chiudi Revit", "#388E3C", "#2E7D32", isEnabled: true);
                 UpdateManualButton.Visibility = Visibility.Collapsed;
                 StopDownloadTimer();
                 break;
 
             case UpdateChecker.DownloadState.Installing:
-                UpdateTitle.Text = "Installazione avviata";
-                UpdateDetail.Text = "Riavvia Revit per completare l'aggiornamento";
+                UpdateTitle.Text = "Installazione avviata — chiusura in corso…";
+                UpdateDetail.Text = "Riavvia Revit al termine dell'installazione.";
                 UpdateProgressGrid.Visibility = Visibility.Collapsed;
-                SetActionButton("Chiudi Revit", "#00796B", "#004D40", isEnabled: true);
+                SetActionButton("Installa e chiudi Revit", "#00796B", "#004D40", isEnabled: false);
                 UpdateManualButton.Visibility = Visibility.Collapsed;
                 StopDownloadTimer();
                 break;
@@ -202,11 +202,20 @@ public partial class GeneralSettingsPage : Page
             case UpdateChecker.DownloadState.Ready:
                 UpdateChecker.LaunchInstaller();
                 RefreshUpdateBanner();
+                // Close Revit after a short delay so the installer process has
+                // time to start and enter its Assert-RevitClosed loop before
+                // Revit exits. Without this the DLLs are locked and the install fails.
+                var closeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+                closeTimer.Tick += (_, _) =>
+                {
+                    closeTimer.Stop();
+                    try { System.Windows.Application.Current?.Shutdown(); } catch { }
+                };
+                closeTimer.Start();
                 break;
 
             case UpdateChecker.DownloadState.Installing:
-                // "Chiudi Revit" button
-                try { System.Windows.Application.Current?.Shutdown(); } catch { }
+                // Button is disabled in this state — unreachable in practice.
                 break;
 
             case UpdateChecker.DownloadState.Done:
