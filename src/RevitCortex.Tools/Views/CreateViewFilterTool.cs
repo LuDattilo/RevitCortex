@@ -102,7 +102,7 @@ public class CreateViewFilterTool : ICortexTool
                 var param = testElem.LookupParameter(parameterName);
                 if (param != null)
                 {
-                    var rule = CreateRule(param.Id, filterRule, filterValue ?? "", param.StorageType);
+                    var rule = CreateRule(param.Id, filterRule!, filterValue ?? "", param.StorageType);
                     if (rule != null)
                     {
                         var elemFilter = new ElementParameterFilter(rule);

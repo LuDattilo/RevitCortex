@@ -78,6 +78,23 @@ public static class CodeDomExecutor
             {
                 result = method!.Invoke(null, new object[] { globals.document, globals.uiDocument, globals.app });
             }
+            else if (transactionMode == "group")
+            {
+                using var txGroup = new TransactionGroup(globals.document, "RevitCortex: Script Group");
+                txGroup.Start();
+                try
+                {
+                    result = method!.Invoke(null, new object[] { globals.document, globals.uiDocument, globals.app });
+                    if (txGroup.GetStatus() == TransactionStatus.Started)
+                        txGroup.Assimilate();
+                }
+                catch
+                {
+                    if (txGroup.GetStatus() == TransactionStatus.Started)
+                        txGroup.RollBack();
+                    throw;
+                }
+            }
             else
             {
                 using var tx = new Transaction(globals.document, "RevitCortex: Script");
@@ -102,8 +119,8 @@ public static class CodeDomExecutor
         {
             return CortexResult<object>.Fail(
                 CortexErrorCode.Unknown,
-                $"Runtime error: {ex.InnerException.Message}",
-                suggestion: "Check variable names, null references, and Revit API usage.");
+                $"Runtime error: {ex.InnerException}",
+                suggestion: "Check variable names, null references, and Revit API usage. Full stack trace above.");
         }
         catch (Exception ex)
         {
@@ -131,11 +148,6 @@ public static class CodeDomExecutor
         sb.AppendLine("      Autodesk.Revit.UI.UIDocument uiDocument,");
         sb.AppendLine("      Autodesk.Revit.ApplicationServices.Application app) {");
         sb.AppendLine(userCode);
-        // If the user code doesn't have a return, add one
-        if (!userCode.TrimEnd().EndsWith(";") && !userCode.Contains("return "))
-        {
-            // Last expression style not supported in CodeDom — user must use return
-        }
         sb.AppendLine("      return null;");
         sb.AppendLine("    }");
         sb.AppendLine("  }");
@@ -146,7 +158,7 @@ public static class CodeDomExecutor
     private static object SerializeResult(object result)
     {
         if (result == null)
-            return new { result = (object)null };
+            return new { result = (object?)null };
 
         if (result is string || result is int || result is long || result is double || result is float || result is bool)
             return new { result };

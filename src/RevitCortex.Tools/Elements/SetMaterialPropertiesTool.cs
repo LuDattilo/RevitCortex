@@ -69,7 +69,7 @@ public class SetMaterialPropertiesTool : ICortexTool
                     var colorHex = req["color"]?.Value<string>();
                     if (!string.IsNullOrEmpty(colorHex))
                     {
-                        var c = ParseColor(colorHex);
+                        var c = ParseColor(colorHex!);
                         if (c != null) { mat.Color = c; changes.Add("color"); }
                     }
 

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://revitcortex.dev/known-issues.schema.json",
+  "version": "1.0.2",
+  "issues": [
+    {
+      "id": "RC-001",
+      "tool": "send_code_to_revit",
+      "error_code": "PermissionDenied",
+      "status": "fixed",
+      "fix_version": "1.0.1",
+      "fix_date": "2026-04-10",
+      "reporter_version_max": "1.0.0",
+      "title": "send_code_to_revit blocked by missing EnableCodeExecution gate",
+      "notes": "Expected behavior post-v1.0.1 when EnableCodeExecution=false. Only a bug if reporter expected it to be enabled."
+    },
+    {
+      "id": "RC-002",
+      "tool": "manage_additional_settings",
+      "error_code": null,
+      "status": "fixed",
+      "fix_version": "1.0.1",
+      "fix_date": "2026-04-10",
+      "reporter_version_max": "1.0.0",
+      "title": "Dynamic cast crash on sub-category enumeration",
+      "notes": "Fixed by replacing dynamic cast with typed LINQ in ManageAdditionalSettingsTool.cs"
+    }
+  ]
+}

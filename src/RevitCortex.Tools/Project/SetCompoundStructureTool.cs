@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -49,7 +50,7 @@ public class SetCompoundStructureTool : ICortexTool
             }
             else if (!string.IsNullOrWhiteSpace(typeName))
             {
-                hostType = FindTypeByName(doc, typeName, category);
+                hostType = FindTypeByName(doc, typeName!, category);
             }
 
             if (hostType == null)
@@ -101,7 +102,7 @@ public class SetCompoundStructureTool : ICortexTool
         foreach (var lj in layersJson)
         {
             var (ok, layer) = ParseLayer(doc, lj);
-            if (!ok)
+            if (!ok || layer == null)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Invalid layer definition: {lj}. Required: function, widthMm or widthFt");
             newLayers.Add(layer);
@@ -176,7 +177,7 @@ public class SetCompoundStructureTool : ICortexTool
                 "layer object is required for 'add' action");
 
         var (ok, newLayer) = ParseLayer(doc, layerJson);
-        if (!ok)
+        if (!ok || newLayer == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "Invalid layer definition. Required: function, widthMm or widthFt");
 
@@ -298,7 +299,7 @@ public class SetCompoundStructureTool : ICortexTool
 
         // Parse optional changes
         var funcStr = input["function"]?.Value<string>();
-        if (!string.IsNullOrEmpty(funcStr) && TryParseFunction(funcStr, out var func))
+        if (!string.IsNullOrEmpty(funcStr) && TryParseFunction(funcStr!, out var func))
         {
             layer.Function = func;
             changes.Add("function");
@@ -385,11 +386,11 @@ public class SetCompoundStructureTool : ICortexTool
 
     // ── Helpers ────────────────────────────────────────────────────────
 
-    private static (bool ok, CompoundStructureLayer layer) ParseLayer(Document doc, JObject lj)
+    private static (bool ok, CompoundStructureLayer? layer) ParseLayer(Document doc, JObject lj)
     {
         var funcStr = lj["function"]?.Value<string>();
-        if (string.IsNullOrEmpty(funcStr)) return (false, default);
-        if (!TryParseFunction(funcStr, out var func)) return (false, default);
+        if (string.IsNullOrEmpty(funcStr)) return (false, null);
+        if (!TryParseFunction(funcStr!, out var func)) return (false, null);
 
         var widthMm = lj["widthMm"]?.Value<double?>();
         var widthFt = lj["widthFt"]?.Value<double?>();
@@ -400,7 +401,7 @@ public class SetCompoundStructureTool : ICortexTool
         }
         else if (widthMm.HasValue) width = widthMm.Value / 304.8;
         else if (widthFt.HasValue) width = widthFt.Value;
-        else return (false, default);
+        else return (false, null);
 
         var materialId = ElementId.InvalidElementId;
         var matIdVal = lj["materialId"]?.Value<long?>();
@@ -484,9 +485,9 @@ public class SetCompoundStructureTool : ICortexTool
 
         if (!string.IsNullOrEmpty(category))
         {
-            string bicName = category!.StartsWith("OST_") ? category : "OST_" + category;
-            if (Enum.TryParse<BuiltInCategory>(bicName, true, out var bic))
-                collector = collector.OfCategory(bic);
+            var catId = CategoryResolver.ResolveToId(doc, category!);
+            if (catId != null && catId != ElementId.InvalidElementId)
+                collector = collector.OfCategoryId(catId);
         }
 
         return collector
@@ -510,8 +511,8 @@ public class SetCompoundStructureTool : ICortexTool
             var (desc, fix) = DescribeError(err, layerFunc, layerMm);
 
             errorList.Add(new { layer = idx, function_ = layerFunc, widthMm = layerMm, error = err.ToString(), description = desc, fix });
-            if (!string.IsNullOrEmpty(fix) && !suggestions.Contains(fix))
-                suggestions.Add(fix);
+            if (!string.IsNullOrEmpty(fix) && !suggestions.Contains(fix!))
+                suggestions.Add(fix!);
         }
 
         var message = $"Validation failed on {errors.Count} layer(s):\n" +

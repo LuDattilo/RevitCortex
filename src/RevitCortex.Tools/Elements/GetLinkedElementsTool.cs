@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -74,15 +75,16 @@ public class GetLinkedElementsTool : ICortexTool
 
                 if (categories.Count > 0)
                 {
-                    // Resolve OST_* category codes to BuiltInCategory and collect per-category
+                    // Resolve via CategoryResolver — accepts OST_* codes, English friendly names, and localized display names (resolved against the linked doc).
                     elements = new List<Element>();
                     foreach (var catCode in categories)
                     {
-                        if (!Enum.TryParse<BuiltInCategory>(catCode, ignoreCase: true, out var bic))
+                        var catId = CategoryResolver.ResolveToId(linkDoc, catCode);
+                        if (catId == null || catId == ElementId.InvalidElementId)
                             continue;   // skip unknown category codes
 
                         var catElements = new FilteredElementCollector(linkDoc)
-                            .OfCategory(bic)
+                            .OfCategoryId(catId)
                             .WhereElementIsNotElementType()
                             .ToList();
 

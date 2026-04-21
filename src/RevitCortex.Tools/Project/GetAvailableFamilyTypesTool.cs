@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -54,9 +55,13 @@ public class GetAvailableFamilyTypesTool : ICortexTool
                 var validCatIds = new List<long>();
                 foreach (var catName in categoryList)
                 {
-                    string bicName = catName.StartsWith("OST_") ? catName : "OST_" + catName;
-                    if (Enum.TryParse<BuiltInCategory>(bicName, true, out var bic))
-                        validCatIds.Add((long)(int)bic);
+                    var catId = CategoryResolver.ResolveToId(doc, catName);
+                    if (catId != null && catId != ElementId.InvalidElementId)
+#if REVIT2024_OR_GREATER
+                        validCatIds.Add(catId.Value);
+#else
+                        validCatIds.Add((long)catId.IntegerValue);
+#endif
                 }
 
                 if (validCatIds.Count > 0)

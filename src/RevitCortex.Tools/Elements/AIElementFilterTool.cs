@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -84,39 +85,55 @@ public class AIElementFilterTool : ICortexTool
         try
         {
             // ── Collect elements ───────────────────────────────────────────
+            // Perf: CollectByKind applies early-exit when maxElements is reached,
+            // and returns (totalMatching, takenElements) so we avoid
+            // materializing the full list just to count + slice. On large models
+            // (1k+ elements per category) this turns an O(N) allocation into O(k)
+            // where k = maxElements.
             var elements = new List<Element>();
+            int totalCount = 0;
 
             if (includeInstances && includeTypes)
             {
-                elements.AddRange(CollectByKind(doc, isElementType: false,
+                var (cntInst, instList) = CollectByKind(doc, isElementType: false,
                     filterCategory, filterElementType, filterFamilySymId,
-                    filterVisibleInView, bbMin, bbMax));
-                elements.AddRange(CollectByKind(doc, isElementType: true,
+                    filterVisibleInView, bbMin, bbMax, maxElements);
+                elements.AddRange(instList);
+                totalCount += cntInst;
+
+                // For types we only need the remaining slots (if any); if caller
+                // wanted a hard cap we still report true totalCount below.
+                int remaining = maxElements > 0
+                    ? System.Math.Max(0, maxElements - elements.Count)
+                    : 0;
+                var (cntType, typeList) = CollectByKind(doc, isElementType: true,
                     filterCategory, filterElementType, filterFamilySymId: -1,
-                    filterVisibleInView: false, bbMin, bbMax));
+                    filterVisibleInView: false, bbMin, bbMax,
+                    maxElements > 0 ? remaining : 0);
+                elements.AddRange(typeList);
+                totalCount += cntType;
             }
             else if (includeInstances)
             {
-                elements.AddRange(CollectByKind(doc, isElementType: false,
+                var (cnt, list) = CollectByKind(doc, isElementType: false,
                     filterCategory, filterElementType, filterFamilySymId,
-                    filterVisibleInView, bbMin, bbMax));
+                    filterVisibleInView, bbMin, bbMax, maxElements);
+                elements.AddRange(list);
+                totalCount = cnt;
             }
             else // includeTypes only
             {
-                elements.AddRange(CollectByKind(doc, isElementType: true,
+                var (cnt, list) = CollectByKind(doc, isElementType: true,
                     filterCategory, filterElementType, filterFamilySymId: -1,
-                    filterVisibleInView: false, bbMin, bbMax));
+                    filterVisibleInView: false, bbMin, bbMax, maxElements);
+                elements.AddRange(list);
+                totalCount = cnt;
             }
 
-            int totalCount = elements.Count;
-
-            // Apply limit
+            // Apply limit note
             string limitNote = string.Empty;
-            if (maxElements > 0 && elements.Count > maxElements)
-            {
-                elements = elements.Take(maxElements).ToList();
+            if (maxElements > 0 && totalCount > maxElements)
                 limitNote = $" (limited to {maxElements} of {totalCount} matches)";
-            }
 
             // ── Build rich element info ────────────────────────────────────
             var results = BuildElementInfoList(doc, elements);
@@ -142,7 +159,13 @@ public class AIElementFilterTool : ICortexTool
 
     // ── Collection ─────────────────────────────────────────────────────────
 
-    private static List<Element> CollectByKind(
+    /// <summary>
+    /// Build and execute a FilteredElementCollector.
+    /// Returns (totalMatching, taken) where 'taken' contains at most maxElements
+    /// entries. When maxElements == 0 or > totalMatching, 'taken' contains all
+    /// matching elements. Avoids materializing the full result when a cap is set.
+    /// </summary>
+    private static (int total, List<Element> taken) CollectByKind(
         Document doc,
         bool isElementType,
         string? filterCategory,
@@ -150,7 +173,8 @@ public class AIElementFilterTool : ICortexTool
         int filterFamilySymId,
         bool filterVisibleInView,
         XYZ? bbMin,
-        XYZ? bbMax)
+        XYZ? bbMax,
+        int maxElements = 0)
     {
         // Choose base collector (view-constrained or whole-model)
         FilteredElementCollector collector =
@@ -167,10 +191,11 @@ public class AIElementFilterTool : ICortexTool
         // 1. Category filter
         if (!string.IsNullOrWhiteSpace(filterCategory))
         {
-            if (!Enum.TryParse<BuiltInCategory>(filterCategory, ignoreCase: true, out var bic))
+            var catId = CategoryResolver.ResolveToId(doc, filterCategory!);
+            if (catId == null || catId == ElementId.InvalidElementId)
                 throw new ArgumentException(
-                    $"'{filterCategory}' is not a valid BuiltInCategory. Use OST_* codes.");
-            filters.Add(new ElementCategoryFilter(bic));
+                    $"'{filterCategory}' is not a recognized category. Use OST_* codes (e.g. OST_Walls), English friendly names (Walls, Foundations), or the localized display name.");
+            filters.Add(new ElementCategoryFilter(catId));
         }
 
         // 2. Element-class filter
@@ -211,7 +236,29 @@ public class AIElementFilterTool : ICortexTool
         else if (filters.Count > 1)
             collector = collector.WherePasses(new LogicalAndFilter(filters));
 
-        return collector.ToElements().ToList();
+        // GetElementCount walks the filtered set without wrapping each entry in
+        // a managed Element — much cheaper than ToElements() when we only need
+        // the count + a small prefix.
+        int total = collector.GetElementCount();
+
+        if (maxElements <= 0 || total <= maxElements)
+        {
+            // No cap (or cap >= total): materialize once, same semantics as before.
+            var all = collector.ToElements();
+            // ToElements returns IList<Element>; copy to avoid holding the collector ref.
+            var allList = new List<Element>(all.Count);
+            allList.AddRange(all);
+            return (total, allList);
+        }
+
+        // Early-exit: enumerate just enough to fill maxElements.
+        var taken = new List<Element>(capacity: maxElements);
+        foreach (var e in collector)
+        {
+            taken.Add(e);
+            if (taken.Count >= maxElements) break;
+        }
+        return (total, taken);
     }
 
     // ── Element info builders ──────────────────────────────────────────────
@@ -551,9 +598,30 @@ public class AIElementFilterTool : ICortexTool
 
     private static object? GetBoundingBox(Element elem)
     {
+        // Perf: get_BoundingBox(null) forces a global geometry regeneration,
+        // which on large models costs 150-500ms per element. Passing the
+        // active view reuses cached view geometry when possible. If the
+        // active view yields no bbox (element not visible in it), we fall
+        // back to the global bbox — correct at the cost of the old path.
         try
         {
-            var bb = elem.get_BoundingBox(null);
+            BoundingBoxXYZ? bb = null;
+            try
+            {
+                var activeView = elem.Document?.ActiveView;
+                if (activeView != null)
+                    bb = elem.get_BoundingBox(activeView);
+            }
+            catch
+            {
+                // ActiveView may not be queryable in some contexts (e.g.
+                // browser views, sheets) — fall through to null lookup.
+                bb = null;
+            }
+
+            if (bb == null)
+                bb = elem.get_BoundingBox(null);
+
             if (bb == null) return null;
             return new
             {

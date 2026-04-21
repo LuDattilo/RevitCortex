@@ -55,7 +55,7 @@ public class BatchRenameTool : ICortexTool
             }
             else if (!string.IsNullOrEmpty(targetCategory))
             {
-                elements = (targetCategory.ToLowerInvariant() switch
+                elements = (targetCategory!.ToLowerInvariant() switch
                 {
                     "views" => new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>()
                         .Where(v => !v.IsTemplate).Cast<Element>(),

@@ -134,6 +134,34 @@ public static class IconFactory
         });
     }
 
+    /// <summary>Support icon: stylized envelope on indigo background.</summary>
+    public static BitmapSource CreateSupportIcon(int size)
+    {
+        return CreateIconWithDrawing(size, IndigoAccent, (dc, s) =>
+        {
+            // Envelope body (rounded rectangle)
+            double mx = s * 0.15;
+            double my = s * 0.25;
+            double w = s - 2 * mx;
+            double h = s - 2 * my;
+            var rect = new Rect(mx, my, w, h);
+            var pen = new Pen(Brushes.White, s * 0.06) { LineJoin = PenLineJoin.Round };
+            pen.Freeze();
+            dc.DrawRoundedRectangle(null, pen, rect, s * 0.05, s * 0.05);
+
+            // Envelope flap (triangle apex pointing down to center)
+            var flap = new StreamGeometry();
+            using (var ctx = flap.Open())
+            {
+                ctx.BeginFigure(new Point(mx, my), false, false);
+                ctx.LineTo(new Point(s / 2.0, my + h * 0.55), true, true);
+                ctx.LineTo(new Point(mx + w, my), true, true);
+            }
+            flap.Freeze();
+            dc.DrawGeometry(null, pen, flap);
+        });
+    }
+
     private static Point PointOnCircle(Point center, double radius, double angle)
     {
         return new Point(

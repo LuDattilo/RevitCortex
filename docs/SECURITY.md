@@ -1,7 +1,7 @@
 # RevitCortex -- Analisi di Sicurezza
 
 **Data:** 2026-04-11
-**Autore:** Luigi D'Attilo -- GPA S.r.l.
+**Autore:** Luigi Dattilo
 **Versione:** 1.0
 
 ---
@@ -30,7 +30,7 @@ Nel contesto di un professionista BIM che usa il sistema su modelli propri, il r
 
 I modelli Revit contengono informazioni sensibili: dati di progetto, localizzazione di edifici, dati cliente, planimetrie. RevitCortex non trasmette questi dati a server esterni durante l'esecuzione -- tutto rimane locale. Tuttavia quando Claude Desktop elabora una richiesta che include dati del modello (ad esempio "analizza questi parametri"), quei dati transitano verso i server Anthropic per l'elaborazione del linguaggio naturale.
 
-Questo e un aspetto che il titolare del trattamento -- in questo caso GPA S.r.l. -- deve considerare nell'ottica del GDPR (Regolamento UE 2016/679). Non si tratta di dati personali nel senso classico, ma se i modelli contengono dati riferibili a persone fisiche (proprietari, residenti, dati catastali nominativi), la trasmissione verso un servizio cloud di AI va documentata come trattamento. La base giuridica e tipicamente il legittimo interesse professionale o il contratto con il cliente, ma deve essere esplicitata.
+Questo e un aspetto che il titolare del trattamento deve considerare nell'ottica del GDPR (Regolamento UE 2016/679). Non si tratta di dati personali nel senso classico, ma se i modelli contengono dati riferibili a persone fisiche (proprietari, residenti, dati catastali nominativi), la trasmissione verso un servizio cloud di AI va documentata come trattamento. La base giuridica e tipicamente il legittimo interesse professionale o il contratto con il cliente, ma deve essere esplicitata.
 
 Anthropic pubblica una data processing agreement (DPA) e politiche di utilizzo dei dati che specificano come vengono trattati i dati inviati tramite Claude Desktop. E consigliabile leggere queste politiche e, se necessario, valutare l'uso di Claude for Enterprise che offre garanzie piu stringenti sul non utilizzo dei dati per il training.
 

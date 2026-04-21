@@ -95,7 +95,7 @@ public class CreateScheduleTool : ICortexTool
                             field.ColumnHeading = heading;
                         var isHidden = fieldSpec["isHidden"]?.Value<bool>() ?? false;
                         field.IsHidden = isHidden;
-                        addedFields.Add(paramName);
+                        addedFields.Add(paramName!);
                     }
                 }
             }

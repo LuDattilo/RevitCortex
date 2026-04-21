@@ -1,6 +1,6 @@
 # RevitCortex
 
-A next-generation **MCP (Model Context Protocol) server** for Autodesk Revit with 157 tools, typed errors, session state, and dynamic tool discovery. Pure C# — no Node.js required.
+**MCP (Model Context Protocol) server** for Autodesk Revit with 157 tools, typed errors, session state, and dynamic tool discovery. Pure C# — no Node.js required.
 
 RevitCortex lets Claude (or any MCP-compatible LLM) read, create, modify, and analyze Revit models in real time -- from querying elements and parameters to creating views, sheets, schedules, and running full audit workflows.
 

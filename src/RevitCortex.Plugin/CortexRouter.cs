@@ -18,7 +18,10 @@ public class CortexRouter
     private readonly CortexSession _session;
     private readonly IDocumentAnalyzer _analyzer;
     private readonly AuditLogger _auditLogger;
-    private RevitThreadDispatcher? _dispatcher;
+    // volatile: set once from OnStartup (UI thread) but read from the socket
+    // worker thread inside Route. The cheap guarantee is a full acquire/release
+    // barrier so the worker never sees a partially-initialised dispatcher.
+    private volatile RevitThreadDispatcher? _dispatcher;
     private readonly HashSet<string> _disabledTools = new();
     private bool _readOnlyMode;
 

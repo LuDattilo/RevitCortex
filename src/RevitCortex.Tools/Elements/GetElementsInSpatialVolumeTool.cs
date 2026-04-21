@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -219,12 +220,13 @@ public class GetElementsInSpatialVolumeTool : ICortexTool
         if (categories == null || categories.Count == 0)
             return elements;
 
-        // Resolve OST_* codes to ElementIds for language-independent matching
+        // Resolve via CategoryResolver — accepts OST_* codes, English friendly names, and localized display names.
         var resolvedIds = new HashSet<ElementId>();
         foreach (var catCode in categories)
         {
-            if (Enum.TryParse<BuiltInCategory>(catCode, ignoreCase: true, out var bic))
-                resolvedIds.Add(new ElementId(bic));
+            var catId = CategoryResolver.ResolveToId(doc, catCode);
+            if (catId != null && catId != ElementId.InvalidElementId)
+                resolvedIds.Add(catId);
         }
 
         if (resolvedIds.Count == 0)

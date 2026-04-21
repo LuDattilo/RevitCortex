@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using ModelContextProtocol.Server;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Server.Connection;
@@ -84,16 +85,50 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "audit_families"), Description("Audit families in the Revit project.")]
+    [McpServerTool(Name = "audit_families"), Description("Audit families in the Revit project. Lists loadable (.rfa) families by default; set includeSystemFamilies=true to also list system-family types (wall/floor/roof/ceiling types, including Foundation Slab).")]
     public static async Task<string> AuditFamilies(
         RevitConnectionManager revit,
-        [Description("Filter by category")] string? categoryFilter = null,
+        [Description("Filter by category (OST_* code, English friendly name, or localized display name)")] string? categoryFilter = null,
         [Description("Include unused families in the audit")] bool includeUnused = false,
+        [Description("Also enumerate system-family types (WallType/FloorType/RoofType/CeilingType). Default: false")] bool? includeSystemFamilies = null,
+        [Description("Sort order: instance_count | name. Default: instance_count")] string? sortBy = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["includeUnused"] = includeUnused };
         if (categoryFilter != null) p["categoryFilter"] = categoryFilter;
+        if (includeSystemFamilies != null) p["includeSystemFamilies"] = includeSystemFamilies;
+        if (sortBy != null) p["sortBy"] = sortBy;
         var result = await revit.ExecuteAsync("audit_families", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "manage_phase_filters"), Description("List, set, or create Revit Phase Filters. Actions: list | set | create. The 'set' action changes one presentation (New | Demolished | Existing | Temporary) on one filter and preserves the other three. Presentations: None | ByCategory | Overridden | NotDisplayed.")]
+    public static async Task<string> ManagePhaseFilters(
+        RevitConnectionManager revit,
+        [Description("Action: list | set | create. Default: list")] string? action = null,
+        [Description("Filter name (for set/create)")] string? filterName = null,
+        [Description("Filter element ID (alternative to filterName for set)")] long? filterId = null,
+        [Description("Phase status to modify (for set): New | Demolished | Existing | Temporary")] string? status = null,
+        [Description("Presentation value (for set): None | ByCategory | Overridden | NotDisplayed")] string? presentation = null,
+        [Description("Name of the new filter (for create)")] string? name = null,
+        [Description("New-phase presentation (for create). Default: ByCategory")] string? newStatus = null,
+        [Description("Existing-phase presentation (for create). Default: ByCategory")] string? existingStatus = null,
+        [Description("Demolished-phase presentation (for create). Default: ByCategory")] string? demolishedStatus = null,
+        [Description("Temporary-phase presentation (for create). Default: ByCategory")] string? temporaryStatus = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (filterName != null) p["filterName"] = filterName;
+        if (filterId != null) p["filterId"] = filterId;
+        if (status != null) p["status"] = status;
+        if (presentation != null) p["presentation"] = presentation;
+        if (name != null) p["name"] = name;
+        if (newStatus != null) p["newStatus"] = newStatus;
+        if (existingStatus != null) p["existingStatus"] = existingStatus;
+        if (demolishedStatus != null) p["demolishedStatus"] = demolishedStatus;
+        if (temporaryStatus != null) p["temporaryStatus"] = temporaryStatus;
+        var result = await revit.ExecuteAsync("manage_phase_filters", p, ct);
         return result.ToString();
     }
 
@@ -155,7 +190,7 @@ public static class ProjectTools
     [McpServerTool(Name = "create_room"), Description("Create a new room in the Revit project.")]
     public static async Task<string> CreateRoom(
         RevitConnectionManager revit,
-        [Description("Level element ID where the room will be placed")] int levelId,
+        [Description("Level element ID where the room will be placed")] long levelId,
         [Description("X coordinate for room placement")] double x,
         [Description("Y coordinate for room placement")] double y,
         [Description("Room name")] string? name = null,
@@ -191,7 +226,7 @@ public static class ProjectTools
     [McpServerTool(Name = "duplicate_system_type"), Description("Duplicate an existing system type with a new name.")]
     public static async Task<string> DuplicateSystemType(
         RevitConnectionManager revit,
-        [Description("Element ID of the source type to duplicate")] int sourceTypeId,
+        [Description("Element ID of the source type to duplicate")] long sourceTypeId,
         [Description("Name for the new duplicated type")] string newName,
         CancellationToken ct = default)
     {
@@ -227,33 +262,55 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "rename_families"), Description("Rename loaded families with find/replace, prefix, or suffix")]
+    [McpServerTool(Name = "rename_families"), Description("Rename loaded families (and optionally their types) with find/replace, prefix, or suffix operations.")]
     public static async Task<string> RenameFamilies(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Operation: prefix | suffix | findReplace. Default: prefix")] string? operation = null,
+        [Description("Prefix string (for prefix operation)")] string? prefix = null,
+        [Description("Suffix string (for suffix operation)")] string? suffix = null,
+        [Description("Text to find (for findReplace operation)")] string? findText = null,
+        [Description("Replacement text (for findReplace operation)")] string? replaceText = null,
+        [Description("Categories to restrict the rename (e.g. Doors, Windows)")] string[]? categories = null,
+        [Description("Also rename the family types. Default: false")] bool? renameTypes = null,
+        [Description("Preview without writing. Default: true")] bool? dryRun = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("rename_families", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (operation != null) p["operation"] = operation;
+        if (prefix != null) p["prefix"] = prefix;
+        if (suffix != null) p["suffix"] = suffix;
+        if (findText != null) p["findText"] = findText;
+        if (replaceText != null) p["replaceText"] = replaceText;
+        if (categories != null) p["categories"] = new JArray(categories);
+        if (renameTypes != null) p["renameTypes"] = renameTypes;
+        if (dryRun != null) p["dryRun"] = dryRun;
+        var result = await revit.ExecuteAsync("rename_families", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "tag_rooms"), Description("Tag rooms in the current view")]
+    [McpServerTool(Name = "tag_rooms"), Description("Tag rooms in the active view. Operates on the active view only — activate the correct view first.")]
     public static async Task<string> TagRooms(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Use leader on tags. Default: false")] bool? useLeader = null,
+        [Description("Room IDs to tag (optional; tags all rooms in view when omitted)")] long[]? roomIds = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("tag_rooms", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (useLeader != null) p["useLeader"] = useLeader;
+        if (roomIds != null) p["roomIds"] = new JArray(roomIds.Cast<object>().ToArray());
+        var result = await revit.ExecuteAsync("tag_rooms", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "tag_walls"), Description("Tag walls at their midpoints")]
+    [McpServerTool(Name = "tag_walls"), Description("Tag walls at their midpoints in the active view. Operates on the active view only.")]
     public static async Task<string> TagWalls(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Use leader on tags. Default: false")] bool? useLeader = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("tag_walls", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (useLeader != null) p["useLeader"] = useLeader;
+        var result = await revit.ExecuteAsync("tag_walls", p, ct);
         return result.ToString();
     }
 
@@ -261,7 +318,7 @@ public static class ProjectTools
     public static async Task<string> WipeEmptyTags(
         RevitConnectionManager revit,
         [Description("Preview changes without applying. Default: true")] bool dryRun = true,
-        [Description("View element ID to search in")] int? viewId = null,
+        [Description("View element ID to search in")] long? viewId = null,
         [Description("JSON array of category names to filter")] string? categories = null,
         CancellationToken ct = default)
     {
@@ -272,23 +329,38 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "set_material_properties"), Description("Set identity and product info on Revit materials")]
+    [McpServerTool(Name = "set_material_properties"), Description("Set identity and product info on Revit materials. Pass a JSON array of request objects: [{materialId|materialName, properties:{...}}].")]
     public static async Task<string> SetMaterialProperties(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("JSON array of requests: [{materialId|materialName, properties:{key:value, ...}}]")] string requests,
+        [Description("Preview changes without applying. Default: true")] bool? dryRun = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("set_material_properties", JObject.Parse(data), ct);
+        var p = new JObject { ["requests"] = JArray.Parse(requests) };
+        if (dryRun != null) p["dryRun"] = dryRun;
+        var result = await revit.ExecuteAsync("set_material_properties", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "modify_schedule"), Description("Modify schedule fields, sorting, or rename")]
+    [McpServerTool(Name = "modify_schedule"), Description("Modify schedule fields, sorting, or rename the schedule. Supported actions: add_field, remove_field, set_sort, rename.")]
     public static async Task<string> ModifySchedule(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Action: add_field | remove_field | set_sort | rename. Default: add_field")] string? action = null,
+        [Description("Schedule element ID (alternative to scheduleName)")] long? scheduleId = null,
+        [Description("Schedule name (alternative to scheduleId)")] string? scheduleName = null,
+        [Description("Field names for add_field/remove_field actions")] string[]? fieldNames = null,
+        [Description("Sort field specs as JSON array: [{fieldName, ascending:true}]")] string? sortFields = null,
+        [Description("New schedule name (for rename action)")] string? newName = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("modify_schedule", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (scheduleId != null) p["scheduleId"] = scheduleId;
+        if (scheduleName != null) p["scheduleName"] = scheduleName;
+        if (fieldNames != null) p["fieldNames"] = new JArray(fieldNames);
+        if (sortFields != null) p["sortFields"] = JArray.Parse(sortFields);
+        if (newName != null) p["newName"] = newName;
+        var result = await revit.ExecuteAsync("modify_schedule", p, ct);
         return result.ToString();
     }
 
@@ -305,83 +377,128 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "workflow_clash_review"), Description("Detect clashes and create 3D section box view")]
+    [McpServerTool(Name = "workflow_clash_review"), Description("Detect clashes between two categories and create a 3D section-boxed view for visual review.")]
     public static async Task<string> WorkflowClashReview(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("First category (e.g. OST_Walls)")] string categoryA,
+        [Description("Second category (e.g. OST_Pipes)")] string categoryB,
+        [Description("Intersection tolerance in mm. Default: 0")] double? tolerance = null,
+        [Description("Create a section-boxed 3D view around detected clashes. Default: true")] bool? createSectionBox = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("workflow_clash_review", JObject.Parse(data), ct);
+        var p = new JObject
+        {
+            ["categoryA"] = categoryA,
+            ["categoryB"] = categoryB,
+        };
+        if (tolerance != null) p["tolerance"] = tolerance;
+        if (createSectionBox != null) p["createSectionBox"] = createSectionBox;
+        var result = await revit.ExecuteAsync("workflow_clash_review", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "workflow_data_roundtrip"), Description("Export parameters to Excel for external editing, then re-import")]
+    [McpServerTool(Name = "workflow_data_roundtrip"), Description("Export parameters to Excel for external editing, then re-import once the file has been saved.")]
     public static async Task<string> WorkflowDataRoundtrip(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Path to the .xlsx file (created on export, read on import)")] string filePath,
+        [Description("Categories to include (e.g. Walls, Doors)")] string[]? categories = null,
+        [Description("Parameter names to include")] string[]? parameterNames = null,
+        [Description("Include type-level parameters. Default: false")] bool? includeTypeParameters = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("workflow_data_roundtrip", JObject.Parse(data), ct);
+        var p = new JObject { ["filePath"] = filePath };
+        if (categories != null) p["categories"] = new JArray(categories);
+        if (parameterNames != null) p["parameterNames"] = new JArray(parameterNames);
+        if (includeTypeParameters != null) p["includeTypeParameters"] = includeTypeParameters;
+        var result = await revit.ExecuteAsync("workflow_data_roundtrip", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "workflow_room_documentation"), Description("Auto-generate callout views and sections from rooms")]
+    [McpServerTool(Name = "workflow_room_documentation"), Description("Auto-generate callout views (and optionally sections) for every room on a level.")]
     public static async Task<string> WorkflowRoomDocumentation(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Level name to document")] string levelName,
+        [Description("Also create sections per room. Default: true")] bool? createSections = null,
+        [Description("Boundary offset in mm. Default: 300")] double? offset = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("workflow_room_documentation", JObject.Parse(data), ct);
+        var p = new JObject { ["levelName"] = levelName };
+        if (createSections != null) p["createSections"] = createSections;
+        if (offset != null) p["offset"] = offset;
+        var result = await revit.ExecuteAsync("workflow_room_documentation", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "workflow_sheet_set"), Description("Auto-create sheets with title blocks from a definition list")]
+    [McpServerTool(Name = "workflow_sheet_set"), Description("Auto-create a set of sheets with title blocks from a definition list: [{number, name, viewIds?}].")]
     public static async Task<string> WorkflowSheetSet(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("JSON array of sheet specs: [{number, name, viewIds?}]")] string sheets,
+        [Description("Default title block family-type name")] string? titleBlockName = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("workflow_sheet_set", JObject.Parse(data), ct);
+        var p = new JObject { ["sheets"] = JArray.Parse(sheets) };
+        if (titleBlockName != null) p["titleBlockName"] = titleBlockName;
+        var result = await revit.ExecuteAsync("workflow_sheet_set", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "get_shared_parameters"), Description("List all project parameters with bindings and categories")]
+    [McpServerTool(Name = "get_shared_parameters"), Description("List all project parameters with their bindings and categories, optionally filtered by category.")]
     public static async Task<string> GetSharedParameters(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Category filter (e.g. OST_Walls); empty for all")] string? categoryFilter = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("get_shared_parameters", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (categoryFilter != null) p["categoryFilter"] = categoryFilter;
+        var result = await revit.ExecuteAsync("get_shared_parameters", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "lines_per_view_count"), Description("Count detail lines per view for performance auditing")]
+    [McpServerTool(Name = "lines_per_view_count"), Description("Count detail and/or model lines per view for performance auditing. Always set threshold >= 20 on large models; the tool has an automatic 300-view cap.")]
     public static async Task<string> LinesPerViewCount(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Only report views at or above this line count. Default: 0")] int? threshold = null,
+        [Description("Count detail lines. Default: true")] bool? includeDetailLines = null,
+        [Description("Count model lines. Default: true")] bool? includeModelLines = null,
+        [Description("Max views returned. Default: 200")] int? limit = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("lines_per_view_count", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (threshold != null) p["threshold"] = threshold;
+        if (includeDetailLines != null) p["includeDetailLines"] = includeDetailLines;
+        if (includeModelLines != null) p["includeModelLines"] = includeModelLines;
+        if (limit != null) p["limit"] = limit;
+        var result = await revit.ExecuteAsync("lines_per_view_count", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "list_family_sizes"), Description("List families with type and instance counts")]
+    [McpServerTool(Name = "list_family_sizes"), Description("List loaded families with their type and instance counts.")]
     public static async Task<string> ListFamilySizes(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Max families returned. Default: 50")] int? limit = null,
+        [Description("Sort by: instanceCount | typeCount | name. Default: instanceCount")] string? sortBy = null,
+        [Description("Categories to restrict the list")] string[]? categories = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("list_family_sizes", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (limit != null) p["limit"] = limit;
+        if (sortBy != null) p["sortBy"] = sortBy;
+        if (categories != null) p["categories"] = new JArray(categories);
+        var result = await revit.ExecuteAsync("list_family_sizes", p, ct);
         return result.ToString();
     }
 
-    [McpServerTool(Name = "list_schedulable_fields"), Description("Discover available schedulable fields for a category")]
+    [McpServerTool(Name = "list_schedulable_fields"), Description("Discover available schedulable fields for a category.")]
     public static async Task<string> ListSchedulableFields(
         RevitConnectionManager revit,
-        [Description("JSON parameters")] string data,
+        [Description("Category name (e.g. OST_Rooms). Default: OST_Rooms")] string? categoryName = null,
+        [Description("Schedule type: regular | key | material-takeoff. Default: regular")] string? scheduleType = null,
         CancellationToken ct = default)
     {
-        var result = await revit.ExecuteAsync("list_schedulable_fields", JObject.Parse(data), ct);
+        var p = new JObject();
+        if (categoryName != null) p["categoryName"] = categoryName;
+        if (scheduleType != null) p["scheduleType"] = scheduleType;
+        var result = await revit.ExecuteAsync("list_schedulable_fields", p, ct);
         return result.ToString();
     }
 

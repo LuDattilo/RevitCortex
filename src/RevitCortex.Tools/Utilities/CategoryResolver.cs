@@ -83,7 +83,14 @@ public static class CategoryResolver
     }
 
     /// <summary>
-    /// Resolve a category name to an ElementId, falling back to localized display name.
+    /// Resolve a category name to an ElementId. Resolution is deterministic — exact match
+    /// only, no substring fallback (substring matching on "Stair" would silently select
+    /// categories like "Stair Support" or "Stair Tread Number", masking user typos).
+    /// Tries, in order:
+    ///   1. OST_ enum name → BuiltInCategory → category id
+    ///   2. English friendly name (FriendlyNameMap) → BuiltInCategory → category id
+    ///   3. Exact (case-insensitive) match against the localized display name
+    /// Returns null when none of these match.
     /// </summary>
     public static ElementId? ResolveToId(Document doc, string name)
     {
@@ -99,11 +106,7 @@ public static class CategoryResolver
 
         var displayMatch = doc.Settings.Categories.Cast<Category>()
             .FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        if (displayMatch != null) return displayMatch.Id;
-
-        var partialMatch = doc.Settings.Categories.Cast<Category>()
-            .FirstOrDefault(c => c.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
-        return partialMatch?.Id;
+        return displayMatch?.Id;
     }
 
     /// <summary>

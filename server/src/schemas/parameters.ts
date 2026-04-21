@@ -50,6 +50,13 @@ export const ManageProjectParametersInput = z.object({
     .array(z.string())
     .optional()
     .describe("Categories to bind (for create/modify)"),
+  categoriesMode: z
+    .enum(["add", "remove", "replace"])
+    .optional()
+    .default("add")
+    .describe(
+      "How to apply 'categories' in modify action: 'add' (default, union with existing), 'remove' (unbind listed categories), 'replace' (set bindings to exactly the listed categories). Ignored for other actions.",
+    ),
 });
 
 export const AddPrefixSuffixInput = z.object({

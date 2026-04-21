@@ -28,8 +28,8 @@ public class ClashDetectionTool : ICortexTool
         if (doc == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
 
-        var categoryA = input["categoryA"]?.Value<string>();
-        var categoryB = input["categoryB"]?.Value<string>();
+        var categoryA = input["categoryA"]?.Value<string>() ?? input["category1"]?.Value<string>();
+        var categoryB = input["categoryB"]?.Value<string>() ?? input["category2"]?.Value<string>();
         var elementIdsA = input["elementIdsA"]?.ToObject<List<long>>() ?? new List<long>();
         var elementIdsB = input["elementIdsB"]?.ToObject<List<long>>() ?? new List<long>();
         var toleranceMm = input["tolerance"]?.Value<double>() ?? 0;
@@ -52,7 +52,7 @@ public class ClashDetectionTool : ICortexTool
             }
             else if (!string.IsNullOrEmpty(categoryA))
             {
-                var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryA);
+                var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryA!);
                 setA = new FilteredElementCollector(doc).OfCategoryId(catId).WhereElementIsNotElementType().ToList();
             }
             else
@@ -75,7 +75,7 @@ public class ClashDetectionTool : ICortexTool
             }
             else if (!string.IsNullOrEmpty(categoryB))
             {
-                var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryB);
+                var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryB!);
                 setB = new FilteredElementCollector(doc).OfCategoryId(catId).WhereElementIsNotElementType().ToList();
             }
             else

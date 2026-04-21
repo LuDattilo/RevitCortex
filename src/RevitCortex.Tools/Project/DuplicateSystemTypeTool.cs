@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -122,9 +123,9 @@ public class DuplicateSystemTypeTool : ICortexTool
 
         if (!string.IsNullOrEmpty(category))
         {
-            string bicName = category!.StartsWith("OST_") ? category : "OST_" + category;
-            if (Enum.TryParse<BuiltInCategory>(bicName, true, out var bic))
-                collector = collector.OfCategory(bic);
+            var catId = CategoryResolver.ResolveToId(doc, category!);
+            if (catId != null && catId != ElementId.InvalidElementId)
+                collector = collector.OfCategoryId(catId);
         }
 
         return collector

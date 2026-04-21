@@ -1,10 +1,16 @@
 using Newtonsoft.Json;
+using RevitCortex.Plugin.Commands;
+using RevitCortex.Plugin.Updates;
 using System;
 using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
+using TaskDialog = Autodesk.Revit.UI.TaskDialog;
+using TaskDialogCommonButtons = Autodesk.Revit.UI.TaskDialogCommonButtons;
+using TaskDialogResult = Autodesk.Revit.UI.TaskDialogResult;
 
 namespace RevitCortex.Plugin.UI;
 
@@ -12,6 +18,7 @@ public partial class GeneralSettingsPage : Page
 {
     private const int DefaultPort = 8080;
     private const string DefaultLogLevel = "Info";
+    private const int DefaultKeepCount = 10;
     private int _originalPort;
 
     private static string SettingsFilePath => Path.Combine(
@@ -21,9 +28,77 @@ public partial class GeneralSettingsPage : Page
     public GeneralSettingsPage()
     {
         InitializeComponent();
+        ApplyLocalizedStrings();
         LoadSettings();
         LoadVersionInfo();
         RefreshConnectionStatus();
+        RefreshUpdateBanner();
+        // The update check runs once at plugin startup on a background thread;
+        // when the user opens Settings it may or may not have completed yet.
+        // Re-check every second for ~10 s to catch the late reply, then stop.
+        StartUpdateBannerPolling();
+    }
+
+    private void ApplyLocalizedStrings()
+    {
+        SupportReportsTitle.Text = Localization.T("support.settings.title");
+        SupportReportsSubtitle.Text = Localization.T("support.settings.subtitle");
+        OpenReportsFolderButton.Content = Localization.T("support.settings.open_folder");
+        DeleteAllReportsButton.Content = Localization.T("support.settings.delete_now");
+        UpdateDownloadButton.Content = Localization.T("update.download_button");
+    }
+
+    private void RefreshUpdateBanner()
+    {
+        var info = UpdateChecker.Latest;
+        if (info?.HasUpdate == true)
+        {
+            UpdateTitle.Text = Localization.T("update.available_title", info.RemoteVersion);
+            UpdateDetail.Text = Localization.T("update.available_detail", UpdateChecker.CurrentVersion);
+            UpdateBanner.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            UpdateBanner.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void StartUpdateBannerPolling()
+    {
+        if (UpdateChecker.Latest != null) return; // check already completed
+
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        int ticks = 0;
+        timer.Tick += (_, _) =>
+        {
+            ticks++;
+            if (UpdateChecker.Latest != null || ticks >= 10)
+            {
+                timer.Stop();
+                RefreshUpdateBanner();
+            }
+        };
+        timer.Start();
+    }
+
+    private void UpdateDownload_Click(object sender, RoutedEventArgs e)
+    {
+        var info = UpdateChecker.Latest;
+        if (info == null || string.IsNullOrWhiteSpace(info.DownloadUrl)) return;
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = info.DownloadUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            TaskDialog.Show(Localization.T("support.title"),
+                Localization.T("update.open_browser_failed", ex.Message));
+        }
     }
 
     private void RefreshConnectionStatus()
@@ -68,6 +143,7 @@ public partial class GeneralSettingsPage : Page
                     PortTextBox.Text = settings.Port.ToString();
                     SetComboSelection(LogLevelComboBox, settings.LogLevel ?? DefaultLogLevel);
                     ReadOnlyCheckBox.IsChecked = settings.ReadOnlyMode;
+                    KeepCountTextBox.Text = ClampKeepCount(settings.SupportReportKeepCount).ToString();
                     return;
                 }
             }
@@ -109,7 +185,10 @@ public partial class GeneralSettingsPage : Page
         _originalPort = DefaultPort;
         PortTextBox.Text = DefaultPort.ToString();
         SetComboSelection(LogLevelComboBox, DefaultLogLevel);
+        KeepCountTextBox.Text = DefaultKeepCount.ToString();
     }
+
+    private static int ClampKeepCount(int n) => n < 1 ? 1 : (n > 200 ? 200 : n);
 
     private static void SetComboSelection(ComboBox combo, string value)
     {
@@ -135,13 +214,18 @@ public partial class GeneralSettingsPage : Page
 
         string logLevel = (LogLevelComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? DefaultLogLevel;
 
+        if (!int.TryParse(KeepCountTextBox.Text.Trim(), out int keep)) keep = DefaultKeepCount;
+        keep = ClampKeepCount(keep);
+        KeepCountTextBox.Text = keep.ToString();
+
         try
         {
             var settings = new CortexSettings
             {
                 Port = port,
                 LogLevel = logLevel,
-                ReadOnlyMode = ReadOnlyCheckBox.IsChecked == true
+                ReadOnlyMode = ReadOnlyCheckBox.IsChecked == true,
+                SupportReportKeepCount = keep
             };
 
             string dir = Path.GetDirectoryName(SettingsFilePath)!;
@@ -169,6 +253,56 @@ public partial class GeneralSettingsPage : Page
     }
 
     private void ResetDefaults_Click(object sender, RoutedEventArgs e) => SetDefaults();
+
+    private void OpenReportsFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(SendSupportReport.ReportsFolder);
+            System.Diagnostics.Process.Start("explorer.exe", SendSupportReport.ReportsFolder);
+        }
+        catch (Exception ex)
+        {
+            TaskDialog.Show(Localization.T("support.title"),
+                Localization.T("support.settings.open_folder_failed", ex.Message));
+        }
+    }
+
+    private void DeleteAllReports_Click(object sender, RoutedEventArgs e)
+    {
+        var title = Localization.T("support.title");
+        int count = SendSupportReport.CountReports();
+        if (count == 0)
+        {
+            TaskDialog.Show(title, Localization.T("support.cleanup.none"));
+            return;
+        }
+
+        long bytes = SendSupportReport.TotalReportsBytes();
+        string size = FormatSize(bytes);
+        var dialog = new TaskDialog(title)
+        {
+            MainInstruction = Localization.T("support.cleanup.confirm_title"),
+            MainContent = Localization.T("support.cleanup.confirm_body", count, size),
+            CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+            DefaultButton = TaskDialogResult.No,
+        };
+        if (dialog.Show() != TaskDialogResult.Yes) return;
+
+        var (deleted, failed, _) = SendSupportReport.DeleteAllReports();
+        if (failed == 0)
+            TaskDialog.Show(title, Localization.T("support.cleanup.done", deleted));
+        else
+            TaskDialog.Show(title, Localization.T("support.cleanup.partial", deleted, failed));
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        if (bytes < 1024L * 1024 * 1024) return $"{bytes / 1024.0 / 1024.0:F1} MB";
+        return $"{bytes / 1024.0 / 1024.0 / 1024.0:F2} GB";
+    }
 }
 
 internal class CortexSettings
@@ -176,4 +310,5 @@ internal class CortexSettings
     public int Port { get; set; } = 8080;
     public string? LogLevel { get; set; } = "Info";
     public bool ReadOnlyMode { get; set; }
+    public int SupportReportKeepCount { get; set; } = 10;
 }

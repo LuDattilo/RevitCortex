@@ -88,7 +88,7 @@ public class LoadFamilyTool : ICortexTool
 
         if (!string.IsNullOrEmpty(categoryFilter))
         {
-            var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryFilter);
+            var catId = Utilities.CategoryResolver.ResolveToId(doc, categoryFilter!);
             if (catId != ElementId.InvalidElementId)
                 families = families.Where(f => f.FamilyCategory?.Id == catId);
         }

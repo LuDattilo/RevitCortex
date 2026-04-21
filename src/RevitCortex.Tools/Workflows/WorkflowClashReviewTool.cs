@@ -28,8 +28,8 @@ public class WorkflowClashReviewTool : ICortexTool
         if (doc == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
 
-        var categoryA = input["categoryA"]?.Value<string>();
-        var categoryB = input["categoryB"]?.Value<string>();
+        var categoryA = input["categoryA"]?.Value<string>() ?? input["category1"]?.Value<string>();
+        var categoryB = input["categoryB"]?.Value<string>() ?? input["category2"]?.Value<string>();
         var toleranceMm = input["tolerance"]?.Value<double>() ?? 0;
         var createSectionBox = input["createSectionBox"]?.Value<bool>() ?? true;
 
@@ -38,8 +38,8 @@ public class WorkflowClashReviewTool : ICortexTool
 
         try
         {
-            var catIdA = Utilities.CategoryResolver.ResolveToId(doc, categoryA);
-            var catIdB = Utilities.CategoryResolver.ResolveToId(doc, categoryB);
+            var catIdA = Utilities.CategoryResolver.ResolveToId(doc, categoryA!);
+            var catIdB = Utilities.CategoryResolver.ResolveToId(doc, categoryB!);
             if (catIdA == null || catIdB == null)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "Category not found");
 

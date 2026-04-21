@@ -9,6 +9,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -46,14 +47,36 @@
             </Grid>
         </Border>
 
+        <!-- Update Available Banner (hidden until UpdateChecker finds a newer version) -->
+        <Border Grid.Row="2" x:Name="UpdateBanner" CornerRadius="6" Padding="14,10"
+                Margin="0,0,0,15" Background="#FFF8E1" BorderThickness="1" BorderBrush="#FFB300"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock x:Name="UpdateTitle" FontSize="13" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock x:Name="UpdateDetail" FontSize="11" Foreground="#666" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Button x:Name="UpdateDownloadButton" Grid.Column="1" Content="Download"
+                        Padding="14,6" Margin="12,0,0,0" FontSize="13"
+                        Background="#FFB300" Foreground="White" BorderBrush="#FF8F00"
+                        Click="UpdateDownload_Click" Cursor="Hand"/>
+            </Grid>
+        </Border>
+
         <!-- Form -->
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
             <Grid Margin="0,0,20,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="200"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -106,26 +129,46 @@
 
                 <Separator Grid.Row="5" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
 
-                <!-- Plugin Version -->
+                <!-- Support Reports -->
                 <StackPanel Grid.Row="6" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
-                    <TextBlock Text="Plugin Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock x:Name="SupportReportsTitle" Text="Support Reports" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                    <TextBlock x:Name="SupportReportsSubtitle" Text="Number of reports to keep on disk" FontSize="11" Foreground="#666" Margin="0,3,0,0"/>
                 </StackPanel>
-                <TextBlock x:Name="PluginVersionText" Grid.Row="6" Grid.Column="1"
-                           Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
+                <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="15,10,0,10" VerticalAlignment="Center">
+                    <TextBox x:Name="KeepCountTextBox" Padding="8,6" FontSize="14"
+                             Width="70" BorderBrush="#E0E0E0"/>
+                    <Button x:Name="OpenReportsFolderButton" Content="Open folder"
+                            Padding="12,6" Margin="15,0,0,0" FontSize="13"
+                            Background="#F5F5F5" Foreground="#333" BorderBrush="#E0E0E0"
+                            Click="OpenReportsFolder_Click" Cursor="Hand"/>
+                    <Button x:Name="DeleteAllReportsButton" Content="Delete all now"
+                            Padding="12,6" Margin="10,0,0,0" FontSize="13"
+                            Background="#F5F5F5" Foreground="#333" BorderBrush="#E0E0E0"
+                            Click="DeleteAllReports_Click" Cursor="Hand"/>
+                </StackPanel>
 
                 <Separator Grid.Row="7" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
 
-                <!-- Revit Version -->
+                <!-- Plugin Version -->
                 <StackPanel Grid.Row="8" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
+                    <TextBlock Text="Plugin Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
+                </StackPanel>
+                <TextBlock x:Name="PluginVersionText" Grid.Row="8" Grid.Column="1"
+                           Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
+
+                <Separator Grid.Row="9" Grid.ColumnSpan="2" Margin="0,5" Background="#E0E0E0"/>
+
+                <!-- Revit Version -->
+                <StackPanel Grid.Row="10" Grid.Column="0" Margin="0,10" VerticalAlignment="Center">
                     <TextBlock Text="Revit Version" FontSize="14" FontWeight="SemiBold" Foreground="#333"/>
                 </StackPanel>
-                <TextBlock x:Name="RevitVersionText" Grid.Row="8" Grid.Column="1"
+                <TextBlock x:Name="RevitVersionText" Grid.Row="10" Grid.Column="1"
                            Margin="15,10,0,10" FontSize="14" Foreground="#333" VerticalAlignment="Center"/>
             </Grid>
         </ScrollViewer>
 
         <!-- Footer -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
             <Button Content="Reset Defaults" Padding="15,8" Margin="0,0,10,0" FontSize="13"
                     Background="#F5F5F5" Foreground="#333" BorderBrush="#E0E0E0"
                     Click="ResetDefaults_Click" Cursor="Hand"/>

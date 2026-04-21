@@ -72,7 +72,7 @@ public class CreateColorLegendTool : ICortexTool
                     "No elements found for the specified categories");
 
             // Group by parameter value
-            var groups = GroupByParameterValue(elements, parameterName);
+            var groups = GroupByParameterValue(elements, parameterName!);
 
             // Generate color assignments
             var colorMap = GenerateColors(groups.Keys.ToList(), colorScheme, customColors);

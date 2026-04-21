@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -30,11 +31,12 @@ public class ListSchedulableFieldsTool : ICortexTool
         var categoryName = input["categoryName"]?.Value<string>() ?? "OST_Rooms";
         var scheduleType = input["scheduleType"]?.Value<string>() ?? "regular";
 
-        string bicName = categoryName.StartsWith("OST_") ? categoryName : "OST_" + categoryName;
-        if (!Enum.TryParse<BuiltInCategory>(bicName, true, out var builtInCategory))
+        var resolved = CategoryResolver.Resolve(categoryName);
+        if (resolved == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Unknown category: {categoryName}",
-                suggestion: "Use OST_* codes like OST_Rooms, OST_Walls, OST_Doors");
+                suggestion: "Use OST_* codes like OST_Rooms, or English friendly names like Walls, Doors, Foundations");
+        var builtInCategory = resolved.Value;
 
         try
         {

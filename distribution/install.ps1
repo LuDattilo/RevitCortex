@@ -1,7 +1,13 @@
-﻿$ErrorActionPreference = "Stop"
+#requires -Version 5.1
+$ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# --- Self-elevate if not admin ---
+. (Join-Path $ScriptDir 'lib\ClaudeConfig.ps1')
+. (Join-Path $ScriptDir 'lib\RevitDeploy.ps1')
+. (Join-Path $ScriptDir 'lib\GitInstall.ps1')
+
+# --- Self-elevate (machine-scope Revit install path requires admin;
+#     user-scope fallback does not, but we try machine first for parity with Inno installer) ---
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "Requesting administrator privileges..." -ForegroundColor Yellow
     Start-Process powershell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`""
@@ -14,130 +20,140 @@ Write-Host "   RevitCortex Installer" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# --- Step 1: Detect Revit versions ---
-Write-Host "[1/4] Detecting Revit installations..." -ForegroundColor Yellow
+# --- Step 0: Verify Revit is not running (lock DLLs if it is) ---
+Write-Host "[0/5] Pre-flight checks..." -ForegroundColor Yellow
+try {
+    Assert-RevitClosed
+    Write-Host "  Revit is not running" -ForegroundColor Gray
+} catch {
+    Write-Host "  $_" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
+}
 
-$addinsRoot = "C:\ProgramData\Autodesk\Revit\Addins"
-$supportedVersions = @("2023", "2024", "2025", "2026", "2027")
-$configMap = @{ "2023" = "R23"; "2024" = "R24"; "2025" = "R25"; "2026" = "R26"; "2027" = "R27" }
+# --- Step 1: Detect Revit versions ---
+Write-Host ""
+Write-Host "[1/5] Detecting Revit installations..." -ForegroundColor Yellow
+
+$configMap = [ordered]@{ "2023" = "R23"; "2024" = "R24"; "2025" = "R25"; "2026" = "R26"; "2027" = "R27" }
+$machineAddinsRoot = "C:\ProgramData\Autodesk\Revit\Addins"
 $foundVersions = @()
 
-foreach ($ver in $supportedVersions) {
+foreach ($ver in $configMap.Keys) {
     $pluginDir = Join-Path $ScriptDir "plugin\$($configMap[$ver])"
-    if (!(Test-Path $pluginDir)) { continue }   # no plugin built for this version
+    if (-not (Test-Path $pluginDir)) { continue }
 
-    $verDir = Join-Path $addinsRoot $ver
+    $machineVerDir = Join-Path $machineAddinsRoot $ver
+    $revitInstalled = Test-Path $machineVerDir
 
-    # Primary: addins folder already exists (Revit launched at least once)
-    # Fallback: check Windows Registry for Autodesk Revit installation
-    $revitInstalled = Test-Path $verDir
     if (-not $revitInstalled) {
-        $regPaths = @(
+        foreach ($rp in @(
             "HKLM:\SOFTWARE\Autodesk\Revit\$ver",
             "HKLM:\SOFTWARE\WOW6432Node\Autodesk\Revit\$ver",
             "HKCU:\SOFTWARE\Autodesk\Revit\$ver"
-        )
-        foreach ($rp in $regPaths) {
-            if (Test-Path $rp) { $revitInstalled = $true; break }
-        }
+        )) { if (Test-Path $rp) { $revitInstalled = $true; break } }
     }
 
-    if ($revitInstalled) {
-        # Create the addins folder if it doesn't exist yet (Revit installed but never launched)
-        if (!(Test-Path $verDir)) {
-            New-Item -ItemType Directory -Path $verDir -Force | Out-Null
-            Write-Host "    Created addins folder for Revit $ver (first launch)" -ForegroundColor Gray
-        }
-        $foundVersions += $ver
-    }
+    if ($revitInstalled) { $foundVersions += $ver }
 }
 
 if ($foundVersions.Count -eq 0) {
     Write-Host "  ERROR: No supported Revit installation found (2023-2027)." -ForegroundColor Red
-    Write-Host "  Looked in: $addinsRoot and Windows Registry" -ForegroundColor Red
     Read-Host "Press Enter to exit"
     exit 1
 }
 
 Write-Host "  Found Revit: $($foundVersions -join ', ')" -ForegroundColor Green
 
-# Warn if default port 8080 is already in use by another process
-$defaultPort = 8080
-$portInUse = (Get-NetTCPConnection -LocalPort $defaultPort -State Listen -ErrorAction SilentlyContinue)
-if ($portInUse) {
-    Write-Host ""
-    Write-Host "  WARNING: Port $defaultPort is already in use by another process." -ForegroundColor Yellow
-    Write-Host "  RevitCortex uses this port to communicate between the plugin and the MCP server." -ForegroundColor Yellow
-    Write-Host "  To use a different port, set it in: $env:USERPROFILE\.revitcortex\settings.json" -ForegroundColor Yellow
-    Write-Host "  Example: { ""Port"": 8081 }" -ForegroundColor Gray
-}
+# Port 8080 warning (non-fatal)
+try {
+    if (Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue) {
+        Write-Host "  WARNING: Port 8080 already in use. Change in %USERPROFILE%\.revitcortex\settings.json if needed." -ForegroundColor Yellow
+    }
+} catch {}
 
-# --- Step 2: Install Plugin ---
+# --- Step 2: Install Plugin (machine → user scope fallback on ACL errors) ---
 Write-Host ""
-Write-Host "[2/4] Installing Revit plugin..." -ForegroundColor Yellow
+Write-Host "[2/5] Installing Revit plugin..." -ForegroundColor Yellow
 
 $addinTemplate = Join-Path $ScriptDir "RevitCortex.addin"
+if (-not (Test-Path $addinTemplate)) {
+    Write-Host "  ERROR: RevitCortex.addin not found at $addinTemplate" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
+}
 
+$deployFailures = @()
 foreach ($ver in $foundVersions) {
     $suffix = $configMap[$ver]
     $sourceDir = Join-Path $ScriptDir "plugin\$suffix"
-    $targetDir = Join-Path $addinsRoot "$ver\RevitCortex"
-    $addinTarget = Join-Path $addinsRoot "$ver\RevitCortex.addin"
-
-    # Remove old installation
-    if (Test-Path $targetDir) { Remove-Item $targetDir -Recurse -Force }
-
-    # Copy plugin DLLs
-    Copy-Item $sourceDir $targetDir -Recurse -Force
-    Write-Host "  Revit $ver : $targetDir" -ForegroundColor Gray
-
-    # Copy .addin manifest
-    Copy-Item $addinTemplate $addinTarget -Force
+    $r = Copy-RevitAddin -Version $ver -PluginSource $sourceDir -AddinManifest $addinTemplate
+    if ($r.Ok) {
+        $tag = if ($r.Scope -eq 'user') { '(user scope)' } else { '' }
+        Write-Host ("  Revit {0} : {1} {2}" -f $ver, $r.TargetDir, $tag) -ForegroundColor Gray
+    } else {
+        Write-Host ("  Revit {0} : FAILED — {1}" -f $ver, $r.Error) -ForegroundColor Red
+        $deployFailures += $ver
+    }
 }
 
+if ($deployFailures.Count -gt 0) {
+    Write-Host "  Plugin install failed for: $($deployFailures -join ', ')" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
+}
 Write-Host "  Plugin installed for $($foundVersions.Count) Revit version(s)." -ForegroundColor Green
 
-# --- Step 3: Install MCP Server ---
+# --- Step 3: Install MCP Server (C# self-contained) ---
 Write-Host ""
-Write-Host "[3/4] Installing MCP server..." -ForegroundColor Yellow
+Write-Host "[3/5] Installing MCP server..." -ForegroundColor Yellow
 
 $serverSource = Join-Path $ScriptDir "server"
 $serverTarget = Join-Path $env:USERPROFILE ".revitcortex\server"
 
-if (!(Test-Path $serverSource)) {
+if (-not (Test-Path $serverSource)) {
     Write-Host "  ERROR: Server files not found at $serverSource" -ForegroundColor Red
     Read-Host "Press Enter to exit"
     exit 1
 }
 
-# Remove old server
 if (Test-Path $serverTarget) { Remove-Item $serverTarget -Recurse -Force }
-
-# Create directory and copy files
 New-Item -ItemType Directory -Path $serverTarget -Force | Out-Null
 Copy-Item "$serverSource\*" $serverTarget -Recurse -Force
 
 $serverExe = Join-Path $serverTarget "RevitCortex.Server.exe"
-
-# Remove Zone.Identifier ADS (marks files as "downloaded from internet") to prevent
-# SmartScreen and Windows Defender from blocking the executable on first launch.
-Get-ChildItem $serverTarget -Recurse -File | ForEach-Object {
-    Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue
+if (-not (Test-Path $serverExe)) {
+    Write-Host "  ERROR: Expected RevitCortex.Server.exe in server/ — check release package" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
 }
-Write-Host "  Unblocked files (Zone.Identifier removed)" -ForegroundColor Gray
 
-# Add Windows Defender exclusion for the server folder so real-time protection
-# does not quarantine the self-contained EXE (common false positive for new executables).
+# Unblock Zone.Identifier so Defender/SmartScreen don't block on first run
+Get-ChildItem $serverTarget -Recurse -File | ForEach-Object { Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue }
+
+# Defender exclusion (opt-in, idempotent) — remains from old installer
 if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
-    Add-MpPreference -ExclusionPath $serverTarget -ErrorAction SilentlyContinue
-    Write-Host "  Windows Defender exclusion added for server folder" -ForegroundColor Gray
+    $existing = @()
+    try { $mp = Get-MpPreference -ErrorAction SilentlyContinue; if ($mp -and $mp.ExclusionPath) { $existing = @($mp.ExclusionPath) } } catch {}
+    if ($existing -notcontains $serverTarget) {
+        $a = Read-Host "  Add Windows Defender exclusion for '$serverTarget'? (y/N)"
+        if ($a -eq 'y' -or $a -eq 'Y') {
+            Add-MpPreference -ExclusionPath $serverTarget -ErrorAction SilentlyContinue
+            Write-Host "  Defender exclusion added" -ForegroundColor Gray
+        }
+    }
 }
 
 Write-Host "  Server installed: $serverExe" -ForegroundColor Green
 
-# --- Step 4: Configure MCP Client ---
+# --- Step 4: Ensure Git (needed by Claude Code for many workflows) ---
 Write-Host ""
-Write-Host "[4/4] Configure Claude client" -ForegroundColor Yellow
+Write-Host "[4/5] Checking Git..." -ForegroundColor Yellow
+$gitOk = Ensure-Git
+
+# --- Step 5: Configure Claude clients ---
+Write-Host ""
+Write-Host "[5/5] Configure Claude client" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  How will you use RevitCortex?"
 Write-Host "  [1] Claude Desktop"
@@ -147,45 +163,34 @@ Write-Host "  [4] Skip (configure later)"
 Write-Host ""
 $choice = Read-Host "  Enter choice (1-4)"
 
-# Claude Desktop config
+$claudeDesktopConfigured = $false
+$claudeCodeConfigured    = $false
+
 if ($choice -eq "1" -or $choice -eq "3") {
     $configPath = Join-Path $env:APPDATA "Claude\claude_desktop_config.json"
-    $configDir = Split-Path $configPath
-
-    if (!(Test-Path $configDir)) { New-Item -ItemType Directory -Path $configDir -Force | Out-Null }
-
-    $mcpEntry = @{
-        command = $serverExe
-        args    = @()
-    }
-
-    if (Test-Path $configPath) {
-        try {
-            $config = Get-Content $configPath -Raw | ConvertFrom-Json
-            if (-not $config.mcpServers) {
-                $config | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue @{} -Force
-            }
-            $config.mcpServers | Add-Member -NotePropertyName "revitcortex" -NotePropertyValue $mcpEntry -Force
-            $config | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8
-        } catch {
-            Copy-Item $configPath "$configPath.bak" -Force
-            $freshConfig = @{ mcpServers = @{ revitcortex = $mcpEntry } }
-            $freshConfig | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8
+    try {
+        $result = Merge-ClaudeMcpServer -ConfigPath $configPath -ServerName 'revitcortex' -Command $serverExe -Arguments @()
+        if ($result.BackupPath) {
+            Write-Host ("  Claude Desktop config backed up: {0}" -f $result.BackupPath) -ForegroundColor Gray
         }
-    } else {
-        $freshConfig = @{ mcpServers = @{ revitcortex = $mcpEntry } }
-        $freshConfig | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8
+        Write-Host ("  Claude Desktop: revitcortex {0}." -f $result.Action) -ForegroundColor Green
+        $claudeDesktopConfigured = $true
+    } catch {
+        Write-Host "  Claude Desktop config update FAILED: $_" -ForegroundColor Red
+        Write-Host "  Your existing config has been preserved. Fix the JSON and re-run this installer." -ForegroundColor Yellow
     }
-
-    Write-Host "  Claude Desktop configured." -ForegroundColor Green
 }
 
-# Claude Code config
 if ($choice -eq "2" -or $choice -eq "3") {
     $claudeCli = Get-Command claude -ErrorAction SilentlyContinue
     if ($claudeCli) {
-        & claude mcp add revitcortex $serverExe 2>$null
-        Write-Host "  Claude Code configured." -ForegroundColor Green
+        try {
+            & claude mcp add revitcortex $serverExe 2>$null | Out-Null
+            Write-Host "  Claude Code: revitcortex configured." -ForegroundColor Green
+            $claudeCodeConfigured = $true
+        } catch {
+            Write-Host "  Claude Code CLI returned: $_" -ForegroundColor Yellow
+        }
     } else {
         Write-Host "  Claude Code CLI not found. Add manually:" -ForegroundColor Yellow
         Write-Host "    claude mcp add revitcortex `"$serverExe`"" -ForegroundColor Gray
@@ -204,11 +209,11 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host "   RevitCortex installed successfully" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Plugin:  Revit $($foundVersions -join ', ')" -ForegroundColor White
-Write-Host "  Server:  $serverExe" -ForegroundColor White
-if ($choice -eq "1") { Write-Host "  Client:  Claude Desktop" -ForegroundColor White }
-if ($choice -eq "2") { Write-Host "  Client:  Claude Code" -ForegroundColor White }
-if ($choice -eq "3") { Write-Host "  Client:  Claude Desktop + Claude Code" -ForegroundColor White }
+Write-Host ("  Plugin:  Revit {0}" -f ($foundVersions -join ', ')) -ForegroundColor White
+Write-Host ("  Server:  {0}" -f $serverExe) -ForegroundColor White
+Write-Host ("  Git:     {0}" -f $(if ($gitOk) { 'OK' } else { 'NOT installed (install manually)' })) -ForegroundColor White
+if ($claudeDesktopConfigured) { Write-Host "  Client:  Claude Desktop" -ForegroundColor White }
+if ($claudeCodeConfigured)    { Write-Host "  Client:  Claude Code" -ForegroundColor White }
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Yellow
 Write-Host "  1. Restart Revit" -ForegroundColor White
