@@ -163,6 +163,6 @@ public class SendCodeToRevitTool : ICortexTool
     private static string SanitizeName(string name)
     {
         var safe = Regex.Replace(name, @"[^\w\-]", "-").Trim('-');
-        return safe.Length == 0 ? "script" : safe[..Math.Min(safe.Length, 40)];
+        return safe.Length == 0 ? "script" : safe.Substring(0, Math.Min(safe.Length, 40));
     }
 }
