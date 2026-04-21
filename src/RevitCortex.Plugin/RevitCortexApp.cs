@@ -20,6 +20,7 @@ public class RevitCortexApp : IExternalApplication
     private UIApplication? _uiApplication;
     private int _port = 8080;
     private Autodesk.Revit.UI.PushButton? _connectButton;
+    private bool _updateNotificationShown;
 
     public static RevitCortexApp? Instance { get; private set; }
 
@@ -93,8 +94,9 @@ public class RevitCortexApp : IExternalApplication
             LoadPort();
 
             // Fire-and-forget update check against the public metadata repo.
-            // Populates UpdateChecker.Latest for the Settings page banner.
-            // Silent on any failure — must never block Revit startup.
+            // When an update is found, the UpdateAvailable event wakes up the
+            // notification window (or OnIdling shows it if Revit is already idle).
+            RevitCortex.Plugin.Updates.UpdateChecker.UpdateAvailable += OnUpdateAvailable;
             RevitCortex.Plugin.Updates.UpdateChecker.CheckInBackground();
 
             // Create socket service but do NOT start automatically
@@ -285,6 +287,40 @@ public class RevitCortexApp : IExternalApplication
                 System.Diagnostics.Trace.WriteLine(
                     $"[RevitCortex] Session initialized from Idling: {doc.Title}, locale: {locale}");
             }
+
+            // If the update check already completed before Idling fired, show now.
+            if (RevitCortex.Plugin.Updates.UpdateChecker.Latest?.HasUpdate == true)
+                ShowUpdateNotification();
+        }
+    }
+
+    /// <summary>
+    /// Called on a background thread when the update check finds a newer version.
+    /// Marshals to the UI thread to show the notification window.
+    /// </summary>
+    private void OnUpdateAvailable()
+    {
+        // If Revit isn't idle yet, OnIdling will handle it.
+        if (_uiApplication == null) return;
+
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(
+            (System.Action)ShowUpdateNotification);
+    }
+
+    private void ShowUpdateNotification()
+    {
+        if (_updateNotificationShown) return;
+        _updateNotificationShown = true;
+
+        try
+        {
+            var win = new UI.UpdateNotificationWindow();
+            win.Show();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[RevitCortex] Could not show update notification: {ex.Message}");
         }
     }
 

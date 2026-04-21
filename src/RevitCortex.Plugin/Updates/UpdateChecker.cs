@@ -64,6 +64,12 @@ public static class UpdateChecker
     public static Version CurrentVersion =>
         Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
 
+    /// <summary>
+    /// Fired on a background thread when the check completes and an update is available.
+    /// Subscribers must marshal to the UI thread themselves.
+    /// </summary>
+    public static event Action? UpdateAvailable;
+
     /// <summary>Fires the check in the background. Safe to call once at startup.</summary>
     public static void CheckInBackground()
     {
@@ -109,6 +115,9 @@ public static class UpdateChecker
             downloadUrl!,
             changelog ?? string.Empty,
             remoteVer > CurrentVersion);
+
+        if (Latest.HasUpdate)
+            UpdateAvailable?.Invoke();
     }
 
     /// <summary>
