@@ -20,6 +20,7 @@ public partial class GeneralSettingsPage : Page
     private const string DefaultLogLevel = "Info";
     private const int DefaultKeepCount = 10;
     private int _originalPort;
+    private DispatcherTimer? _downloadTimer;
 
     private static string SettingsFilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -45,22 +46,103 @@ public partial class GeneralSettingsPage : Page
         SupportReportsSubtitle.Text = Localization.T("support.settings.subtitle");
         OpenReportsFolderButton.Content = Localization.T("support.settings.open_folder");
         DeleteAllReportsButton.Content = Localization.T("support.settings.delete_now");
-        UpdateDownloadButton.Content = Localization.T("update.download_button");
     }
 
     private void RefreshUpdateBanner()
     {
         var info = UpdateChecker.Latest;
-        if (info?.HasUpdate == true)
-        {
-            UpdateTitle.Text = Localization.T("update.available_title", info.RemoteVersion);
-            UpdateDetail.Text = Localization.T("update.available_detail", UpdateChecker.CurrentVersion);
-            UpdateBanner.Visibility = Visibility.Visible;
-        }
-        else
+        if (info?.HasUpdate != true)
         {
             UpdateBanner.Visibility = Visibility.Collapsed;
+            StopDownloadTimer();
+            return;
         }
+
+        UpdateBanner.Visibility = Visibility.Visible;
+
+        switch (UpdateChecker.State)
+        {
+            case UpdateChecker.DownloadState.Idle:
+                UpdateTitle.Text = $"RevitCortex {info.RemoteVersion} disponibile";
+                UpdateDetail.Text = $"Sei sulla {UpdateChecker.CurrentVersion} — {info.Changelog}";
+                UpdateProgressGrid.Visibility = Visibility.Collapsed;
+                SetActionButton("Download & Install", "#FFB300", "#FF8F00", isEnabled: true);
+                UpdateManualButton.Visibility = Visibility.Collapsed;
+                StopDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Downloading:
+                var (recv, total) = UpdateChecker.DownloadProgress;
+                string progress = total > 0
+                    ? $"{recv / 1_048_576.0:F0} / {total / 1_048_576.0:F0} MB"
+                    : $"{recv / 1_048_576.0:F0} MB scaricati…";
+                double pct = total > 0 ? recv * 100.0 / total : 0;
+                UpdateTitle.Text = $"Download in corso… {progress}";
+                UpdateDetail.Text = string.Empty;
+                UpdateProgress.Value = pct;
+                UpdateProgressText.Text = progress;
+                UpdateProgressGrid.Visibility = Visibility.Visible;
+                SetActionButton("Annulla", "#9E9E9E", "#757575", isEnabled: true);
+                UpdateManualButton.Visibility = Visibility.Collapsed;
+                StartDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Ready:
+                UpdateTitle.Text = "Pronto per l'installazione";
+                UpdateDetail.Text = "Si aprirà il prompt di amministratore — approva per installare";
+                UpdateProgressGrid.Visibility = Visibility.Collapsed;
+                SetActionButton("Install ora", "#388E3C", "#2E7D32", isEnabled: true);
+                UpdateManualButton.Visibility = Visibility.Collapsed;
+                StopDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Installing:
+                UpdateTitle.Text = "Installazione avviata";
+                UpdateDetail.Text = "Riavvia Revit per completare l'aggiornamento";
+                UpdateProgressGrid.Visibility = Visibility.Collapsed;
+                SetActionButton("Chiudi Revit", "#00796B", "#004D40", isEnabled: true);
+                UpdateManualButton.Visibility = Visibility.Collapsed;
+                StopDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Done:
+                UpdateBanner.Visibility = Visibility.Collapsed;
+                StopDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Error:
+                UpdateTitle.Text = "Download fallito";
+                UpdateDetail.Text = UpdateChecker.DownloadError ?? "Errore sconosciuto";
+                UpdateProgressGrid.Visibility = Visibility.Collapsed;
+                SetActionButton("Riprova", "#E53935", "#B71C1C", isEnabled: true);
+                UpdateManualButton.Visibility = Visibility.Visible;
+                StopDownloadTimer();
+                break;
+        }
+    }
+
+    private void SetActionButton(string label, string bg, string border, bool isEnabled)
+    {
+        UpdateActionButton.Content = label;
+        UpdateActionButton.Background = new SolidColorBrush(
+            (Color)ColorConverter.ConvertFromString(bg));
+        UpdateActionButton.BorderBrush = new SolidColorBrush(
+            (Color)ColorConverter.ConvertFromString(border));
+        UpdateActionButton.IsEnabled = isEnabled;
+    }
+
+    private void StartDownloadTimer()
+    {
+        if (_downloadTimer?.IsEnabled == true) return;
+        _downloadTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _downloadTimer.Tick += (_, _) => RefreshUpdateBanner();
+        _downloadTimer.Start();
+    }
+
+    private void StopDownloadTimer()
+    {
+        _downloadTimer?.Stop();
+        _downloadTimer = null;
     }
 
     private void StartUpdateBannerPolling()
@@ -81,11 +163,38 @@ public partial class GeneralSettingsPage : Page
         timer.Start();
     }
 
-    private void UpdateDownload_Click(object sender, RoutedEventArgs e)
+    private void UpdateAction_Click(object sender, RoutedEventArgs e)
+    {
+        switch (UpdateChecker.State)
+        {
+            case UpdateChecker.DownloadState.Idle:
+            case UpdateChecker.DownloadState.Error:
+                UpdateChecker.ResetDownload();
+                UpdateChecker.StartDownloadAsync();
+                RefreshUpdateBanner();
+                break;
+
+            case UpdateChecker.DownloadState.Downloading:
+                UpdateChecker.CancelDownload();
+                RefreshUpdateBanner();
+                break;
+
+            case UpdateChecker.DownloadState.Ready:
+                UpdateChecker.LaunchInstaller();
+                RefreshUpdateBanner();
+                break;
+
+            case UpdateChecker.DownloadState.Installing:
+                // "Chiudi Revit" button
+                try { System.Windows.Application.Current?.Shutdown(); } catch { }
+                break;
+        }
+    }
+
+    private void UpdateManual_Click(object sender, RoutedEventArgs e)
     {
         var info = UpdateChecker.Latest;
         if (info == null || string.IsNullOrWhiteSpace(info.DownloadUrl)) return;
-
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
