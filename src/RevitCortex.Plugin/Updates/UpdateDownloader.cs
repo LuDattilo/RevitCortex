@@ -42,7 +42,7 @@ public static class UpdateDownloader
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var stream = await response.Content.ReadAsStreamAsync();
             using var file = new FileStream(destZipPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
 
             var buffer = new byte[81920];

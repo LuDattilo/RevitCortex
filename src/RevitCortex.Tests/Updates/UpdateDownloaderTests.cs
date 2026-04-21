@@ -5,7 +5,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -58,6 +57,7 @@ public class UpdateDownloaderTests : IDisposable
         Assert.Null(result.ErrorMessage);
         Assert.True(File.Exists(destPath));
         Assert.True(new FileInfo(destPath).Length > 0);
+        Assert.NotEmpty(progressEvents);
     }
 
     [Fact]
