@@ -12,7 +12,7 @@
 ;   Output: installer\Output\RevitCortex-Setup.exe
 
 #define MyAppName "RevitCortex"
-#define MyAppVersion "1.0.9"
+#define MyAppVersion "1.0.10"
 #define MyAppPublisher "Luigi Dattilo"
 #define MyAppURL "https://github.com/LuDattilo/RevitCortex"
 
@@ -63,7 +63,7 @@ Name: "r27"; Description: "Plugin Revit 2027"; Types: full; Check: RevitDirExist
 Type: filesandordirs; Name: "{userappdata}\.revitcortex\server"
 
 [Files]
-; MCP Server (self-contained C# EXE ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no Node.js dependency)
+; MCP Server (self-contained C# EXE ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no Node.js dependency)
 Source: "..\release\server\*"; DestDir: "{userappdata}\.revitcortex\server"; Components: server; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Plugin DLLs per version
