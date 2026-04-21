@@ -83,6 +83,10 @@ function Copy-RevitAddin {
             Copy-Item $PluginSource $pluginDir -Recurse -Force -ErrorAction Stop
             Copy-Item $AddinManifest $addinFile -Force -ErrorAction Stop
 
+            # Remove Zone.Identifier ADS so .NET can load the DLLs (HRESULT 0x80131515)
+            Get-ChildItem $pluginDir -Recurse -File | ForEach-Object { Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue }
+            Unblock-File -Path $addinFile -ErrorAction SilentlyContinue
+
             return @{ Version = $Version; Scope = $scope.Name; TargetDir = $pluginDir; Ok = $true; Error = $null }
         } catch [System.UnauthorizedAccessException] {
             $lastError = $_
