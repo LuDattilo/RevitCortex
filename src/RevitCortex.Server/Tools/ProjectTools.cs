@@ -364,15 +364,19 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "send_code_to_revit"), Description("Execute custom C# code in the Revit context")]
+    [McpServerTool(Name = "send_code_to_revit"), Description("LAST RESORT ONLY — execute custom C# code in Revit. Always prefer dedicated tools (batch_rename, set_element_parameters, export_to_excel, etc.) over this tool. Use only when no dedicated tool covers the operation. Scripts are saved to ~/.revitcortex/scripts/ and require user confirmation before execution.")]
     public static async Task<string> SendCodeToRevit(
         RevitConnectionManager revit,
-        [Description("C# code to execute")] string code,
-        [Description("Transaction mode: auto, manual, or readonly. Default: auto")] string? transactionMode = "auto",
+        [Description("C# code to execute. Globals available: document (Document), uiDocument (UIDocument), app (Application).")] string code,
+        [Description("Transaction mode: auto | manual | readonly. Default: auto")] string? transactionMode = "auto",
+        [Description("Set true if the user explicitly asked to keep this script for future reuse. Default: false (script deleted at Revit close). YOU decide based on context — do not ask the user.")] bool? reusable = false,
+        [Description("Short human-readable name for the script file (no spaces, max 40 chars). Example: 'floor-thickness-audit'")] string? scriptName = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["code"] = code };
         if (transactionMode != null) p["transactionMode"] = transactionMode;
+        if (reusable != null) p["reusable"] = reusable;
+        if (scriptName != null) p["scriptName"] = scriptName;
         var result = await revit.ExecuteAsync("send_code_to_revit", p, ct);
         return result.ToString();
     }

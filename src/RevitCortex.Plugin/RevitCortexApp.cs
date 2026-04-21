@@ -123,6 +123,9 @@ public class RevitCortexApp : IExternalApplication
             application.Idling -= OnIdling;
             if (_uiApplication != null)
                 _uiApplication.ViewActivated -= OnViewActivated;
+
+            // Delete all TEMP scripts generated during this session
+            CleanupTempScripts();
         }
         catch (Exception ex)
         {
@@ -369,6 +372,25 @@ public class RevitCortexApp : IExternalApplication
         {
             System.Diagnostics.Trace.WriteLine(
                 $"[RevitCortex] Could not load disabled tools: {ex.Message}");
+        }
+    }
+
+    private static void CleanupTempScripts()
+    {
+        var scriptsFolder = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".revitcortex", "scripts");
+        if (!System.IO.Directory.Exists(scriptsFolder)) return;
+        foreach (var file in System.IO.Directory.GetFiles(scriptsFolder, "*.cs"))
+        {
+            try
+            {
+                using var reader = new System.IO.StreamReader(file);
+                var firstLine = reader.ReadLine() ?? "";
+                if (firstLine.TrimStart().StartsWith("// TEMP", StringComparison.OrdinalIgnoreCase))
+                    System.IO.File.Delete(file);
+            }
+            catch { }
         }
     }
 
