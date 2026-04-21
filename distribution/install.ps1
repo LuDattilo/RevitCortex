@@ -37,12 +37,12 @@ Write-Host "[1/5] Detecting Revit installations..." -ForegroundColor Yellow
 
 $configMap = [ordered]@{ "2023" = "R23"; "2024" = "R24"; "2025" = "R25"; "2026" = "R26"; "2027" = "R27" }
 $machineAddinsRoot = "C:\ProgramData\Autodesk\Revit\Addins"
-$foundVersions = @()
+$foundVersions   = @()   # installed + plugin available in this ZIP
+$skippedVersions = @()   # installed but plugin not in this ZIP
 
 foreach ($ver in $configMap.Keys) {
-    $pluginDir = Join-Path $ScriptDir "plugin\$($configMap[$ver])"
-    if (-not (Test-Path $pluginDir)) { continue }
-
+    # 1. Detect whether this Revit version is actually installed on the machine.
+    #    Check three signals in order: Addins folder, registry, Revit.exe.
     $machineVerDir = Join-Path $machineAddinsRoot $ver
     $revitInstalled = Test-Path $machineVerDir
 
@@ -54,16 +54,39 @@ foreach ($ver in $configMap.Keys) {
         )) { if (Test-Path $rp) { $revitInstalled = $true; break } }
     }
 
-    if ($revitInstalled) { $foundVersions += $ver }
+    if (-not $revitInstalled) {
+        $revitExe = "C:\Program Files\Autodesk\Revit $ver\Revit.exe"
+        if (Test-Path $revitExe) { $revitInstalled = $true }
+    }
+
+    if (-not $revitInstalled) { continue }
+
+    # 2. Check whether this ZIP contains the plugin build for this version.
+    $pluginDir = Join-Path $ScriptDir "plugin\$($configMap[$ver])"
+    if (-not (Test-Path $pluginDir)) {
+        $skippedVersions += $ver   # Revit installed but not bundled in this package
+        continue
+    }
+
+    $foundVersions += $ver
 }
 
-if ($foundVersions.Count -eq 0) {
+if ($foundVersions.Count -eq 0 -and $skippedVersions.Count -eq 0) {
     Write-Host "  ERROR: No supported Revit installation found (2023-2027)." -ForegroundColor Red
     Read-Host "Press Enter to exit"
     exit 1
 }
 
+if ($foundVersions.Count -eq 0) {
+    Write-Host "  ERROR: Revit $($skippedVersions -join ', ') detected but this package does not include a plugin build for those versions." -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
 Write-Host "  Found Revit: $($foundVersions -join ', ')" -ForegroundColor Green
+if ($skippedVersions.Count -gt 0) {
+    Write-Host "  NOTE: Revit $($skippedVersions -join ', ') detected but not bundled in this package — skipped." -ForegroundColor Yellow
+}
 
 # Port 8080 warning (non-fatal)
 try {
