@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 . (Join-Path $ScriptDir 'lib\ClaudeConfig.ps1')
+. (Join-Path $ScriptDir 'lib\CodexConfig.ps1')
 . (Join-Path $ScriptDir 'lib\RevitDeploy.ps1')
 . (Join-Path $ScriptDir 'lib\GitInstall.ps1')
 
@@ -174,56 +175,79 @@ Write-Host ""
 Write-Host "[4/5] Checking Git..." -ForegroundColor Yellow
 $gitOk = Ensure-Git
 
-# --- Step 5: Configure Claude clients ---
+# --- Step 5: Configure AI clients ---
 Write-Host ""
-Write-Host "[5/5] Configure Claude client" -ForegroundColor Yellow
+Write-Host "[5/5] Configure AI clients" -ForegroundColor Yellow
+Write-Host "  Answer y/N for each client found on this machine."
 Write-Host ""
-Write-Host "  How will you use RevitCortex?"
-Write-Host "  [1] Claude Desktop"
-Write-Host "  [2] Claude Code (CLI)"
-Write-Host "  [3] Both"
-Write-Host "  [4] Skip (configure later)"
-Write-Host ""
-$choice = Read-Host "  Enter choice (1-4)"
 
 $claudeDesktopConfigured = $false
 $claudeCodeConfigured    = $false
+$codexConfigured         = $false
 
-if ($choice -eq "1" -or $choice -eq "3") {
-    $configPath = Join-Path $env:APPDATA "Claude\claude_desktop_config.json"
-    try {
-        $result = Merge-ClaudeMcpServer -ConfigPath $configPath -ServerName 'revitcortex' -Command $serverExe -Arguments @()
-        if ($result.BackupPath) {
-            Write-Host ("  Claude Desktop config backed up: {0}" -f $result.BackupPath) -ForegroundColor Gray
+# Claude Desktop
+$claudeDesktopConfig = Join-Path $env:APPDATA "Claude\claude_desktop_config.json"
+$claudeDesktopFound  = Test-Path (Join-Path $env:APPDATA "Claude")
+if ($claudeDesktopFound) {
+    $ans = Read-Host "  Configure Claude Desktop? [y/N]"
+    if ($ans -eq 'y' -or $ans -eq 'Y') {
+        try {
+            $result = Merge-ClaudeMcpServer -ConfigPath $claudeDesktopConfig -ServerName 'revitcortex' -Command $serverExe -Arguments @()
+            if ($result.BackupPath) {
+                Write-Host ("    Config backed up: {0}" -f $result.BackupPath) -ForegroundColor Gray
+            }
+            Write-Host ("    Claude Desktop: revitcortex {0}." -f $result.Action) -ForegroundColor Green
+            $claudeDesktopConfigured = $true
+        } catch {
+            Write-Host "    Claude Desktop config FAILED: $_" -ForegroundColor Red
+            Write-Host "    Existing config preserved. Fix the JSON and re-run." -ForegroundColor Yellow
         }
-        Write-Host ("  Claude Desktop: revitcortex {0}." -f $result.Action) -ForegroundColor Green
-        $claudeDesktopConfigured = $true
-    } catch {
-        Write-Host "  Claude Desktop config update FAILED: $_" -ForegroundColor Red
-        Write-Host "  Your existing config has been preserved. Fix the JSON and re-run this installer." -ForegroundColor Yellow
     }
+} else {
+    Write-Host "  Claude Desktop not found — skipped." -ForegroundColor Gray
 }
 
-if ($choice -eq "2" -or $choice -eq "3") {
-    $claudeCli = Get-Command claude -ErrorAction SilentlyContinue
-    if ($claudeCli) {
+# Claude Code CLI
+$claudeCli = Get-Command claude -ErrorAction SilentlyContinue
+if ($claudeCli) {
+    $ans = Read-Host "  Configure Claude Code CLI? [y/N]"
+    if ($ans -eq 'y' -or $ans -eq 'Y') {
         try {
             & claude mcp add revitcortex $serverExe 2>$null | Out-Null
-            Write-Host "  Claude Code: revitcortex configured." -ForegroundColor Green
+            Write-Host "    Claude Code: revitcortex configured." -ForegroundColor Green
             $claudeCodeConfigured = $true
         } catch {
-            Write-Host "  Claude Code CLI returned: $_" -ForegroundColor Yellow
+            Write-Host "    Claude Code CLI returned: $_" -ForegroundColor Yellow
         }
-    } else {
-        Write-Host "  Claude Code CLI not found. Add manually:" -ForegroundColor Yellow
-        Write-Host "    claude mcp add revitcortex `"$serverExe`"" -ForegroundColor Gray
     }
+} else {
+    Write-Host "  Claude Code CLI not found — skipped." -ForegroundColor Gray
 }
 
-if ($choice -eq "4") {
-    Write-Host "  Skipped. Configure later:" -ForegroundColor Yellow
-    Write-Host "    Claude Desktop: add to %APPDATA%\Claude\claude_desktop_config.json" -ForegroundColor Gray
+# Codex CLI
+$codexCli = Get-Command codex -ErrorAction SilentlyContinue
+if ($codexCli) {
+    $ans = Read-Host "  Configure Codex CLI? [y/N]"
+    if ($ans -eq 'y' -or $ans -eq 'Y') {
+        $codexConfigPath = Join-Path $env:USERPROFILE ".codex\config.toml"
+        try {
+            $result = Merge-CodexMcpServer -ConfigPath $codexConfigPath -ServerName 'revitcortex' -Command $serverExe
+            Write-Host ("    Codex CLI: revitcortex {0}." -f $result.Action) -ForegroundColor Green
+            $codexConfigured = $true
+        } catch {
+            Write-Host "    Codex config FAILED: $_" -ForegroundColor Red
+        }
+    }
+} else {
+    Write-Host "  Codex CLI not found — skipped." -ForegroundColor Gray
+}
+
+if (-not $claudeDesktopConfigured -and -not $claudeCodeConfigured -and -not $codexConfigured) {
+    Write-Host ""
+    Write-Host "  No AI client configured. Add manually later:" -ForegroundColor Yellow
+    Write-Host "    Claude Desktop: %APPDATA%\Claude\claude_desktop_config.json" -ForegroundColor Gray
     Write-Host "    Claude Code:    claude mcp add revitcortex `"$serverExe`"" -ForegroundColor Gray
+    Write-Host "    Codex CLI:      add [mcp_servers.revitcortex] to ~/.codex/config.toml" -ForegroundColor Gray
 }
 
 # --- Summary ---
@@ -237,9 +261,16 @@ Write-Host ("  Server:  {0}" -f $serverExe) -ForegroundColor White
 Write-Host ("  Git:     {0}" -f $(if ($gitOk) { 'OK' } else { 'NOT installed (install manually)' })) -ForegroundColor White
 if ($claudeDesktopConfigured) { Write-Host "  Client:  Claude Desktop" -ForegroundColor White }
 if ($claudeCodeConfigured)    { Write-Host "  Client:  Claude Code" -ForegroundColor White }
+if ($codexConfigured)         { Write-Host "  Client:  Codex CLI" -ForegroundColor White }
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Yellow
 Write-Host "  1. Restart Revit" -ForegroundColor White
-Write-Host "  2. Restart Claude Desktop / Claude Code" -ForegroundColor White
+$restartClients = @()
+if ($claudeDesktopConfigured) { $restartClients += "Claude Desktop" }
+if ($claudeCodeConfigured)    { $restartClients += "Claude Code" }
+if ($codexConfigured)         { $restartClients += "Codex CLI" }
+if ($restartClients.Count -gt 0) {
+    Write-Host ("  2. Restart {0}" -f ($restartClients -join ' / ')) -ForegroundColor White
+}
 Write-Host ""
 Read-Host "Press Enter to close"
