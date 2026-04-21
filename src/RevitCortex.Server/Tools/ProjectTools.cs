@@ -369,7 +369,7 @@ public static class ProjectTools
         RevitConnectionManager revit,
         [Description("C# code to execute. Globals available: document (Document), uiDocument (UIDocument), app (Application).")] string code,
         [Description("Transaction mode: auto | manual | readonly. Default: auto")] string? transactionMode = "auto",
-        [Description("Set true if the user explicitly asked to keep this script for future reuse. Default: false (script deleted at Revit close). YOU decide based on context — do not ask the user.")] bool? reusable = false,
+        [Description("YOU decide — never ask the user. true = REUSABLE (kept permanently) if the script is generic and could run again on other models or sessions (e.g. a utility, a report, a recurring audit). false = TEMP (deleted at Revit close) if the script is specific to this one request, these specific element IDs, or this exact model. Default: false.")] bool? reusable = false,
         [Description("Short human-readable name for the script file (no spaces, max 40 chars). Example: 'floor-thickness-audit'")] string? scriptName = null,
         CancellationToken ct = default)
     {
