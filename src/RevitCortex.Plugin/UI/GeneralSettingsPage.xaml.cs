@@ -134,6 +134,7 @@ public partial class GeneralSettingsPage : Page
     private void StartDownloadTimer()
     {
         if (_downloadTimer?.IsEnabled == true) return;
+        StopDownloadTimer(); // stop and null the old one before creating a new one
         _downloadTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _downloadTimer.Tick += (_, _) => RefreshUpdateBanner();
         _downloadTimer.Start();
@@ -188,6 +189,13 @@ public partial class GeneralSettingsPage : Page
                 // "Chiudi Revit" button
                 try { System.Windows.Application.Current?.Shutdown(); } catch { }
                 break;
+
+            case UpdateChecker.DownloadState.Done:
+                // Banner is hidden in this state; click is unreachable.
+                break;
+
+            default:
+                break; // Guard against future enum additions.
         }
     }
 
