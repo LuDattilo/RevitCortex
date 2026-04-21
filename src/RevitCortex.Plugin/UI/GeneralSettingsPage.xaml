@@ -58,12 +58,35 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock x:Name="UpdateTitle" FontSize="13" FontWeight="SemiBold" Foreground="#333"/>
-                    <TextBlock x:Name="UpdateDetail" FontSize="11" Foreground="#666" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="UpdateDetail" FontSize="11" Foreground="#666"
+                               Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    <!-- Progress bar: visible only while downloading -->
+                    <Grid x:Name="UpdateProgressGrid" Visibility="Collapsed" Margin="0,6,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <ProgressBar x:Name="UpdateProgress" Grid.Row="0"
+                                     Height="5" Minimum="0" Maximum="100" Value="0"
+                                     Background="#E0E0E0" Foreground="#1976D2"/>
+                        <TextBlock x:Name="UpdateProgressText" Grid.Row="1"
+                                   FontSize="10" Foreground="#888" Margin="0,3,0,0"/>
+                    </Grid>
                 </StackPanel>
-                <Button x:Name="UpdateDownloadButton" Grid.Column="1" Content="Download"
-                        Padding="14,6" Margin="12,0,0,0" FontSize="13"
-                        Background="#FFB300" Foreground="White" BorderBrush="#FF8F00"
-                        Click="UpdateDownload_Click" Cursor="Hand"/>
+                <!-- Action buttons — only one visible at a time (except ERROR shows both) -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Button x:Name="UpdateActionButton"
+                            Content="Download &amp; Install"
+                            Padding="14,6" FontSize="13"
+                            Background="#FFB300" Foreground="White" BorderBrush="#FF8F00"
+                            Click="UpdateAction_Click" Cursor="Hand"/>
+                    <!-- Secondary button: visible only in ERROR state, to the right of "Riprova" -->
+                    <Button x:Name="UpdateManualButton"
+                            Content="Scarica manualmente"
+                            Padding="10,6" Margin="8,0,0,0" FontSize="12"
+                            Background="#9E9E9E" Foreground="White" BorderBrush="#757575"
+                            Click="UpdateManual_Click" Cursor="Hand" Visibility="Collapsed"/>
+                </StackPanel>
             </Grid>
         </Border>
 
