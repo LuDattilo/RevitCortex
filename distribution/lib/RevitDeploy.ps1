@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
     Revit deploy helpers: detect running instances, copy addin DLLs with ACL-aware
