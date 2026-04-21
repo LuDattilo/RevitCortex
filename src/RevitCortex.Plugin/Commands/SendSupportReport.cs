@@ -70,14 +70,21 @@ public class SendSupportReport : IExternalCommand
             }
             else
             {
-                // Fallback: open the folder so the user can attach manually.
+                // Fallback 1: mailto: — works with New Outlook and any other mail client.
+                // mailto: does not support attachments, so we tell the user to add the ZIP.
+                bool mailtoOk = TryOpenMailto(subject, body);
+
+                // Fallback 2: open the folder so the user can attach manually.
                 try
                 {
                     System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{zipPath}\"");
                 }
                 catch { /* non critico */ }
 
-                TaskDialog.Show(title, Localization.T("support.outlook_unavailable", zipPath, SupportEmail));
+                string key = mailtoOk
+                    ? "support.mailto_opened"
+                    : "support.outlook_unavailable";
+                TaskDialog.Show(title, Localization.T(key, zipPath, SupportEmail));
             }
 
             return Result.Succeeded;
@@ -405,6 +412,33 @@ public class SendSupportReport : IExternalCommand
     /// We never call Thread.Abort: not supported on net8 and unsafe on net48
     /// with COM.
     /// </summary>
+    private static bool TryOpenMailto(string subject, string body)
+    {
+        try
+        {
+            // mailto: body is capped: most clients truncate at ~2000 chars.
+            const int MaxBody = 1800;
+            string truncatedBody = body.Length > MaxBody
+                ? body.Substring(0, MaxBody) + "\n[...]"
+                : body;
+
+            string mailto = $"mailto:{SupportEmail}" +
+                $"?subject={Uri.EscapeDataString(subject)}" +
+                $"&body={Uri.EscapeDataString(truncatedBody)}";
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = mailto,
+                UseShellExecute = true,
+            });
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool TryOpenOutlookWithTimeout(string subject, string body,
         string attachmentPath, TimeSpan timeout)
     {

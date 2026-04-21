@@ -102,6 +102,11 @@ internal static class Localization
             ["en"] = "A draft email has been opened in Outlook with the attached file:\n\n{0}\n\nReview the content, add any notes, and click Send.",
             ["it"] = "Bozza email aperta in Outlook con il file allegato:\n\n{0}\n\nControlla il contenuto, aggiungi eventuali note e clicca Invia.",
         },
+        ["support.mailto_opened"] = new()
+        {
+            ["en"] = "A draft email has been opened in your mail client (without attachment).\n\nPlease attach the diagnostic package manually:\n\n{0}\n\nThe folder is already open in Explorer.",
+            ["it"] = "Bozza email aperta nel client di posta (senza allegato).\n\nAllega manualmente il pacchetto diagnostico:\n\n{0}\n\nLa cartella è già aperta in Esplora risorse.",
+        },
         ["support.outlook_unavailable"] = new()
         {
             ["en"] = "Outlook is not available or not responding. The diagnostic package has been created here:\n\n{0}\n\nPlease send it manually to {1} (email, Teams, OneDrive...).",
