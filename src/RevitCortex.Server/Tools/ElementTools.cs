@@ -13,6 +13,7 @@ public static class ElementTools
         RevitConnectionManager revit,
         [Description("Array of Revit element IDs to query")] long[] elementIds,
         [Description("Include type-level parameters. Default: true")] bool includeTypeParameters = true,
+        [Description("Return compact parameter rows (name+value only) and skip empty params. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -21,7 +22,7 @@ public static class ElementTools
             ["includeTypeParameters"] = includeTypeParameters,
         };
         var result = await revit.ExecuteAsync("get_element_parameters", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("get_element_parameters", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "ai_element_filter"), Description("Query elements by category, parameter filters, and conditions. Supports type and instance filtering.")]

@@ -97,6 +97,7 @@ public static class ProjectTools
         [Description("Include unused families in the audit")] bool includeUnused = false,
         [Description("Also enumerate system-family types (WallType/FloorType/RoofType/CeilingType). Default: false")] bool? includeSystemFamilies = null,
         [Description("Sort order: instance_count | name. Default: instance_count")] string? sortBy = null,
+        [Description("Return compact family rows without audit booleans (isInPlace/isEditable/isUnused/kind). Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject { ["includeUnused"] = includeUnused };
@@ -104,7 +105,7 @@ public static class ProjectTools
         if (includeSystemFamilies != null) p["includeSystemFamilies"] = includeSystemFamilies;
         if (sortBy != null) p["sortBy"] = sortBy;
         var result = await revit.ExecuteAsync("audit_families", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("audit_families", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "manage_phase_filters"), Description("List, set, or create Revit Phase Filters. Actions: list | set | create. The 'set' action changes one presentation (New | Demolished | Existing | Temporary) on one filter and preserves the other three. Presentations: None | ByCategory | Overridden | NotDisplayed.")]

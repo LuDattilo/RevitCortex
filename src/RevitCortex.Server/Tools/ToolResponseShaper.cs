@@ -17,8 +17,55 @@ public static class ToolResponseShaper
             "get_available_family_types" => ShapeAvailableFamilyTypes(payload),
             "list_schedulable_fields" => ShapeSchedulableFields(payload, summaryOnly),
             "get_room_openings" => ShapeRoomOpenings(payload, summaryOnly),
+            "get_element_parameters" => ShapeGetElementParameters(payload),
+            "audit_families" => ShapeAuditFamilies(payload),
             _ => payload
         };
+    }
+
+    private static JToken ShapeGetElementParameters(JToken payload)
+    {
+        var elements = payload["elements"]?.Children<JObject>().Select(el =>
+        {
+            var parameters = el["parameters"]?.Children<JObject>()
+                .Where(p => p["hasValue"]?.Value<bool>() == true)
+                .Select(p => new JObject
+                {
+                    ["name"] = p["name"],
+                    ["value"] = p["value"]
+                })
+                .ToArray() ?? System.Array.Empty<JObject>();
+
+            return new JObject
+            {
+                ["elementId"] = el["elementId"],
+                ["elementName"] = el["elementName"],
+                ["category"] = el["category"],
+                ["parameters"] = new JArray(parameters)
+            };
+        }).ToArray() ?? System.Array.Empty<JObject>();
+
+        return new JObject
+        {
+            ["message"] = payload["message"],
+            ["elements"] = new JArray(elements)
+        };
+    }
+
+    private static JToken ShapeAuditFamilies(JToken payload)
+    {
+        var families = payload["families"]?.Children<JObject>().Select(f => new JObject
+        {
+            ["id"] = f["id"],
+            ["name"] = f["name"],
+            ["category"] = f["category"],
+            ["instanceCount"] = f["instanceCount"],
+            ["typeCount"] = f["typeCount"]
+        }).ToArray() ?? System.Array.Empty<JObject>();
+
+        var result = (JObject)payload.DeepClone();
+        result["families"] = new JArray(families);
+        return result;
     }
 
     private static JToken ShapeAvailableFamilyTypes(JToken payload)

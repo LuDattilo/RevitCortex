@@ -126,6 +126,30 @@ namespace RevitCortex.Tests.Server
         }
 
         [Fact]
+        public void GetElementParameters_ExposesCompactFlag()
+        {
+            var method = GetMethod(typeof(ElementTools), nameof(ElementTools.GetElementParameters));
+            var parameters = method.GetParameters();
+
+            Assert.Contains("compact", parameters.Select(p => p.Name));
+            Assert.Equal(typeof(bool), GetParameter(method, "compact").ParameterType);
+            Assert.True(GetParameter(method, "compact").HasDefaultValue);
+            Assert.Equal(false, GetParameter(method, "compact").DefaultValue);
+        }
+
+        [Fact]
+        public void AuditFamilies_ExposesCompactFlag()
+        {
+            var method = GetMethod(typeof(ProjectTools), nameof(ProjectTools.AuditFamilies));
+            var parameters = method.GetParameters();
+
+            Assert.Contains("compact", parameters.Select(p => p.Name));
+            Assert.Equal(typeof(bool), GetParameter(method, "compact").ParameterType);
+            Assert.True(GetParameter(method, "compact").HasDefaultValue);
+            Assert.Equal(false, GetParameter(method, "compact").DefaultValue);
+        }
+
+        [Fact]
         public void GetAvailableFamilyTypes_ExposesToolNativeParameters()
         {
             var method = GetMethod(typeof(ProjectTools), nameof(ProjectTools.GetAvailableFamilyTypes));

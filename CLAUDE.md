@@ -186,13 +186,13 @@ RevitCortex defaults are calibrated for completeness, not efficiency. Override t
 
 **get_project_info**: The **first call** of the session must be complete (all includes = true) to establish model context. Subsequent calls should filter: `{"includeLevels": false, "includeLinks": false, "includePhases": false, "includeWorksets": false}`.
 
-**get_element_parameters**: Leave `includeTypeParameters` at `true` (default) for most workflows. Override to `false` only for counting/statistics tasks where only instance data is needed.
+**get_element_parameters**: Leave `includeTypeParameters` at `true` (default) for most workflows. Override to `false` only for counting/statistics tasks where only instance data is needed. Use `compact: true` to strip metadata (hasValue/isReadOnly/isShared/storageType/groupName) and skip empty params — typical 60-70% payload reduction.
 
 **get_warnings**: Never use default 500 in normal operations. Use `maxWarnings: 10` for quick checks, `maxWarnings: 50` for category analysis.
 
 **export_room_data**: Use `maxResults: 20` unless the full building is needed.
 
-**audit_families**: Always filter by category in daily operations: `{"categoryFilter": "OST_Doors", "includeUnused": false}`.
+**audit_families**: Always filter by category in daily operations: `{"categoryFilter": "OST_Doors", "includeUnused": false}`. Use `compact: true` to drop audit-only booleans (isInPlace/isEditable/isUnused/kind) — typical 45-50% payload reduction.
 
 **bulk_modify_parameter_values**: With `dryRun: true`, read only `modifiedCount` and `skippedCount` from the response, not the full element list. Then execute with `dryRun: false`.
 

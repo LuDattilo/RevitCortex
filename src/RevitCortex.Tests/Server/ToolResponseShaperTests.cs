@@ -93,6 +93,80 @@ public class ToolResponseShaperTests
     }
 
     [Fact]
+    public void ShapeGetElementParametersCompact_KeepsNameValueAndDropsEmptyParams()
+    {
+        var payload = JObject.Parse("""
+        {
+          "message": "Retrieved parameters for 1 elements",
+          "elements": [
+            {
+              "elementId": 12345,
+              "elementName": "Door 900",
+              "category": "Doors",
+              "parameters": [
+                { "name": "Comments", "value": "entry", "hasValue": true, "isReadOnly": false, "isShared": false, "storageType": "String", "groupName": "autodesk.revit.group.text" },
+                { "name": "Mark", "value": null, "hasValue": false, "isReadOnly": false, "isShared": false, "storageType": "String", "groupName": "autodesk.revit.group.identityData" },
+                { "name": "[Type] Width", "value": 900.0, "hasValue": true, "isReadOnly": true, "isShared": false, "storageType": "Double", "groupName": "autodesk.revit.group.dimensions" }
+              ]
+            }
+          ]
+        }
+        """);
+
+        var shaped = ToolResponseShaper.Shape("get_element_parameters", payload, compact: true, summaryOnly: false);
+
+        var element = shaped["elements"]![0]!;
+        Assert.Equal(12345, element["elementId"]!.Value<long>());
+        Assert.Equal("Doors", element["category"]!.Value<string>());
+
+        var parameters = (JArray)element["parameters"]!;
+        Assert.Equal(2, parameters.Count);
+
+        Assert.Equal("Comments", parameters[0]!["name"]!.Value<string>());
+        Assert.Equal("entry", parameters[0]!["value"]!.Value<string>());
+        Assert.Null(parameters[0]!["hasValue"]);
+        Assert.Null(parameters[0]!["isReadOnly"]);
+        Assert.Null(parameters[0]!["isShared"]);
+        Assert.Null(parameters[0]!["storageType"]);
+        Assert.Null(parameters[0]!["groupName"]);
+
+        Assert.Equal("[Type] Width", parameters[1]!["name"]!.Value<string>());
+    }
+
+    [Fact]
+    public void ShapeAuditFamiliesCompact_KeepsCoreFieldsAndDropsAuditBooleans()
+    {
+        var payload = JObject.Parse("""
+        {
+          "totalFamilies": 2,
+          "loadableCount": 2,
+          "systemCount": 0,
+          "families": [
+            { "id": 1, "name": "Door1", "category": "Doors", "kind": "loadable", "isInPlace": false, "isEditable": true, "instanceCount": 5, "typeCount": 3, "isUnused": false },
+            { "id": 2, "name": "Door2", "category": "Doors", "kind": "loadable", "isInPlace": true, "isEditable": true, "instanceCount": 0, "typeCount": 1, "isUnused": true }
+          ]
+        }
+        """);
+
+        var shaped = ToolResponseShaper.Shape("audit_families", payload, compact: true, summaryOnly: false);
+
+        Assert.Equal(2, shaped["totalFamilies"]!.Value<int>());
+
+        var families = (JArray)shaped["families"]!;
+        Assert.Equal(2, families.Count);
+
+        Assert.Equal("Door1", families[0]!["name"]!.Value<string>());
+        Assert.Equal("Doors", families[0]!["category"]!.Value<string>());
+        Assert.Equal(5, families[0]!["instanceCount"]!.Value<int>());
+        Assert.Equal(3, families[0]!["typeCount"]!.Value<int>());
+
+        Assert.Null(families[0]!["isInPlace"]);
+        Assert.Null(families[0]!["isEditable"]);
+        Assert.Null(families[0]!["isUnused"]);
+        Assert.Null(families[0]!["kind"]);
+    }
+
+    [Fact]
     public void ShapeRoomOpeningsCompact_StripsHeavyOpeningDetails()
     {
         var payload = JObject.Parse("""
