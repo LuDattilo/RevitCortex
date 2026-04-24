@@ -68,6 +68,42 @@ public class AuditLoggerTests : IDisposable
     }
 
     [Fact]
+    public void LogWithPerf_EmitsSchemaVersion2()
+    {
+        _logger.LogWithPerf("get_element_parameters", "ids=[123]", true,
+            durationMs: 123, responseBytes: 4567);
+
+        var content = File.ReadAllText(_tempPath);
+        Assert.Contains("\"v\":2", content);
+        Assert.Contains("\"duration_ms\":123", content);
+        Assert.Contains("\"response_bytes\":4567", content);
+    }
+
+    [Fact]
+    public void LogWithPerf_WithCodeHashAndSnippet_PreservesBothFields()
+    {
+        _logger.LogWithPerf("send_code_to_revit", "code(42 chars)", false,
+            errorCode: CortexErrorCode.PermissionDenied,
+            codeSnippet: "var doc = document; // some revit code",
+            codeHash: "abc123def456");
+
+        var content = File.ReadAllText(_tempPath);
+        Assert.Contains("\"code_snippet\":\"var doc = document; // some revit code\"", content);
+        Assert.Contains("\"code_hash\":\"abc123def456\"", content);
+    }
+
+    [Fact]
+    public void Log_LegacyOverload_DoesNotEmitV2Fields()
+    {
+        _logger.Log("old_tool", "x", true);
+
+        var content = File.ReadAllText(_tempPath);
+        Assert.DoesNotContain("\"v\":2", content);
+        Assert.DoesNotContain("duration_ms", content);
+        Assert.DoesNotContain("response_bytes", content);
+    }
+
+    [Fact]
     public void Log_CreatesDirectoryIfMissing()
     {
         var nestedPath = Path.Combine(Path.GetTempPath(),

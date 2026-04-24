@@ -23,17 +23,12 @@ public class AuditLogger
     }
 
     /// <summary>
-    /// Log a tool execution to the audit trail.
+    /// Log a tool execution to the audit trail (legacy overload, schema v1).
     /// </summary>
-    /// <param name="toolName">Name of the tool invoked.</param>
-    /// <param name="inputSummary">Brief summary of input (no sensitive data).</param>
-    /// <param name="success">Whether the tool succeeded.</param>
-    /// <param name="errorCode">Error code if failed, null if success.</param>
-    /// <param name="elementsAffected">Number of elements read or modified.</param>
     public void Log(string toolName, string inputSummary, bool success,
         CortexErrorCode? errorCode = null, int elementsAffected = 0)
     {
-        var entry = new AuditEntry
+        WriteEntry(new AuditEntry
         {
             Timestamp = DateTime.UtcNow.ToString("o"),
             Tool = toolName,
@@ -41,8 +36,37 @@ public class AuditLogger
             Result = success ? "ok" : "fail",
             ErrorCode = errorCode?.ToString(),
             ElementsAffected = elementsAffected
-        };
+        }, toolName);
+    }
 
+    /// <summary>
+    /// Log a tool execution with performance data and optional send_code_to_revit
+    /// snippet/hash (schema v2). Used by CortexRouter so rclog can diagnose
+    /// perf bottlenecks and token-heavy tools.
+    /// </summary>
+    public void LogWithPerf(string toolName, string inputSummary, bool success,
+        CortexErrorCode? errorCode = null, int elementsAffected = 0,
+        long? durationMs = null, long? responseBytes = null,
+        string? codeSnippet = null, string? codeHash = null)
+    {
+        WriteEntry(new AuditEntryV2
+        {
+            Timestamp = DateTime.UtcNow.ToString("o"),
+            SchemaVersion = 2,
+            Tool = toolName,
+            InputSummary = Truncate(inputSummary, 200),
+            Result = success ? "ok" : "fail",
+            ErrorCode = errorCode?.ToString(),
+            ElementsAffected = elementsAffected,
+            DurationMs = durationMs,
+            ResponseBytes = responseBytes,
+            CodeSnippet = codeSnippet,
+            CodeHash = codeHash
+        }, toolName);
+    }
+
+    private void WriteEntry(object entry, string toolName)
+    {
         var json = JsonConvert.SerializeObject(entry, Formatting.None);
 
         try
@@ -59,7 +83,6 @@ public class AuditLogger
         catch
         {
             // Audit logging must never crash the application.
-            // If we can't write, we silently skip.
             System.Diagnostics.Trace.WriteLine(
                 $"[RevitCortex] Failed to write audit log entry for tool '{toolName}'");
         }
@@ -80,5 +103,25 @@ public class AuditLogger
         [JsonProperty("error_code", NullValueHandling = NullValueHandling.Ignore)]
         public string? ErrorCode { get; set; }
         [JsonProperty("elements_affected")] public int ElementsAffected { get; set; }
+    }
+
+    private class AuditEntryV2
+    {
+        [JsonProperty("ts")] public string Timestamp { get; set; } = "";
+        [JsonProperty("v")] public int SchemaVersion { get; set; }
+        [JsonProperty("tool")] public string Tool { get; set; } = "";
+        [JsonProperty("input_summary")] public string InputSummary { get; set; } = "";
+        [JsonProperty("result")] public string Result { get; set; } = "";
+        [JsonProperty("error_code", NullValueHandling = NullValueHandling.Ignore)]
+        public string? ErrorCode { get; set; }
+        [JsonProperty("elements_affected")] public int ElementsAffected { get; set; }
+        [JsonProperty("duration_ms", NullValueHandling = NullValueHandling.Ignore)]
+        public long? DurationMs { get; set; }
+        [JsonProperty("response_bytes", NullValueHandling = NullValueHandling.Ignore)]
+        public long? ResponseBytes { get; set; }
+        [JsonProperty("code_snippet", NullValueHandling = NullValueHandling.Ignore)]
+        public string? CodeSnippet { get; set; }
+        [JsonProperty("code_hash", NullValueHandling = NullValueHandling.Ignore)]
+        public string? CodeHash { get; set; }
     }
 }

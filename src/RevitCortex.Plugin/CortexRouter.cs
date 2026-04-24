@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Discovery;
 using RevitCortex.Core.Results;
@@ -96,18 +99,60 @@ public class CortexRouter
                 $"Tool '{toolName}' is blocked in read-only mode",
                 suggestion: "Disable read-only mode in Settings to allow write operations");
 
+        var stopwatch = Stopwatch.StartNew();
         CortexResult<object> result;
         if (_dispatcher != null)
             result = _dispatcher.Execute(tool, input, _session);
         else
             result = tool.Execute(input, _session);
+        stopwatch.Stop();
 
-        // Audit log: record every tool invocation
+        // Audit log (schema v2): every invocation, with duration and response size.
+        // send_code_to_revit also gets a code snapshot (truncated) + SHA-256 hash.
         var inputSummary = BuildInputSummary(toolName, input);
-        _auditLogger.Log(toolName, inputSummary, result.Success,
-            result.Error?.Code, elementsAffected: 0);
+        var responseBytes = EstimateResponseBytes(result);
+        string? codeSnippet = null;
+        string? codeHash = null;
+        if (toolName == "send_code_to_revit")
+        {
+            var code = input["code"]?.Value<string>();
+            if (!string.IsNullOrEmpty(code))
+            {
+                codeSnippet = code!.Length <= 500 ? code : code.Substring(0, 500);
+                codeHash = ComputeSha256(code!);
+            }
+        }
+
+        _auditLogger.LogWithPerf(toolName, inputSummary, result.Success,
+            result.Error?.Code, elementsAffected: 0,
+            durationMs: stopwatch.ElapsedMilliseconds,
+            responseBytes: responseBytes,
+            codeSnippet: codeSnippet,
+            codeHash: codeHash);
 
         return result;
+    }
+
+    private static long EstimateResponseBytes(CortexResult<object> result)
+    {
+        try
+        {
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(result);
+            return Encoding.UTF8.GetByteCount(json);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private static string ComputeSha256(string input)
+    {
+        using var sha = SHA256.Create();
+        var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(input));
+        var sb = new StringBuilder(bytes.Length * 2);
+        foreach (var b in bytes) sb.Append(b.ToString("x2"));
+        return sb.ToString();
     }
 
     /// <summary>
