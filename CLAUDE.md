@@ -200,6 +200,16 @@ RevitCortex defaults are calibrated for completeness, not efficiency. Override t
 
 **lines_per_view_count**: Always use `threshold >= 20` on models with >100 views. The tool has an automatic cap at 300 views.
 
+**get_current_view_elements**: Prefer `modelCategoryList` / `annotationCategoryList`. Use legacy `categoryFilter` only for backward compatibility.
+
+**get_schedule_data**: Always set `maxRows` for inspection workflows. Do not pull the default 500 rows unless exporting.
+
+**get_available_family_types**: Use `compact: true` for discovery. Avoid full rows unless a type ID is needed.
+
+**list_schedulable_fields**: Use `summaryOnly: true` when you only need field names.
+
+**get_room_openings**: Use `summaryOnly: true` for per-room counts before requesting nested door/window detail.
+
 ### Tool Selection Hierarchy
 
 When multiple tools can achieve the same goal, use the most targeted one.
@@ -227,6 +237,16 @@ When multiple tools can achieve the same goal, use the most targeted one.
 **Clash detection**:
 - `clash_detection` -> quick check with count and ID list
 - `workflow_clash_review` -> when a 3D view with automatic section box is needed for visual review
+
+**High-cost discovery tools**:
+- `get_available_family_types` -> default to `compact: true` for browsing
+- `list_schedulable_fields` -> default to `summaryOnly: true` for schema discovery
+- `get_room_openings` -> default to `summaryOnly: true` for room counts, then re-run with detail only for the chosen room(s)
+
+**Wrapper alignment**:
+- `get_current_view_elements` now honors `modelCategoryList` / `annotationCategoryList`
+- `get_schedule_data` now supports `maxRows`
+- `workflow_model_audit` now honors `includeWarnings`, `includeFamilies`, and `maxWarnings`
 
 On architectural models, columns are `OST_Columns`, not `OST_StructuralColumns`. Always specify the correct category for the model type.
 
