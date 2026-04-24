@@ -204,7 +204,7 @@ RevitCortex defaults are calibrated for completeness, not efficiency. Override t
 
 **get_schedule_data**: Always set `maxRows` for inspection workflows. Do not pull the default 500 rows unless exporting.
 
-**get_available_family_types**: Use `compact: true` for discovery. Avoid full rows unless a type ID is needed.
+**get_available_family_types**: Use `compact: true` for discovery. Avoid full rows unless a type ID is needed. Filter via `categoryList: ["OST_Doors"]` (array, not string) and `familyNameFilter` for substring search.
 
 **list_schedulable_fields**: Use `summaryOnly: true` when you only need field names.
 

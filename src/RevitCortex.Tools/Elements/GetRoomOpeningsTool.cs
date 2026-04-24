@@ -110,11 +110,13 @@ public class GetRoomOpeningsTool : ICortexTool
             foreach (var room in targetRooms)
             {
                 var rid = GetElementIdValue(room.Id);
-                var doors   = roomDoors[rid].Take(maxElementsPerRoom).ToList();
-                var windows = roomWindows[rid].Take(maxElementsPerRoom).ToList();
+                var allDoors   = roomDoors[rid];
+                var allWindows = roomWindows[rid];
+                var doors   = allDoors.Take(maxElementsPerRoom).ToList();
+                var windows = allWindows.Take(maxElementsPerRoom).ToList();
 
-                totalDoors   += doors.Count;
-                totalWindows += windows.Count;
+                totalDoors   += allDoors.Count;
+                totalWindows += allWindows.Count;
 
                 results.Add(new
                 {
@@ -124,9 +126,9 @@ public class GetRoomOpeningsTool : ICortexTool
                     level      = room.Level?.Name ?? "",
                     area       = Math.Round(room.Area * 0.09290304, 2), // sq ft → sq m
                     roomParameters  = includeRoomParams ? ExtractParams(room, parameterNames) : null,
-                    doorCount  = doors.Count,
+                    doorCount  = allDoors.Count,
                     doors      = includeDoors ? doors.Select(d => BuildOpeningInfo(d, phase, typeCache, includeElementParams, parameterNames)).ToList() : null,
-                    windowCount = windows.Count,
+                    windowCount = allWindows.Count,
                     windows    = includeWindows ? windows.Select(w => BuildOpeningInfo(w, phase, typeCache, includeElementParams, parameterNames)).ToList() : null
                 });
             }

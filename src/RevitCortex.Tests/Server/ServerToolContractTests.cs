@@ -124,5 +124,32 @@ namespace RevitCortex.Tests.Server
             Assert.Contains("compact", roomOpenings.GetParameters().Select(p => p.Name));
             Assert.Contains("summaryOnly", roomOpenings.GetParameters().Select(p => p.Name));
         }
+
+        [Fact]
+        public void GetAvailableFamilyTypes_ExposesToolNativeParameters()
+        {
+            var method = GetMethod(typeof(ProjectTools), nameof(ProjectTools.GetAvailableFamilyTypes));
+            var parameters = method.GetParameters();
+
+            Assert.Collection(
+                parameters.Select(p => p.Name),
+                name => Assert.Equal("revit", name),
+                name => Assert.Equal("categoryList", name),
+                name => Assert.Equal("familyNameFilter", name),
+                name => Assert.Equal("limit", name),
+                name => Assert.Equal("compact", name),
+                name => Assert.Equal("ct", name));
+
+            Assert.Equal(typeof(string[]), GetParameter(method, "categoryList").ParameterType);
+            Assert.Equal(typeof(string), GetParameter(method, "familyNameFilter").ParameterType);
+            Assert.Equal(typeof(int?), GetParameter(method, "limit").ParameterType);
+
+            Assert.True(GetParameter(method, "categoryList").HasDefaultValue);
+            Assert.Null(GetParameter(method, "categoryList").DefaultValue);
+            Assert.True(GetParameter(method, "familyNameFilter").HasDefaultValue);
+            Assert.Null(GetParameter(method, "familyNameFilter").DefaultValue);
+            Assert.True(GetParameter(method, "limit").HasDefaultValue);
+            Assert.Null(GetParameter(method, "limit").DefaultValue);
+        }
     }
 }

@@ -56,12 +56,16 @@ public static class ProjectTools
     [McpServerTool(Name = "get_available_family_types"), Description("List available family types in the Revit project.")]
     public static async Task<string> GetAvailableFamilyTypes(
         RevitConnectionManager revit,
-        [Description("Filter by category")] string? category = null,
+        [Description("Filter by category names (OST codes, English, or localized labels)")] string[]? categoryList = null,
+        [Description("Case-insensitive substring filter on family or type name")] string? familyNameFilter = null,
+        [Description("Max types to return. Default: 100")] int? limit = null,
         [Description("Return a compact payload without uniqueId-heavy rows. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
-        if (category != null) p["category"] = category;
+        if (categoryList != null) p["categoryList"] = new JArray(categoryList);
+        if (familyNameFilter != null) p["familyNameFilter"] = familyNameFilter;
+        if (limit != null) p["limit"] = limit;
         var result = await revit.ExecuteAsync("get_available_family_types", p, ct);
         return ToolResponseShaper.Shape("get_available_family_types", result, compact, summaryOnly: false).ToString();
     }
