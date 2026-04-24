@@ -53,6 +53,15 @@ public class SocketService
             }
             catch (SocketException) when (!_isRunning)
             {
+                // Normal shutdown via Stop() — exit cleanly.
+                break;
+            }
+            catch (Exception ex)
+            {
+                // Unexpected listener crash — reset flag so IsRunning reflects reality.
+                _isRunning = false;
+                System.Diagnostics.Trace.WriteLine(
+                    $"[RevitCortex] Listener crashed unexpectedly: {ex.Message}");
                 break;
             }
         }
@@ -117,7 +126,8 @@ public class SocketService
                 return JsonConvert.SerializeObject(
                     JsonRpcResponse.Fail(request.Id,
                         (int)result.Error!.Code,
-                        JsonConvert.SerializeObject(result.Error)));
+                        result.Error.Message,
+                        JToken.FromObject(result.Error)));
             }
         }
         catch (Exception ex)

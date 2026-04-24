@@ -48,6 +48,12 @@ public class OverrideGraphicsTool : ICortexTool
             if (view == null)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "Could not resolve view");
 
+            if (view is ViewSheet)
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"View '{view.Name}' is a Drawing Sheet — graphic overrides are not supported on sheets. " +
+                    "Activate a floor plan, section, elevation, or 3D view first, then retry.",
+                    suggestion: "Use the activate_view tool to switch to a graphical view before applying overrides.");
+
             if (!session.RequestConfirmation("modify graphics for", elementIds.Count))
                 return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 

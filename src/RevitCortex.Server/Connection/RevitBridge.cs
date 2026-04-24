@@ -89,8 +89,15 @@ public sealed class RevitBridge : IDisposable
 
             if (response["error"] != null)
             {
-                var errMsg = response["error"]!["message"]?.ToString() ?? "Unknown Revit error";
-                throw new InvalidOperationException(errMsg);
+                var err = response["error"]!;
+                var message = err["message"]?.ToString() ?? "Unknown Revit error";
+                var ex = new InvalidOperationException(message);
+                // Attach the structured CortexError (code, suggestion, context) so callers
+                // that need typed error info can inspect ex.Data["RevitError"].
+                var data = err["data"];
+                if (data != null)
+                    ex.Data["RevitError"] = data.ToString(Formatting.None);
+                throw ex;
             }
 
             return response["result"] ?? JValue.CreateNull();
@@ -127,11 +134,18 @@ public sealed class RevitConnectionManager
     }
 
     public async Task<JToken> ExecuteAsync(string method, JObject parameters, CancellationToken ct = default)
+        => await ExecuteAsync(method, parameters, commandTimeoutSeconds: 300, ct);
+
+    /// <summary>
+    /// Overload with explicit command timeout — use for long-running operations
+    /// such as IFC export on large models.
+    /// </summary>
+    public async Task<JToken> ExecuteAsync(string method, JObject parameters, int commandTimeoutSeconds, CancellationToken ct = default)
     {
         await _mutex.WaitAsync(ct);
         try
         {
-            using var bridge = new RevitBridge(port: _port);
+            using var bridge = new RevitBridge(port: _port, commandTimeoutSeconds: commandTimeoutSeconds);
             return await bridge.SendCommandAsync(method, parameters, ct);
         }
         finally

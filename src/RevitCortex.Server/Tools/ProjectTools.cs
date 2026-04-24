@@ -248,11 +248,11 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "batch_rename"), Description("Batch rename elements in the Revit project.")]
+    [McpServerTool(Name = "batch_rename"), Description("Batch rename elements or system types in the Revit project. Supports both loadable-family elements and system types (wall/floor/ceiling/roof types).")]
     public static async Task<string> BatchRename(
         RevitConnectionManager revit,
-        [Description("Array of element IDs to rename")] int[]? elementIds = null,
-        [Description("Target category for batch rename")] string? targetCategory = null,
+        [Description("Array of element IDs to rename. Use this when you already have specific IDs.")] int[]? elementIds = null,
+        [Description("Target category to rename. Valid values: views | sheets | levels | grids | rooms | walltypes | floortypes | ceilingtypes | rooftypes. Use 'floortypes' to rename system floor types.")] string? targetCategory = null,
         [Description("Text to find")] string? findText = null,
         [Description("Replacement text")] string? replaceText = null,
         [Description("Prefix to add")] string? prefix = null,
@@ -373,15 +373,19 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "send_code_to_revit"), Description("Execute custom C# code in the Revit context")]
+    [McpServerTool(Name = "send_code_to_revit"), Description("LAST RESORT ONLY — execute custom C# code in Revit. Always prefer dedicated tools (batch_rename, set_element_parameters, export_to_excel, etc.) over this tool. Use only when no dedicated tool covers the operation. Scripts are saved to ~/.revitcortex/scripts/ and require user confirmation before execution.")]
     public static async Task<string> SendCodeToRevit(
         RevitConnectionManager revit,
-        [Description("C# code to execute")] string code,
-        [Description("Transaction mode: auto, manual, or readonly. Default: auto")] string? transactionMode = "auto",
+        [Description("C# code to execute. Globals available: document (Document), uiDocument (UIDocument), app (Application).")] string code,
+        [Description("Transaction mode: auto | manual | readonly. Default: auto")] string? transactionMode = "auto",
+        [Description("YOU decide — never ask the user. true = REUSABLE (kept permanently) if the script is generic and could run again on other models or sessions (e.g. a utility, a report, a recurring audit). false = TEMP (deleted at Revit close) if the script is specific to this one request, these specific element IDs, or this exact model. Default: false.")] bool? reusable = false,
+        [Description("Short human-readable name for the script file (no spaces, max 40 chars). Example: 'floor-thickness-audit'")] string? scriptName = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["code"] = code };
         if (transactionMode != null) p["transactionMode"] = transactionMode;
+        if (reusable != null) p["reusable"] = reusable;
+        if (scriptName != null) p["scriptName"] = scriptName;
         var result = await revit.ExecuteAsync("send_code_to_revit", p, ct);
         return result.ToString();
     }

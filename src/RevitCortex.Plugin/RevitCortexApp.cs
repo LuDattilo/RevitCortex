@@ -20,9 +20,41 @@ public class RevitCortexApp : IExternalApplication
     private UIApplication? _uiApplication;
     private int _port = 8080;
     private Autodesk.Revit.UI.PushButton? _connectButton;
+    private bool _updateNotificationShown;
 
     public static RevitCortexApp? Instance { get; private set; }
-    public bool IsServiceRunning => _socketService?.IsRunning ?? false;
+
+    /// <summary>
+    /// Fired on the calling thread whenever the server starts, stops, or crashes.
+    /// Subscribers must marshal to the UI thread themselves if needed.
+    /// </summary>
+    public event Action? ServiceStateChanged;
+
+    /// <summary>
+    /// Returns true only if the socket service flag is set AND a live TCP
+    /// connection to localhost:port succeeds. This catches cases where the
+    /// listener thread died unexpectedly while the flag remained true.
+    /// </summary>
+    public bool IsServiceRunning
+    {
+        get
+        {
+            if (_socketService?.IsRunning != true) return false;
+            try
+            {
+                using var probe = new System.Net.Sockets.TcpClient();
+                probe.Connect("127.0.0.1", _port);
+                return true;
+            }
+            catch
+            {
+                // Listener is gone — sync internal flag so next call is fast
+                _socketService.Stop();
+                return false;
+            }
+        }
+    }
+
     public int Port => _port;
     public UIApplication? UiApplication => _uiApplication;
     public CortexRouter? Router => _router;
@@ -62,8 +94,9 @@ public class RevitCortexApp : IExternalApplication
             LoadPort();
 
             // Fire-and-forget update check against the public metadata repo.
-            // Populates UpdateChecker.Latest for the Settings page banner.
-            // Silent on any failure — must never block Revit startup.
+            // When an update is found, the UpdateAvailable event wakes up the
+            // notification window (or OnIdling shows it if Revit is already idle).
+            RevitCortex.Plugin.Updates.UpdateChecker.UpdateAvailable += OnUpdateAvailable;
             RevitCortex.Plugin.Updates.UpdateChecker.CheckInBackground();
 
             // Create socket service but do NOT start automatically
@@ -98,6 +131,9 @@ public class RevitCortexApp : IExternalApplication
             application.Idling -= OnIdling;
             if (_uiApplication != null)
                 _uiApplication.ViewActivated -= OnViewActivated;
+
+            // Delete all TEMP scripts generated during this session
+            CleanupTempScripts();
         }
         catch (Exception ex)
         {
@@ -124,6 +160,7 @@ public class RevitCortexApp : IExternalApplication
 
             _socketService.Start();
             UpdateConnectionButtonIcon();
+            ServiceStateChanged?.Invoke();
         }
     }
 
@@ -131,6 +168,7 @@ public class RevitCortexApp : IExternalApplication
     {
         _socketService?.Stop();
         UpdateConnectionButtonIcon();
+        ServiceStateChanged?.Invoke();
     }
 
     private void UpdateConnectionButtonIcon()
@@ -207,6 +245,8 @@ public class RevitCortexApp : IExternalApplication
             if (_socketService != null && _socketService.IsRunning)
             {
                 _socketService.Stop();
+                UpdateConnectionButtonIcon();
+                ServiceStateChanged?.Invoke();
                 System.Diagnostics.Trace.WriteLine(
                     "[RevitCortex] Server stopped: document closing");
             }
@@ -247,6 +287,40 @@ public class RevitCortexApp : IExternalApplication
                 System.Diagnostics.Trace.WriteLine(
                     $"[RevitCortex] Session initialized from Idling: {doc.Title}, locale: {locale}");
             }
+
+            // If the update check already completed before Idling fired, show now.
+            if (RevitCortex.Plugin.Updates.UpdateChecker.Latest?.HasUpdate == true)
+                ShowUpdateNotification();
+        }
+    }
+
+    /// <summary>
+    /// Called on a background thread when the update check finds a newer version.
+    /// Marshals to the UI thread to show the notification window.
+    /// </summary>
+    private void OnUpdateAvailable()
+    {
+        // If Revit isn't idle yet, OnIdling will handle it.
+        if (_uiApplication == null) return;
+
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(
+            (System.Action)ShowUpdateNotification);
+    }
+
+    private void ShowUpdateNotification()
+    {
+        if (_updateNotificationShown) return;
+        _updateNotificationShown = true;
+
+        try
+        {
+            var win = new UI.UpdateNotificationWindow();
+            win.Show();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[RevitCortex] Could not show update notification: {ex.Message}");
         }
     }
 
@@ -343,6 +417,25 @@ public class RevitCortexApp : IExternalApplication
         {
             System.Diagnostics.Trace.WriteLine(
                 $"[RevitCortex] Could not load disabled tools: {ex.Message}");
+        }
+    }
+
+    private static void CleanupTempScripts()
+    {
+        var scriptsFolder = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".revitcortex", "scripts");
+        if (!System.IO.Directory.Exists(scriptsFolder)) return;
+        foreach (var file in System.IO.Directory.GetFiles(scriptsFolder, "*.cs"))
+        {
+            try
+            {
+                using var reader = new System.IO.StreamReader(file);
+                var firstLine = reader.ReadLine() ?? "";
+                if (firstLine.TrimStart().StartsWith("// TEMP", StringComparison.OrdinalIgnoreCase))
+                    System.IO.File.Delete(file);
+            }
+            catch { }
         }
     }
 

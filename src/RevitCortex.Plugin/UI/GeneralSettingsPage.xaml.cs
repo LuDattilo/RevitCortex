@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RevitCortex.Plugin.Commands;
 using RevitCortex.Plugin.Updates;
 using System;
@@ -20,6 +21,7 @@ public partial class GeneralSettingsPage : Page
     private const string DefaultLogLevel = "Info";
     private const int DefaultKeepCount = 10;
     private int _originalPort;
+    private DispatcherTimer? _downloadTimer;
 
     private static string SettingsFilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -37,6 +39,24 @@ public partial class GeneralSettingsPage : Page
         // when the user opens Settings it may or may not have completed yet.
         // Re-check every second for ~10 s to catch the late reply, then stop.
         StartUpdateBannerPolling();
+
+        // Subscribe to real-time server state changes so the status banner
+        // updates immediately when the user clicks Cortex Switch.
+        if (RevitCortexApp.Instance != null)
+            RevitCortexApp.Instance.ServiceStateChanged += OnServiceStateChanged;
+
+        Unloaded += (_, _) =>
+        {
+            if (RevitCortexApp.Instance != null)
+                RevitCortexApp.Instance.ServiceStateChanged -= OnServiceStateChanged;
+        };
+    }
+
+    private void OnServiceStateChanged()
+    {
+        // The event may fire from the Revit main thread or a background thread.
+        // Dispatcher.Invoke ensures we update WPF controls on the UI thread.
+        Dispatcher.Invoke(RefreshConnectionStatus);
     }
 
     private void ApplyLocalizedStrings()
@@ -45,22 +65,104 @@ public partial class GeneralSettingsPage : Page
         SupportReportsSubtitle.Text = Localization.T("support.settings.subtitle");
         OpenReportsFolderButton.Content = Localization.T("support.settings.open_folder");
         DeleteAllReportsButton.Content = Localization.T("support.settings.delete_now");
-        UpdateDownloadButton.Content = Localization.T("update.download_button");
     }
 
     private void RefreshUpdateBanner()
     {
         var info = UpdateChecker.Latest;
-        if (info?.HasUpdate == true)
-        {
-            UpdateTitle.Text = Localization.T("update.available_title", info.RemoteVersion);
-            UpdateDetail.Text = Localization.T("update.available_detail", UpdateChecker.CurrentVersion);
-            UpdateBanner.Visibility = Visibility.Visible;
-        }
-        else
+        if (info?.HasUpdate != true)
         {
             UpdateBanner.Visibility = Visibility.Collapsed;
+            StopDownloadTimer();
+            return;
         }
+
+        UpdateBanner.Visibility = Visibility.Visible;
+
+        switch (UpdateChecker.State)
+        {
+            case UpdateChecker.DownloadState.Idle:
+                UpdateTitle.Text = $"RevitCortex {info.RemoteVersion} disponibile";
+                UpdateDetail.Text = $"Sei sulla {UpdateChecker.CurrentVersion} — {info.Changelog}";
+                UpdateProgressGrid.Visibility = Visibility.Collapsed;
+                SetActionButton("Download & Install", "#FFB300", "#FF8F00", isEnabled: true);
+                UpdateManualButton.Visibility = Visibility.Collapsed;
+                StopDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Downloading:
+                var (recv, total) = UpdateChecker.DownloadProgress;
+                string progress = total > 0
+                    ? $"{recv / 1_048_576.0:F0} / {total / 1_048_576.0:F0} MB"
+                    : $"{recv / 1_048_576.0:F0} MB scaricati…";
+                double pct = total > 0 ? recv * 100.0 / total : 0;
+                UpdateTitle.Text = $"Download in corso… {progress}";
+                UpdateDetail.Text = string.Empty;
+                UpdateProgress.Value = pct;
+                UpdateProgressText.Text = progress;
+                UpdateProgressGrid.Visibility = Visibility.Visible;
+                SetActionButton("Annulla", "#9E9E9E", "#757575", isEnabled: true);
+                UpdateManualButton.Visibility = Visibility.Collapsed;
+                StartDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Ready:
+                UpdateTitle.Text = "Pronto per l'installazione";
+                UpdateDetail.Text = "⚠ Revit verrà chiuso automaticamente — salva il lavoro prima di continuare.";
+                UpdateProgressGrid.Visibility = Visibility.Collapsed;
+                SetActionButton("Installa e chiudi Revit", "#388E3C", "#2E7D32", isEnabled: true);
+                UpdateManualButton.Visibility = Visibility.Collapsed;
+                StopDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Installing:
+                UpdateTitle.Text = "Installazione avviata — chiusura in corso…";
+                UpdateDetail.Text = "Riavvia Revit al termine dell'installazione.";
+                UpdateProgressGrid.Visibility = Visibility.Collapsed;
+                SetActionButton("Installa e chiudi Revit", "#00796B", "#004D40", isEnabled: false);
+                UpdateManualButton.Visibility = Visibility.Collapsed;
+                StopDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Done:
+                UpdateBanner.Visibility = Visibility.Collapsed;
+                StopDownloadTimer();
+                break;
+
+            case UpdateChecker.DownloadState.Error:
+                UpdateTitle.Text = "Download fallito";
+                UpdateDetail.Text = UpdateChecker.DownloadError ?? "Errore sconosciuto";
+                UpdateProgressGrid.Visibility = Visibility.Collapsed;
+                SetActionButton("Riprova", "#E53935", "#B71C1C", isEnabled: true);
+                UpdateManualButton.Visibility = Visibility.Visible;
+                StopDownloadTimer();
+                break;
+        }
+    }
+
+    private void SetActionButton(string label, string bg, string border, bool isEnabled)
+    {
+        UpdateActionButton.Content = label;
+        UpdateActionButton.Background = new SolidColorBrush(
+            (Color)ColorConverter.ConvertFromString(bg));
+        UpdateActionButton.BorderBrush = new SolidColorBrush(
+            (Color)ColorConverter.ConvertFromString(border));
+        UpdateActionButton.IsEnabled = isEnabled;
+    }
+
+    private void StartDownloadTimer()
+    {
+        if (_downloadTimer?.IsEnabled == true) return;
+        StopDownloadTimer(); // stop and null the old one before creating a new one
+        _downloadTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _downloadTimer.Tick += (_, _) => RefreshUpdateBanner();
+        _downloadTimer.Start();
+    }
+
+    private void StopDownloadTimer()
+    {
+        _downloadTimer?.Stop();
+        _downloadTimer = null;
     }
 
     private void StartUpdateBannerPolling()
@@ -81,11 +183,54 @@ public partial class GeneralSettingsPage : Page
         timer.Start();
     }
 
-    private void UpdateDownload_Click(object sender, RoutedEventArgs e)
+    private void UpdateAction_Click(object sender, RoutedEventArgs e)
+    {
+        switch (UpdateChecker.State)
+        {
+            case UpdateChecker.DownloadState.Idle:
+            case UpdateChecker.DownloadState.Error:
+                UpdateChecker.ResetDownload();
+                UpdateChecker.StartDownloadAsync();
+                RefreshUpdateBanner();
+                break;
+
+            case UpdateChecker.DownloadState.Downloading:
+                UpdateChecker.CancelDownload();
+                RefreshUpdateBanner();
+                break;
+
+            case UpdateChecker.DownloadState.Ready:
+                UpdateChecker.LaunchInstaller();
+                RefreshUpdateBanner();
+                // Close Revit after a short delay so the installer process has
+                // time to start and enter its Assert-RevitClosed loop before
+                // Revit exits. Without this the DLLs are locked and the install fails.
+                var closeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+                closeTimer.Tick += (_, _) =>
+                {
+                    closeTimer.Stop();
+                    try { System.Windows.Application.Current?.Shutdown(); } catch { }
+                };
+                closeTimer.Start();
+                break;
+
+            case UpdateChecker.DownloadState.Installing:
+                // Button is disabled in this state — unreachable in practice.
+                break;
+
+            case UpdateChecker.DownloadState.Done:
+                // Banner is hidden in this state; click is unreachable.
+                break;
+
+            default:
+                break; // Guard against future enum additions.
+        }
+    }
+
+    private void UpdateManual_Click(object sender, RoutedEventArgs e)
     {
         var info = UpdateChecker.Latest;
         if (info == null || string.IsNullOrWhiteSpace(info.DownloadUrl)) return;
-
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -220,23 +365,25 @@ public partial class GeneralSettingsPage : Page
 
         try
         {
-            var settings = new CortexSettings
-            {
-                Port = port,
-                LogLevel = logLevel,
-                ReadOnlyMode = ReadOnlyCheckBox.IsChecked == true,
-                SupportReportKeepCount = keep
-            };
+            // Merge-write: preserve keys managed by other pages (e.g. EnableCodeExecution,
+            // DisabledTools) by loading the existing JSON first and updating only our fields.
+            JObject settings = File.Exists(SettingsFilePath)
+                ? JObject.Parse(File.ReadAllText(SettingsFilePath))
+                : new JObject();
+
+            settings["Port"] = port;
+            settings["LogLevel"] = logLevel;
+            settings["ReadOnlyMode"] = ReadOnlyCheckBox.IsChecked == true;
+            settings["SupportReportKeepCount"] = keep;
 
             string dir = Path.GetDirectoryName(SettingsFilePath)!;
             if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
-            File.WriteAllText(SettingsFilePath,
-                JsonConvert.SerializeObject(settings, Formatting.Indented));
+            File.WriteAllText(SettingsFilePath, settings.ToString(Formatting.Indented));
 
             // Apply read-only mode immediately (no restart needed)
             if (RevitCortexApp.Instance?.Router != null)
-                RevitCortexApp.Instance.Router.ReadOnlyMode = settings.ReadOnlyMode;
+                RevitCortexApp.Instance.Router.ReadOnlyMode = ReadOnlyCheckBox.IsChecked == true;
 
             if (port != _originalPort)
             {

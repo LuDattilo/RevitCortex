@@ -35,8 +35,8 @@ public class JsonRpcResponse
     public static JsonRpcResponse Success(string? id, object result)
         => new() { Id = id, Result = result };
 
-    public static JsonRpcResponse Fail(string? id, int code, string message)
-        => new() { Id = id, Error = new JsonRpcError { Code = code, Message = message } };
+    public static JsonRpcResponse Fail(string? id, int code, string message, JToken? data = null)
+        => new() { Id = id, Error = new JsonRpcError { Code = code, Message = message, Data = data } };
 }
 
 public class JsonRpcError
@@ -46,4 +46,12 @@ public class JsonRpcError
 
     [JsonProperty("message")]
     public string Message { get; set; } = "";
+
+    /// <summary>
+    /// Optional structured error data (JSON-RPC 2.0 §5.1).
+    /// Carries the full CortexError object so the server bridge can
+    /// reconstruct typed error information without string-parsing the message.
+    /// </summary>
+    [JsonProperty("data", NullValueHandling = NullValueHandling.Ignore)]
+    public JToken? Data { get; set; }
 }

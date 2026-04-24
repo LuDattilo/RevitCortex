@@ -1,4 +1,4 @@
-# RevitCortex v1.0.3 — Guida Installazione
+# RevitCortex v1.0.10 — Guida Installazione
 
 Assistente AI per Autodesk Revit (2023–2027). Server MCP in C# + plugin Revit.
 
@@ -10,7 +10,7 @@ Assistente AI per Autodesk Revit (2023–2027). Server MCP in C# + plugin Revit.
 
 ## Installazione — 3 passi
 
-1. **Estrai** `RevitCortex-v1.0.3.zip` in una cartella temporanea (es. `Desktop\RevitCortex-setup`).
+1. **Estrai** `RevitCortex-v1.0.10.zip` in una cartella temporanea (es. `Desktop\RevitCortex-setup`).
 2. **Tasto destro su `install.ps1` → Esegui con PowerShell**
    (se non appare l'opzione, apri PowerShell come Amministratore e lancia `powershell -ExecutionPolicy Bypass -File install.ps1`)
 3. L'installer chiede:
@@ -96,9 +96,33 @@ Dalle **Impostazioni → Support Reports** puoi:
 
 Vedi `COME_INVIARE_BUG_REPORT.md` per dettagli.
 
+## Novità v1.0.10
+
+- **Fix critico: plugin non si caricava dopo installazione da ZIP** — i file DLL scaricati da GitHub venivano bloccati da Windows (HRESULT 0x80131515). L'installer ora chiama `Unblock-File` automaticamente su tutti i file copiati.
+- **Fix: banner stato server in tempo reale** — la pagina Impostazioni ora riflette immediatamente il cambio di stato del Cortex Switch senza dover riaprire il pannello.
+
+## Novità v1.0.9
+
+- **Governance script `send_code_to_revit`**: ogni script viene salvato in `%USERPROFILE%\.revitcortex\scripts\` con intestazione `// TEMP` o `// REUSABLE`. Gli script TEMP vengono cancellati automaticamente alla chiusura di Revit.
+- Gate di consenso esplicito prima di ogni esecuzione script.
+- Claude decide autonomamente se uno script è TEMP o REUSABLE in base alla riusabilità.
+
+## Novità v1.0.8
+
+- Fix: `batch_rename` ora supporta esplicitamente i **system floor types** (e altri tipi sistema: wall, ceiling, roof).
+- Fix: `override_graphics` restituisce errore chiaro se applicato a un Drawing Sheet.
+- Fix: `ifc_export` usa timeout esteso (900 s) per modelli grandi.
+- Fix: `set_element_parameters` gestisce correttamente i parametri a livello tipo.
+
+## Novità v1.0.7
+
+- **Download & Install automatico**: il banner aggiornamenti ora scarica il ZIP direttamente dentro Revit e lancia l'installer con UAC, senza aprire il browser. Progresso in tempo reale, pulsante Annulla durante il download, retry in caso di errore.
+- Fix: `settings.json` aggiornato con merge (non sovrascrittura) — le impostazioni avanzate vengono ora preservate al salvataggio.
+- Fix: propagazione errori JSON-RPC strutturata via campo `data` (§5.1 spec) per diagnostica più precisa.
+
 ## Novità v1.0.3
 
-- **Banner aggiornamenti in-app**: al lancio di Revit il plugin controlla se è disponibile una versione più recente. Se sì, compare un banner giallo nella pagina Impostazioni con un pulsante "Scarica" che apre il link di download.
+- **Banner aggiornamenti in-app**: al lancio di Revit il plugin controlla se è disponibile una versione più recente. Se sì, compare un banner giallo nella pagina Impostazioni.
 - Controllo non invadente: una sola chiamata in background al boot, timeout 5 s, nessun popup, nessun blocco se offline.
 
 ## Novità v1.0.2
