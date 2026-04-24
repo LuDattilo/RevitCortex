@@ -97,7 +97,7 @@ public class ManageProjectParametersTool : ICortexTool
         var parameterName = input["parameterName"]?.Value<string>();
         if (string.IsNullOrEmpty(parameterName))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "parameterName is required for create action");
+                "parameterName is required for create action. Example: {\"action\":\"create\",\"parameterName\":\"MyParam\",\"categories\":[\"OST_Doors\"],\"dataType\":\"Text\",\"isInstance\":true}. Do not retry with empty params — ask the user what parameter name and categories to use.");
 
         var categories = input["categories"]?.ToObject<List<string>>() ?? new List<string>();
         var isInstance = input["isInstance"]?.Value<bool>() ?? true;
@@ -105,7 +105,7 @@ public class ManageProjectParametersTool : ICortexTool
 
         if (categories.Count == 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "categories array is required for create action");
+                "categories array is required for create action. Provide OST_* codes (preferred, language-independent) or English display names, e.g. [\"OST_Doors\",\"OST_Windows\"]. Do not retry with the same empty input — ask the user which categories the new parameter should bind to.");
 
         var app = doc.Application;
 
@@ -181,7 +181,7 @@ public class ManageProjectParametersTool : ICortexTool
         var parameterName = input["parameterName"]?.Value<string>();
         if (string.IsNullOrEmpty(parameterName))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "parameterName is required for delete action");
+                "parameterName is required for delete action. Example: {\"action\":\"delete\",\"parameterName\":\"MyParam\"}. Do not retry with empty params — first call {\"action\":\"list\"} to discover existing parameter names, then ask the user which one to delete.");
 
         var bindingMap = doc.ParameterBindings;
         var iterator = bindingMap.ForwardIterator();
@@ -221,7 +221,7 @@ public class ManageProjectParametersTool : ICortexTool
         var parameterName = input["parameterName"]?.Value<string>();
         if (string.IsNullOrEmpty(parameterName))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "parameterName is required for modify action");
+                "parameterName is required for modify action. Example: {\"action\":\"modify\",\"parameterName\":\"MyParam\",\"categories\":[\"OST_Windows\"],\"categoriesMode\":\"add\"}. Do not retry with empty params — first call {\"action\":\"list\"} to discover existing names.");
 
         var requestedCategories = input["categories"]?.ToObject<List<string>>() ?? new List<string>();
         var categoriesMode = (input["categoriesMode"]?.Value<string>() ?? "add").ToLowerInvariant();
@@ -233,7 +233,7 @@ public class ManageProjectParametersTool : ICortexTool
 
         if (requestedCategories.Count == 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "categories array is required for modify action");
+                "categories array is required for modify action. Provide OST_* codes (preferred, language-independent) or English display names, e.g. [\"OST_Doors\"]. Do not retry with empty categories — ask the user which category bindings to modify.");
 
         // Collect all (Definition, ElementBinding) pairs up-front: the BindingMap iterator
         // must not be alive when we mutate the map (Insert/Remove/ReInsert), otherwise Revit

@@ -43,8 +43,8 @@ public class SendCodeToRevitTool : ICortexTool
                 errorCode: CortexErrorCode.PermissionDenied);
             return CortexResult<object>.Fail(
                 CortexErrorCode.PermissionDenied,
-                "send_code_to_revit is disabled. Set \"EnableCodeExecution\": true in ~/.revitcortex/settings.json or via Settings > Tools.",
-                suggestion: "Edit ~/.revitcortex/settings.json and set EnableCodeExecution to true.");
+                "send_code_to_revit is disabled in this installation. STOP: do NOT retry this tool. Ask the user to enable code execution via Settings > Tools (or \"EnableCodeExecution\": true in ~/.revitcortex/settings.json), or solve the task with dedicated tools instead.",
+                suggestion: "Do not retry send_code_to_revit. Either ask the user to enable it in Settings, or use native tools (ai_element_filter, export_elements_data, bulk_modify_parameter_values, etc.) for the same task.");
         }
 
         var doc = session.Store.Get<object>("activeDocument") as Document;
