@@ -14,11 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RevitCortex.Core\RevitCortex.Core.csproj" />
     <ProjectReference Include="..\RevitCortex.Plugin\RevitCortex.Plugin.csproj" />
+    <ProjectReference Include="..\RevitCortex.Server\RevitCortex.Server.csproj" />
     <ProjectReference Include="..\RevitCortex.Tools\RevitCortex.Tools.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\RevitCortex.Server\Connection\RevitBridge.cs" Link="ServerSources\RevitBridge.cs" />
-    <Compile Include="..\RevitCortex.Server\Tools\ViewTools.cs" Link="ServerSources\ViewTools.cs" />
-    <Compile Include="..\RevitCortex.Server\Tools\ProjectTools.cs" Link="ServerSources\ProjectTools.cs" />
   </ItemGroup>
 </Project>
