@@ -318,6 +318,8 @@ public static class ElementTools
         [Description("Include opening element parameters in response. Default: false")] bool? includeElementParams = null,
         [Description("Specific parameter names to extract")] string[]? parameterNames = null,
         [Description("Max elements per room. Default: 100")] int? maxElementsPerRoom = null,
+        [Description("Return a compact payload. Default: false")] bool compact = false,
+        [Description("Return counts without nested opening arrays. Default: false")] bool summaryOnly = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
@@ -330,7 +332,7 @@ public static class ElementTools
         if (parameterNames != null) p["parameterNames"] = new JArray(parameterNames);
         if (maxElementsPerRoom != null) p["maxElementsPerRoom"] = maxElementsPerRoom;
         var result = await revit.ExecuteAsync("get_room_openings", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("get_room_openings", result, compact, summaryOnly).ToString();
     }
 
     [McpServerTool(Name = "modify_element"), Description("Move, rotate, mirror, or copy elements. Action-specific params: move needs 'translation' [x,y,z]; rotate needs 'rotationCenter' [x,y,z] and 'rotationAngle' (radians); mirror needs 'mirrorPlaneOrigin' and 'mirrorPlaneNormal'; copy needs 'copyOffset' [x,y,z].")]

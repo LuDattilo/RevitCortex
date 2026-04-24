@@ -44,7 +44,27 @@ public static class ToolResponseShaper
     {
         if (!summaryOnly)
         {
-            return payload;
+            if (!payload.HasValues)
+            {
+                return payload;
+            }
+
+            var compactFields = payload["fields"]?
+                .Children<JObject>()
+                .Select(field => new JObject
+                {
+                    ["name"] = field["name"],
+                    ["fieldType"] = field["fieldType"]
+                })
+                .ToArray();
+
+            return new JObject
+            {
+                ["category"] = payload["category"],
+                ["scheduleType"] = payload["scheduleType"],
+                ["fieldCount"] = payload["fieldCount"],
+                ["fields"] = compactFields is null ? null : new JArray(compactFields)
+            };
         }
 
         var fieldNames = payload["fields"]!
@@ -70,10 +90,32 @@ public static class ToolResponseShaper
     {
         if (!summaryOnly)
         {
-            return payload;
+            var compactRooms = payload["rooms"]?
+                .Children<JObject>()
+                .Select(room => new JObject
+                {
+                    ["roomId"] = room["roomId"],
+                    ["roomName"] = room["roomName"],
+                    ["roomNumber"] = room["roomNumber"],
+                    ["level"] = room["level"],
+                    ["area"] = room["area"],
+                    ["doorCount"] = room["doorCount"],
+                    ["doors"] = ShapeCompactOpenings(room["doors"]),
+                    ["windowCount"] = room["windowCount"],
+                    ["windows"] = ShapeCompactOpenings(room["windows"])
+                })
+                .ToArray();
+
+            return new JObject
+            {
+                ["totalRooms"] = payload["totalRooms"],
+                ["totalDoors"] = payload["totalDoors"],
+                ["totalWindows"] = payload["totalWindows"],
+                ["rooms"] = compactRooms is null ? null : new JArray(compactRooms)
+            };
         }
 
-        var rooms = payload["rooms"]!
+        var summaryRooms = payload["rooms"]!
             .Children<JObject>()
             .Select(room => new JObject
             {
@@ -90,7 +132,30 @@ public static class ToolResponseShaper
             ["totalRooms"] = payload["totalRooms"],
             ["totalDoors"] = payload["totalDoors"],
             ["totalWindows"] = payload["totalWindows"],
-            ["rooms"] = new JArray(rooms)
+            ["rooms"] = new JArray(summaryRooms)
         };
+    }
+
+    private static JToken? ShapeCompactOpenings(JToken? openings)
+    {
+        if (openings == null || openings.Type == JTokenType.Null)
+        {
+            return openings;
+        }
+
+        var items = openings
+            .Children<JObject>()
+            .Select(opening => new JObject
+            {
+                ["elementId"] = opening["elementId"],
+                ["familyName"] = opening["familyName"],
+                ["typeName"] = opening["typeName"],
+                ["width"] = opening["width"],
+                ["height"] = opening["height"],
+                ["mark"] = opening["mark"]
+            })
+            .ToArray();
+
+        return new JArray(items);
     }
 }

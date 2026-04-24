@@ -57,12 +57,13 @@ public static class ProjectTools
     public static async Task<string> GetAvailableFamilyTypes(
         RevitConnectionManager revit,
         [Description("Filter by category")] string? category = null,
+        [Description("Return a compact payload without uniqueId-heavy rows. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (category != null) p["category"] = category;
         var result = await revit.ExecuteAsync("get_available_family_types", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("get_available_family_types", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "analyze_model_statistics"), Description("Analyze element counts by category in the active Revit document.")]
@@ -497,13 +498,15 @@ public static class ProjectTools
         RevitConnectionManager revit,
         [Description("Category name (e.g. OST_Rooms). Default: OST_Rooms")] string? categoryName = null,
         [Description("Schedule type: regular | key | material-takeoff. Default: regular")] string? scheduleType = null,
+        [Description("Return a compact payload. Default: false")] bool compact = false,
+        [Description("Return names/counts only. Default: false")] bool summaryOnly = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (categoryName != null) p["categoryName"] = categoryName;
         if (scheduleType != null) p["scheduleType"] = scheduleType;
         var result = await revit.ExecuteAsync("list_schedulable_fields", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("list_schedulable_fields", result, compact, summaryOnly).ToString();
     }
 
     [McpServerTool(Name = "manage_project_units"), Description("Get or set project units (length, area, volume, angle, etc.). Actions: get, set, list_valid_units.")]

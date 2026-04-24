@@ -110,5 +110,19 @@ namespace RevitCortex.Tests.Server
 
             AssertDescription(method, "Run a complete model audit workflow.");
         }
+
+        [Fact]
+        public void HighCostWrappers_ExposeCompactFlags()
+        {
+            var familyTypes = GetMethod(typeof(ProjectTools), nameof(ProjectTools.GetAvailableFamilyTypes));
+            var schedulableFields = GetMethod(typeof(ProjectTools), nameof(ProjectTools.ListSchedulableFields));
+            var roomOpenings = GetMethod(typeof(ElementTools), nameof(ElementTools.GetRoomOpenings));
+
+            Assert.Contains("compact", familyTypes.GetParameters().Select(p => p.Name));
+            Assert.Contains("compact", schedulableFields.GetParameters().Select(p => p.Name));
+            Assert.Contains("summaryOnly", schedulableFields.GetParameters().Select(p => p.Name));
+            Assert.Contains("compact", roomOpenings.GetParameters().Select(p => p.Name));
+            Assert.Contains("summaryOnly", roomOpenings.GetParameters().Select(p => p.Name));
+        }
     }
 }
