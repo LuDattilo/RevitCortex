@@ -56,12 +56,17 @@ public static class ViewTools
     public static async Task<string> GetCurrentViewElements(
         RevitConnectionManager revit,
         [Description("Maximum number of elements to return")] int? limit = 50,
-        [Description("Filter by category name (e.g. Walls, Doors)")] string? categoryFilter = null,
+        [Description("Model category filters (e.g. OST_Walls, OST_Doors)")] string[]? modelCategoryList = null,
+        [Description("Annotation category filters (e.g. OST_Dimensions, OST_TextNotes)")] string[]? annotationCategoryList = null,
+        [Description("Legacy single-category filter; mapped into modelCategoryList for backward compatibility")] string? categoryFilter = null,
         [Description("Specific fields to include in the response")] string[]? fields = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (limit != null) p["limit"] = limit;
+        if (modelCategoryList != null) p["modelCategoryList"] = new JArray(modelCategoryList);
+        if (annotationCategoryList != null) p["annotationCategoryList"] = new JArray(annotationCategoryList);
+        if (categoryFilter != null && modelCategoryList == null) p["modelCategoryList"] = new JArray(categoryFilter);
         if (categoryFilter != null) p["categoryFilter"] = categoryFilter;
         if (fields != null) p["fields"] = new JArray(fields);
         var result = await revit.ExecuteAsync("get_current_view_elements", p, ct);
@@ -177,9 +182,11 @@ public static class ViewTools
     public static async Task<string> GetScheduleData(
         RevitConnectionManager revit,
         [Description("Schedule view element ID")] long scheduleId,
+        [Description("Maximum number of body rows to return. Default: 500")] int? maxRows = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["scheduleId"] = scheduleId };
+        if (maxRows != null) p["maxRows"] = maxRows;
         var result = await revit.ExecuteAsync("get_schedule_data", p, ct);
         return result.ToString();
     }

@@ -162,11 +162,15 @@ public static class ProjectTools
     [McpServerTool(Name = "workflow_model_audit"), Description("Run a complete model audit workflow.")]
     public static async Task<string> WorkflowModelAudit(
         RevitConnectionManager revit,
-        [Description("Audit filters as JSON string")] string? filters = null,
+        [Description("Include warnings in the response. Default: true")] bool? includeWarnings = null,
+        [Description("Include family lists in the response. Default: true")] bool? includeFamilies = null,
+        [Description("Maximum grouped warnings returned. Default: 50")] int? maxWarnings = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
-        if (filters != null) p["filters"] = filters;
+        if (includeWarnings != null) p["includeWarnings"] = includeWarnings;
+        if (includeFamilies != null) p["includeFamilies"] = includeFamilies;
+        if (maxWarnings != null) p["maxWarnings"] = maxWarnings;
         var result = await revit.ExecuteAsync("workflow_model_audit", p, ct);
         return result.ToString();
     }
