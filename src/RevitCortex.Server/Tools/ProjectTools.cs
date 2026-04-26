@@ -171,6 +171,7 @@ public static class ProjectTools
         [Description("Include warnings in the response. Default: true")] bool? includeWarnings = null,
         [Description("Include family lists in the response. Default: true")] bool? includeFamilies = null,
         [Description("Maximum grouped warnings returned. Default: 50")] int? maxWarnings = null,
+        [Description("Strip warnings/families to summary fields only. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
@@ -178,7 +179,7 @@ public static class ProjectTools
         if (includeFamilies != null) p["includeFamilies"] = includeFamilies;
         if (maxWarnings != null) p["maxWarnings"] = maxWarnings;
         var result = await revit.ExecuteAsync("workflow_model_audit", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("workflow_model_audit", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "create_level"), Description("Create a new level in the Revit project.")]
@@ -460,12 +461,13 @@ public static class ProjectTools
     public static async Task<string> GetSharedParameters(
         RevitConnectionManager revit,
         [Description("Category filter (e.g. OST_Walls); empty for all")] string? categoryFilter = null,
+        [Description("Strip per-parameter description. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (categoryFilter != null) p["categoryFilter"] = categoryFilter;
         var result = await revit.ExecuteAsync("get_shared_parameters", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("get_shared_parameters", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "lines_per_view_count"), Description("Count detail and/or model lines per view for performance auditing. Always set threshold >= 20 on large models; the tool has an automatic 300-view cap.")]

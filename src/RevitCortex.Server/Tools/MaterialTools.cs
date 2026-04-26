@@ -12,10 +12,11 @@ public static class MaterialTools
     [McpServerTool(Name = "get_materials"), Description("List all materials in the active Revit document.")]
     public static async Task<string> GetMaterials(
         RevitConnectionManager revit,
+        [Description("Strip numeric appearance props (transparency/shininess/smoothness). Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var result = await revit.ExecuteAsync("get_materials", new JObject(), ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("get_materials", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "create_material"), Description("Create a new material in the Revit project.")]

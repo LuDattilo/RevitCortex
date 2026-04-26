@@ -53,10 +53,11 @@ public static class LinkTools
     [McpServerTool(Name = "get_linked_file_instances"), Description("Lists all linked Revit files grouped by type, with transforms and load status.")]
     public static async Task<string> GetLinkedFileInstances(
         RevitConnectionManager revit,
+        [Description("Strip transform matrix (origin/basisX/basisY) per instance. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var result = await revit.ExecuteAsync("get_linked_file_instances", new JObject(), ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("get_linked_file_instances", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "get_selected_linked_elements"), Description("Returns info about currently selected link instances.")]

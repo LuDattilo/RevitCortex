@@ -147,12 +147,13 @@ public static class CreationTools
     public static async Task<string> ExportRoomData(
         RevitConnectionManager revit,
         [Description("Maximum number of rooms to return. Default: 20")] int? maxResults = 20,
+        [Description("Strip department/perimeterMm. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (maxResults != null) p["maxResults"] = maxResults;
         var result = await revit.ExecuteAsync("export_room_data", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("export_room_data", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "create_array"), Description("Create linear or radial arrays of elements. arrayType=linear uses spacingX/Y/Z; arrayType=radial uses centerX/Y and totalAngle.")]

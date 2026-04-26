@@ -174,6 +174,12 @@ When DocumentAnalyzer scans a document:
 node server/generate-tool-schemas-csharp.mjs
 ```
 
+### Compact Responses (per-call)
+
+Some HIGH-payload tools accept a `compact: true` flag that strips per-item metadata to reduce tokens. Counters, identifiers and item counts are always preserved (safety contract enforced by `ToolResponseShaper`).
+
+Tools that accept `compact`: `get_element_parameters`, `get_available_family_types`, `audit_families`, `list_schedulable_fields`, `get_room_openings`, `get_shared_parameters`, `get_linked_file_instances`, `get_elements_in_spatial_volume`, `get_materials`, `export_room_data`, `ifc_list_export_configurations`, `ifc_analyze_rebuildability`, `ifc_list_rebuild_candidates`, `workflow_model_audit`. Default is `false` (full payload).
+
 ### Fundamental Rule
 
 > Before calling any tool, ask: **do I already have this information in the current conversation context?** If yes, do not call the tool again.

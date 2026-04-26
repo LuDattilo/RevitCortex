@@ -273,6 +273,7 @@ public static class ElementTools
         [Description("Custom box max X (when volumeType=custom)")] double? customMaxX = null,
         [Description("Custom box max Y (when volumeType=custom)")] double? customMaxY = null,
         [Description("Custom box max Z (when volumeType=custom)")] double? customMaxZ = null,
+        [Description("Strip per-element extras. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
@@ -287,7 +288,7 @@ public static class ElementTools
         if (customMaxY != null) p["customMaxY"] = customMaxY;
         if (customMaxZ != null) p["customMaxZ"] = customMaxZ;
         var result = await revit.ExecuteAsync("get_elements_in_spatial_volume", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("get_elements_in_spatial_volume", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "get_linked_elements"), Description("Query elements from linked Revit models with optional filtering. parameterNames is additive — without it only basic fields are returned.")]

@@ -128,10 +128,11 @@ public static class IfcTools
     [McpServerTool(Name = "ifc_list_export_configurations"), Description("List available built-in export configurations")]
     public static async Task<string> IfcListExportConfigurations(
         RevitConnectionManager revit,
+        [Description("Strip per-config description text. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var result = await revit.ExecuteAsync("ifc_list_export_configurations", new JObject(), ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("ifc_list_export_configurations", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "ifc_get_export_configuration"), Description("Get full details of a specific export configuration by name.")]
@@ -161,13 +162,14 @@ public static class IfcTools
         RevitConnectionManager revit,
         [Description("Category filter (e.g. OST_Walls). Optional.")] string? categoryFilter = null,
         [Description("Max elements to analyze. Default: 200")] int? maxElements = null,
+        [Description("Strip per-result extras. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (categoryFilter != null) p["categoryFilter"] = categoryFilter;
         if (maxElements != null) p["maxElements"] = maxElements;
         var result = await revit.ExecuteAsync("ifc_analyze_rebuildability", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("ifc_analyze_rebuildability", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "ifc_list_rebuild_candidates"), Description("List elements above a rebuild confidence threshold.")]
@@ -176,6 +178,7 @@ public static class IfcTools
         [Description("Category filter (e.g. OST_Walls). Optional.")] string? categoryFilter = null,
         [Description("Minimum confidence 0.0-1.0. Default: 0.5")] double? minConfidence = null,
         [Description("Max elements returned. Default: 100")] int? maxElements = null,
+        [Description("Strip per-candidate extras. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
@@ -183,7 +186,7 @@ public static class IfcTools
         if (minConfidence != null) p["minConfidence"] = minConfidence;
         if (maxElements != null) p["maxElements"] = maxElements;
         var result = await revit.ExecuteAsync("ifc_list_rebuild_candidates", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("ifc_list_rebuild_candidates", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "ifc_rebuild_walls"), Description("Rebuild native walls from IFC DirectShapes. dryRun defaults to true.")]

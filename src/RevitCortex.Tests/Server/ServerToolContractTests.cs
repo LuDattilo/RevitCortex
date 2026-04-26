@@ -95,6 +95,7 @@ namespace RevitCortex.Tests.Server
                 name => Assert.Equal("includeWarnings", name),
                 name => Assert.Equal("includeFamilies", name),
                 name => Assert.Equal("maxWarnings", name),
+                name => Assert.Equal("compact", name),
                 name => Assert.Equal("ct", name));
 
             Assert.Equal(typeof(bool?), GetParameter(method, "includeWarnings").ParameterType);

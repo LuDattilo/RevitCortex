@@ -20,6 +20,7 @@ public partial class GeneralSettingsPage : Page
     private const int DefaultPort = 8080;
     private const string DefaultLogLevel = "Info";
     private const int DefaultKeepCount = 10;
+    private DispatcherTimer? _saveFeedbackTimer;
     private int _originalPort;
     private DispatcherTimer? _downloadTimer;
 
@@ -385,18 +386,43 @@ public partial class GeneralSettingsPage : Page
             if (RevitCortexApp.Instance?.Router != null)
                 RevitCortexApp.Instance.Router.ReadOnlyMode = ReadOnlyCheckBox.IsChecked == true;
 
-            if (port != _originalPort)
+            bool portChanged = port != _originalPort;
+            if (portChanged)
             {
-                MessageBox.Show("Settings saved. Restart Revit for port changes.",
-                    "Saved", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowSaveFeedback("Saved \u2713  Restart Revit for port change", success: true, restartHint: true);
                 _originalPort = port;
+            }
+            else
+            {
+                ShowSaveFeedback("Saved \u2713", success: true);
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to save: {ex.Message}", "Error",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            ShowSaveFeedback($"Save failed: {ex.Message}", success: false);
         }
+    }
+
+    private void ShowSaveFeedback(string message, bool success, bool restartHint = false)
+    {
+        SaveFeedbackText.Text = message;
+        SaveFeedbackText.Foreground = new SolidColorBrush(success
+            ? Color.FromRgb(46, 125, 50)        // green
+            : Color.FromRgb(198, 40, 40));      // red
+        SaveFeedbackText.Visibility = Visibility.Visible;
+
+        // Restart hint stays visible longer (4s) so the user can read it.
+        var ttl = restartHint ? TimeSpan.FromSeconds(4) : TimeSpan.FromSeconds(2.5);
+
+        _saveFeedbackTimer?.Stop();
+        _saveFeedbackTimer = new DispatcherTimer { Interval = ttl };
+        _saveFeedbackTimer.Tick += (_, _) =>
+        {
+            _saveFeedbackTimer?.Stop();
+            _saveFeedbackTimer = null;
+            SaveFeedbackText.Visibility = Visibility.Collapsed;
+        };
+        _saveFeedbackTimer.Start();
     }
 
     private void ResetDefaults_Click(object sender, RoutedEventArgs e) => SetDefaults();

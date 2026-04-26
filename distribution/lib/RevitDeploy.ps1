@@ -63,9 +63,11 @@ function Copy-RevitAddin {
         [Parameter(Mandatory)] [string] $AddinManifest
     )
 
+    $machineRoot = "C:\ProgramData\Autodesk\Revit\Addins"
+    $userRoot    = Join-Path $env:APPDATA 'Autodesk\Revit\Addins'
     $scopes = @(
-        @{ Name = 'machine'; Root = "C:\ProgramData\Autodesk\Revit\Addins" },
-        @{ Name = 'user';    Root = Join-Path $env:APPDATA 'Autodesk\Revit\Addins' }
+        @{ Name = 'machine'; Root = $machineRoot; Other = $userRoot },
+        @{ Name = 'user';    Root = $userRoot;    Other = $machineRoot }
     )
 
     $lastError = $null
@@ -86,6 +88,19 @@ function Copy-RevitAddin {
             # Remove Zone.Identifier ADS so .NET can load the DLLs (HRESULT 0x80131515)
             Get-ChildItem $pluginDir -Recurse -File | ForEach-Object { Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue }
             Unblock-File -Path $addinFile -ErrorAction SilentlyContinue
+
+            # Wipe the OTHER scope so Revit doesn't load a stale shadow copy.
+            # Revit scans both ProgramData and AppData\Roaming on startup; leaving
+            # an old copy in the opposite location silently shadows this install.
+            $otherVerDir    = Join-Path $scope.Other $Version
+            $otherPluginDir = Join-Path $otherVerDir 'RevitCortex'
+            $otherAddinFile = Join-Path $otherVerDir 'RevitCortex.addin'
+            if (Test-Path $otherPluginDir) {
+                try { Remove-Item $otherPluginDir -Recurse -Force -ErrorAction Stop } catch {}
+            }
+            if (Test-Path $otherAddinFile) {
+                try { Remove-Item $otherAddinFile -Force -ErrorAction Stop } catch {}
+            }
 
             return @{ Version = $Version; Scope = $scope.Name; TargetDir = $pluginDir; Ok = $true; Error = $null }
         } catch [System.UnauthorizedAccessException] {
