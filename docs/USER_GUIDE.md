@@ -113,6 +113,41 @@ Quando si devono creare/modificare centinaia di elementi, uno script C# eseguito
 "Usa send_code_to_revit per creare tutti i tipi di pavimento da questo elenco: [...]"
 ```
 
+### Risposte compatte (`compact: true`) — *novità v1.0.18*
+
+Alcuni tool con payload pesante accettano un flag `compact: true` che rimuove i metadati per-elemento (uniqueId, storageType, isReadOnly, transparency, ecc.) mantenendo identificatori, contatori e nomi. Riduzione tipica: 30-50% dei token.
+
+```
+"Elenca i materiali del progetto in formato compatto"
+→ Claude chiamerà get_materials con compact: true
+```
+
+I tool che supportano `compact`:
+
+| Tool | Strippa |
+|------|--------|
+| `get_element_parameters` | hasValue, isReadOnly, storageType, groupName, isShared |
+| `get_available_family_types` | uniqueId, fullName, isReadOnly |
+| `audit_families` | isInPlace, isEditable, isUnused, kind |
+| `list_schedulable_fields` | parameterId, fieldType verbose |
+| `get_room_openings` | metadati apertura per elemento |
+| `get_shared_parameters` | description testuale |
+| `get_linked_file_instances` | matrice trasformazione (origin/basisX/basisY) |
+| `get_elements_in_spatial_volume` | extras per elemento |
+| `get_materials` | transparency, shininess, smoothness numerici |
+| `export_room_data` | department, perimeterMm |
+| `ifc_list_export_configurations` | description per configurazione |
+| `ifc_analyze_rebuildability` | extras per risultato |
+| `ifc_list_rebuild_candidates` | extras per candidato |
+| `workflow_model_audit` | dettagli warnings/famiglie verbosi |
+
+**Garanzie di sicurezza** (contratto rispettato dal `ToolResponseShaper`):
+- Nessun elemento viene mai rimosso dalle liste
+- I contatori top-level (`count`, `totalRooms`, `materialCount`, `instanceCount`, ecc.) sono sempre veritieri
+- ID, nomi e categorie restano intatti
+
+Default: `compact: false` (payload pieno). Chiedere a Claude esplicitamente "in formato compatto" per attivarlo.
+
 ---
 
 ## Discipline di progetto e categorie Revit

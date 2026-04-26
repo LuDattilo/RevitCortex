@@ -34,7 +34,7 @@ class GuidePDF(FPDF):
         self.set_y(-12)
         self.set_font("Helvetica", "I", 7)
         self.set_text_color(*C_LIGHT_GRAY)
-        self.cell(0, 8, "RevitCortex v1.0 - AI Assistant for Autodesk Revit", align="C")
+        self.cell(0, 8, "RevitCortex v1.0.18 - AI Assistant for Autodesk Revit", align="C")
 
     def section_title(self, num, title):
         self.add_page()
@@ -1406,7 +1406,37 @@ def build_pdf():
              "3. Con dryRun, leggi solo modifiedCount/skippedCount, non la lista completa.\n"
              "4. Quando il contesto supera ~15,000 token di risposta, apri una nuova conversazione.\n"
              "5. Non mischiare task QA con authoring nella stessa sessione lunga.\n"
-             "6. Usa lo strumento piu' mirato: check_model_health prima di analyze_model_statistics.")
+             "6. Usa lo strumento piu' mirato: check_model_health prima di analyze_model_statistics.\n"
+             "7. Per liste lunghe, chiedi a Claude le risposte in formato compatto (vedi sotto).")
+
+    pdf.h2("Risposte compatte (compact: true)  -- novita' v1.0.18")
+    pdf.para("Alcuni strumenti ad alto payload accettano un parametro compact: true che "
+             "rimuove i metadati per-elemento mantenendo identificatori e contatori. "
+             "Riduzione tipica dei token: 30-50%.")
+
+    pdf.prompt("Esempio", "Elenca i materiali del progetto in formato compatto.")
+    pdf.text_small("Claude chiama get_materials con compact: true. La risposta perde "
+                   "transparency/shininess/smoothness ma conserva nome, classe, categoria "
+                   "e gli has*Asset flags utili a decidere se interrogare get_material_properties.")
+
+    pdf.para("Strumenti che supportano compact:")
+    pdf.para("- get_element_parameters (strippa hasValue, isReadOnly, storageType, groupName, isShared)\n"
+             "- get_available_family_types (strippa uniqueId, fullName, isReadOnly)\n"
+             "- audit_families (strippa isInPlace, isEditable, isUnused, kind)\n"
+             "- list_schedulable_fields (strippa parameterId)\n"
+             "- get_room_openings (strippa metadati per apertura)\n"
+             "- get_shared_parameters (strippa description)\n"
+             "- get_linked_file_instances (strippa matrice di trasformazione)\n"
+             "- get_elements_in_spatial_volume (strippa extras per elemento)\n"
+             "- get_materials (strippa transparency/shininess/smoothness)\n"
+             "- export_room_data (strippa department, perimeterMm)\n"
+             "- ifc_list_export_configurations (strippa description configurazione)\n"
+             "- ifc_analyze_rebuildability / ifc_list_rebuild_candidates (strippa extras)\n"
+             "- workflow_model_audit (strippa dettagli warnings/famiglie verbosi)")
+
+    pdf.para("Garanzie di sicurezza: nessun elemento viene mai rimosso dalle liste, i contatori "
+             "top-level (count, totalRooms, materialCount, instanceCount) sono sempre veritieri, "
+             "ID e categorie restano intatti. Default: compact: false (payload pieno).")
 
     pdf.h2("Prestazioni")
     pdf.para("- Operazioni di lettura: sicure in parallelo (5+)\n"

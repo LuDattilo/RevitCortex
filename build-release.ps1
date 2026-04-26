@@ -92,6 +92,12 @@ $templatesTarget = Join-Path $ReleaseDir "config-templates"
 New-Item -ItemType Directory -Path $templatesTarget -Force | Out-Null
 Copy-Item (Join-Path $RepoRoot "distribution\config-templates\*") $templatesTarget
 
+# User guides (PDF, IT + EN if present)
+foreach ($guide in @("RevitCortex_User_Guide_IT.pdf", "RevitCortex_User_Guide_EN.pdf")) {
+    $guidePath = Join-Path $RepoRoot "docs\$guide"
+    if (Test-Path $guidePath) { Copy-Item $guidePath $ReleaseDir }
+}
+
 Write-Host "  Support files copied." -ForegroundColor Green
 
 # --- Create ZIP ---
