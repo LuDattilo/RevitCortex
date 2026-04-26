@@ -27,3 +27,6 @@ docs/check_*.py
 /*.jpg
 docs/RevitCortex-Survey.*
 .publish-smoke/
+
+# Local run logs from deploy/install scripts
+/*.log
