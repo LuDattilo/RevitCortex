@@ -13,5 +13,6 @@ public class HostLinkResolverTests
         Assert.Equal("strutture.rvt", HostLinkResolver.NormalizeBasename("Strutture.rvt"));
         Assert.Equal("",               HostLinkResolver.NormalizeBasename(null));
         Assert.Equal("",               HostLinkResolver.NormalizeBasename(""));
+        Assert.Equal("", HostLinkResolver.NormalizeBasename("   "));
     }
 }

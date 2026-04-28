@@ -92,7 +92,7 @@ namespace RevitCortex.Tools.Interop
                     var byUid = doc.GetElement(r.RevitUniqueId);
                     if (byUid != null) return byUid;
                 }
-                catch { /* fall through */ }
+                catch (Exception ex) when (!IsFatal(ex)) { /* fall through */ }
             }
 
             if (!string.IsNullOrWhiteSpace(r.IfcGuid))
@@ -106,16 +106,23 @@ namespace RevitCortex.Tools.Interop
             {
                 try
                 {
-                    var elementId =
 #if REVIT2024_OR_GREATER
-                        new ElementId(idValue);
-#else
-                        new ElementId((int)idValue);
-#endif
+                    var elementId = new ElementId(idValue);
                     var byId = doc.GetElement(elementId);
                     if (byId != null) return byId;
+#else
+                    // R23/R24 ElementId is 32-bit. Skip out-of-range values rather than
+                    // silently truncating — a truncated ID is indistinguishable from a
+                    // legitimate miss and produces ghost notFound diagnostics.
+                    if (idValue >= int.MinValue && idValue <= int.MaxValue)
+                    {
+                        var elementId = new ElementId((int)idValue);
+                        var byId = doc.GetElement(elementId);
+                        if (byId != null) return byId;
+                    }
+#endif
                 }
-                catch { /* fall through */ }
+                catch (Exception ex) when (!IsFatal(ex)) { /* fall through */ }
             }
             return null;
         }
@@ -133,11 +140,16 @@ namespace RevitCortex.Tools.Interop
                     .WherePasses(filter)
                     .FirstElement();
             }
-            catch
+            catch (Exception ex) when (!IsFatal(ex))
             {
                 return null;
             }
         }
+
+        private static bool IsFatal(Exception ex)
+            => ex is OutOfMemoryException
+            || ex is StackOverflowException
+            || ex is AccessViolationException;
     }
 
     public class ResolveOutcome
@@ -148,6 +160,12 @@ namespace RevitCortex.Tools.Interop
         public ElementId? LinkInstanceId { get; }
         public ElementId? LinkedElementId { get; }
         public string? NotFoundReason { get; }
+
+        /// <summary>
+        /// True when the ref resolved to either a host element or a linked element.
+        /// Prefer this over individually testing IsHost and IsLinked.
+        /// </summary>
+        public bool IsFound => IsHost || IsLinked;
 
         private ResolveOutcome(bool host, bool linked,
             ElementId? hostId, ElementId? linkId, ElementId? linkedId,
