@@ -24,11 +24,17 @@ public class RevitThreadDispatcher
     {
         lock (_lock)
         {
-            _handler.PrepareExecution(tool, input, session);
+            if (!_handler.TryPrepareExecution(tool, input, session))
+            {
+                return CortexResult<object>.Fail(CortexErrorCode.Timeout,
+                    $"Tool '{tool.Name}' could not start because a previous Revit event is still pending or running",
+                    suggestion: "Wait for Revit to finish the previous operation, then try again.");
+            }
 
             var raiseResult = _externalEvent.Raise();
             if (raiseResult != ExternalEventRequest.Accepted)
             {
+                _handler.ClearPreparedExecution();
                 return CortexResult<object>.Fail(CortexErrorCode.Timeout,
                     $"Revit rejected the event request: {raiseResult}",
                     suggestion: "Revit may be busy with another operation. Try again.");

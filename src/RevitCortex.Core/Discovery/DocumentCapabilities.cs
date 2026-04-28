@@ -4,6 +4,24 @@ namespace RevitCortex.Core.Discovery;
 
 public class DocumentCapabilities
 {
+    public static readonly IReadOnlyCollection<string> KnownDynamicToolNames = new[]
+    {
+        "get_worksets",
+        "set_element_workset",
+        "get_phases",
+        "set_element_phase",
+        "get_linked_file_instances",
+        "get_link_transform",
+        "reload_linked_file_from",
+        "pin_unpin_link_instance",
+        "move_link_instance",
+        "align_link_to_host",
+        "highlight_linked_element",
+        "show_cross_model_elements",
+        "get_selected_linked_elements",
+        "get_room_openings",
+    };
+
     public bool HasWorksets { get; set; }
     public bool HasPhases { get; set; }
     public bool HasDesignOptions { get; set; }

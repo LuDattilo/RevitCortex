@@ -118,4 +118,21 @@ public class CortexRouterTests
         Assert.Contains("always_on", available);
         Assert.DoesNotContain("workset_tool", available);
     }
+
+    [Fact]
+    public void Route_ResetsApproveAllAfterToolExecution()
+    {
+        var router = CreateRouter(out var session);
+        session.ApproveAll = true;
+
+        var field = typeof(CortexRouter).GetField("_tools",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var tools = (System.Collections.Generic.Dictionary<string, RevitCortex.Core.Tools.ICortexTool>)field.GetValue(router)!;
+        tools["say_hello"] = new FakeTool { Name = "say_hello" };
+
+        var result = router.Route("say_hello", new JObject());
+
+        Assert.True(result.Success);
+        Assert.False(session.ApproveAll);
+    }
 }

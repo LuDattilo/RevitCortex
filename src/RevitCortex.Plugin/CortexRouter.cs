@@ -124,10 +124,22 @@ public class CortexRouter
             }
         }
 
-        if (_dispatcher != null)
-            result = _dispatcher.Execute(tool, input, _session);
-        else
-            result = tool.Execute(input, _session);
+        try
+        {
+            if (_dispatcher != null)
+            {
+                var timeoutSeconds = (tool as ICommandTimeoutTool)?.CommandTimeoutSeconds ?? 120;
+                result = _dispatcher.Execute(tool, input, _session, timeoutSeconds * 1000);
+            }
+            else
+            {
+                result = tool.Execute(input, _session);
+            }
+        }
+        finally
+        {
+            _session.ResetApproveAll();
+        }
 
         // Only cache successful results. Failures must always re-execute so a
         // transient error doesn't get stuck in the cache.

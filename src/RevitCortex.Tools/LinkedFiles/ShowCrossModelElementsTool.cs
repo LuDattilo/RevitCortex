@@ -95,82 +95,98 @@ public class ShowCrossModelElementsTool : ICortexTool
 
             foreach (var token in linkedTargets.OfType<JObject>())
             {
-                var instanceId = token["instanceId"]?.Value<long>() ?? 0;
-                var linkedElementId = token["linkedElementId"]?.Value<long>() ?? 0;
-                if (instanceId <= 0 || linkedElementId <= 0)
+                long instanceId = 0;
+                long linkedElementId = 0;
+                try
                 {
+                    instanceId = token["instanceId"]?.Value<long>() ?? 0;
+                    linkedElementId = token["linkedElementId"]?.Value<long>() ?? 0;
+                    if (instanceId <= 0 || linkedElementId <= 0)
+                    {
+                        linkedResults.Add(new
+                        {
+                            instanceId,
+                            linkedElementId,
+                            found = false,
+                            reason = "instanceId and linkedElementId are required"
+                        });
+                        continue;
+                    }
+
+                    var linkInstance = doc.GetElement(ToElementId(instanceId)) as RevitLinkInstance;
+                    var linkDoc = linkInstance?.GetLinkDocument();
+                    var linkedElement = linkDoc?.GetElement(ToElementId(linkedElementId));
+                    if (linkInstance == null || linkDoc == null || linkedElement == null)
+                    {
+                        linkedResults.Add(new
+                        {
+                            instanceId,
+                            linkedElementId,
+                            found = false,
+                            reason = linkInstance == null
+                                ? "link instance not found"
+                                : linkDoc == null
+                                    ? "linked document is not loaded"
+                                    : "linked element not found"
+                        });
+                        continue;
+                    }
+
+                    // Select the link instance itself; the linked sub-element is highlighted
+                    // via the DirectShape marker (default path) or by PostCommand isolate.
+                    selectionElementIds.Add(linkInstance.Id);
+                    isolateIds.Add(linkInstance.Id);
+                    linkedReferenceCount++;
+
+                    var rawBbox = ResolveLinkedElementBoundingBox(linkedElement, linkDoc);
+                    var bboxSource = rawBbox.Source;
+                    var transformedBox = TransformBoundingBox(rawBbox.Box, linkInstance.GetTotalTransform());
+                    AddBoundingBox(bbs, transformedBox);
+
+                    string markerStatus;
+                    if (!createLinkedMarkers)
+                    {
+                        markerStatus = "skipped:createLinkedMarkers=false";
+                    }
+                    else if (transformedBox == null)
+                    {
+                        markerStatus = $"skipped:no-bbox(source={bboxSource})";
+                    }
+                    else
+                    {
+                        pendingMarkers.Add(new PendingMarker
+                        {
+                            Box = transformedBox,
+                            InstanceId = instanceId,
+                            LinkedElementId = linkedElementId,
+                            LinkedElementName = linkedElement.Name,
+                            LinkName = linkInstance.Name
+                        });
+                        markerStatus = $"queued(bboxSource={bboxSource})";
+                    }
+
+                    linkedResults.Add(new
+                    {
+                        instanceId,
+                        linkedElementId,
+                        found = true,
+                        linkedElementName = linkedElement.Name,
+                        linkedElementCategory = linkedElement.Category?.Name ?? "",
+                        linkName = linkInstance.Name,
+                        markerStatus
+                    });
+                }
+                catch (Exception ex)
+                {
+                    // Per-target try/catch so one bad linked element doesn't abort the whole call.
                     linkedResults.Add(new
                     {
                         instanceId,
                         linkedElementId,
                         found = false,
-                        reason = "instanceId and linkedElementId are required"
+                        reason = $"exception:{ex.GetType().Name}:{ex.Message}"
                     });
-                    continue;
                 }
-
-                var linkInstance = doc.GetElement(ToElementId(instanceId)) as RevitLinkInstance;
-                var linkDoc = linkInstance?.GetLinkDocument();
-                var linkedElement = linkDoc?.GetElement(ToElementId(linkedElementId));
-                if (linkInstance == null || linkDoc == null || linkedElement == null)
-                {
-                    linkedResults.Add(new
-                    {
-                        instanceId,
-                        linkedElementId,
-                        found = false,
-                        reason = linkInstance == null
-                            ? "link instance not found"
-                            : linkDoc == null
-                                ? "linked document is not loaded"
-                                : "linked element not found"
-                    });
-                    continue;
-                }
-
-                // Select the link instance itself; the linked sub-element is highlighted
-                // via the DirectShape marker (default path) or by PostCommand isolate.
-                selectionElementIds.Add(linkInstance.Id);
-                isolateIds.Add(linkInstance.Id);
-                linkedReferenceCount++;
-
-                var rawBbox = ResolveLinkedElementBoundingBox(linkedElement, linkDoc);
-                var bboxSource = rawBbox.Source;
-                var transformedBox = TransformBoundingBox(rawBbox.Box, linkInstance.GetTotalTransform());
-                AddBoundingBox(bbs, transformedBox);
-
-                string markerStatus;
-                if (!createLinkedMarkers)
-                {
-                    markerStatus = "skipped:createLinkedMarkers=false";
-                }
-                else if (transformedBox == null)
-                {
-                    markerStatus = $"skipped:no-bbox(source={bboxSource})";
-                }
-                else
-                {
-                    pendingMarkers.Add(new PendingMarker
-                    {
-                        Box = transformedBox,
-                        InstanceId = instanceId,
-                        LinkedElementId = linkedElementId,
-                        LinkedElementName = linkedElement.Name,
-                        LinkName = linkInstance.Name
-                    });
-                    markerStatus = $"queued(bboxSource={bboxSource})";
-                }
-
-                linkedResults.Add(new
-                {
-                    instanceId,
-                    linkedElementId,
-                    found = true,
-                    linkedElementName = linkedElement.Name,
-                    linkedElementCategory = linkedElement.Category?.Name ?? "",
-                    linkName = linkInstance.Name,
-                    markerStatus
-                });
             }
 
             if (shouldSelect && selectionElementIds.Count > 0)
@@ -320,19 +336,35 @@ public class ShowCrossModelElementsTool : ICortexTool
 
     private static BoundingBoxResolution ResolveLinkedElementBoundingBox(Element linkedElement, Document linkDoc)
     {
-        var nullViewBox = linkedElement.get_BoundingBox(null);
-        if (nullViewBox != null)
-            return new BoundingBoxResolution { Box = nullViewBox, Source = "model-null-view" };
-
-        var anyView3D = new FilteredElementCollector(linkDoc)
-            .OfClass(typeof(View3D))
-            .Cast<View3D>()
-            .FirstOrDefault(v => !v.IsTemplate);
-        if (anyView3D != null)
+        // Wrap each strategy in its own try/catch — some Revit elements (e.g. linked MEP fittings)
+        // can throw native exceptions that bubble out of the Revit API. Keep going on failure.
+        try
         {
-            var viewBox = linkedElement.get_BoundingBox(anyView3D);
-            if (viewBox != null)
-                return new BoundingBoxResolution { Box = viewBox, Source = "linkdoc-3d-view" };
+            var nullViewBox = linkedElement.get_BoundingBox(null);
+            if (nullViewBox != null)
+                return new BoundingBoxResolution { Box = nullViewBox, Source = "model-null-view" };
+        }
+        catch
+        {
+            // Fall through to next strategy.
+        }
+
+        try
+        {
+            var anyView3D = new FilteredElementCollector(linkDoc)
+                .OfClass(typeof(View3D))
+                .Cast<View3D>()
+                .FirstOrDefault(v => !v.IsTemplate);
+            if (anyView3D != null)
+            {
+                var viewBox = linkedElement.get_BoundingBox(anyView3D);
+                if (viewBox != null)
+                    return new BoundingBoxResolution { Box = viewBox, Source = "linkdoc-3d-view" };
+            }
+        }
+        catch
+        {
+            // Fall through to geometry extents.
         }
 
         try

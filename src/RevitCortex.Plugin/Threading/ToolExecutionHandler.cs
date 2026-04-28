@@ -11,7 +11,9 @@ namespace RevitCortex.Plugin.Threading;
 public class ToolExecutionHandler : IExternalEventHandler
 {
     private readonly ManualResetEvent _resetEvent = new ManualResetEvent(false);
+    private readonly object _stateLock = new object();
     private int _executionId;
+    private bool _hasPendingOrRunning;
 
     public ICortexTool? PendingTool { get; set; }
     public JObject? PendingInput { get; set; }
@@ -20,10 +22,22 @@ public class ToolExecutionHandler : IExternalEventHandler
 
     public void Execute(UIApplication app)
     {
-        int myId = _executionId;
+        int myId;
+        ICortexTool? tool;
+        JObject? input;
+        CortexSession? session;
+
+        lock (_stateLock)
+        {
+            myId = _executionId;
+            tool = PendingTool;
+            input = PendingInput;
+            session = PendingSession;
+        }
+
         try
         {
-            if (PendingTool == null || PendingInput == null || PendingSession == null)
+            if (tool == null || input == null || session == null)
             {
                 if (_executionId == myId)
                     Result = CortexResult<object>.Fail(
@@ -31,7 +45,7 @@ public class ToolExecutionHandler : IExternalEventHandler
                 return;
             }
 
-            var result = PendingTool.Execute(PendingInput, PendingSession);
+            var result = tool.Execute(input, session);
             // Only store result if this execution is still current (not superseded by timeout)
             if (_executionId == myId)
                 Result = result;
@@ -44,25 +58,53 @@ public class ToolExecutionHandler : IExternalEventHandler
         }
         finally
         {
-            // Only signal if still current — stale executions must not wake up the new waiter
-            if (_executionId == myId)
-                _resetEvent.Set();
+            lock (_stateLock)
+            {
+                if (_executionId == myId)
+                {
+                    PendingTool = null;
+                    PendingInput = null;
+                    PendingSession = null;
+                    _hasPendingOrRunning = false;
+                    _resetEvent.Set();
+                }
+            }
         }
     }
 
-    public void PrepareExecution(ICortexTool tool, JObject input, CortexSession session)
+    public bool TryPrepareExecution(ICortexTool tool, JObject input, CortexSession session)
     {
-        System.Threading.Interlocked.Increment(ref _executionId);
-        PendingTool = tool;
-        PendingInput = input;
-        PendingSession = session;
-        Result = null;
-        _resetEvent.Reset();
+        lock (_stateLock)
+        {
+            if (_hasPendingOrRunning)
+                return false;
+
+            _executionId++;
+            PendingTool = tool;
+            PendingInput = input;
+            PendingSession = session;
+            Result = null;
+            _hasPendingOrRunning = true;
+            _resetEvent.Reset();
+            return true;
+        }
     }
 
     public bool WaitForCompletion(int timeoutMs = 120000)
     {
         return _resetEvent.WaitOne(timeoutMs);
+    }
+
+    public void ClearPreparedExecution()
+    {
+        lock (_stateLock)
+        {
+            PendingTool = null;
+            PendingInput = null;
+            PendingSession = null;
+            _hasPendingOrRunning = false;
+            _resetEvent.Set();
+        }
     }
 
     public string GetName() => "RevitCortex Tool Execution";

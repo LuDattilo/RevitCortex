@@ -39,13 +39,13 @@ public class ManageAdditionalSettingsTool : ICortexTool
             return action.ToLowerInvariant() switch
             {
                 "list_line_styles"   => ListLineStyles(doc),
-                "create_line_style"  => CreateLineStyle(doc, input),
-                "set_line_style"     => SetLineStyle(doc, input),
+                "create_line_style"  => CreateLineStyle(doc, input, session),
+                "set_line_style"     => SetLineStyle(doc, input, session),
                 "list_line_weights"  => ListLineWeights(doc),
                 "list_line_patterns" => ListLinePatterns(doc),
                 "list_fill_patterns" => ListFillPatterns(doc),
                 "get_halftone"       => GetHalftone(doc),
-                "set_halftone"       => SetHalftone(doc, input),
+                "set_halftone"       => SetHalftone(doc, input, session),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}",
                     suggestion: "Use: list_line_styles, create_line_style, set_line_style, " +
@@ -79,7 +79,7 @@ public class ManageAdditionalSettingsTool : ICortexTool
         });
     }
 
-    private static CortexResult<object> CreateLineStyle(Document doc, JObject input)
+    private static CortexResult<object> CreateLineStyle(Document doc, JObject input, CortexSession session)
     {
         var name = input["name"]?.Value<string>();
         if (string.IsNullOrEmpty(name))
@@ -94,6 +94,9 @@ public class ManageAdditionalSettingsTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Line style '{name}' already exists");
         }
+
+        if (!session.RequestConfirmation("create line style", 1, name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Create Line Style");
         tx.Start();
@@ -112,7 +115,7 @@ public class ManageAdditionalSettingsTool : ICortexTool
         });
     }
 
-    private static CortexResult<object> SetLineStyle(Document doc, JObject input)
+    private static CortexResult<object> SetLineStyle(Document doc, JObject input, CortexSession session)
     {
         var name = input["name"]?.Value<string>();
         if (string.IsNullOrEmpty(name))
@@ -132,6 +135,9 @@ public class ManageAdditionalSettingsTool : ICortexTool
         if (target == null)
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
                 $"Line style '{name}' not found");
+
+        if (!session.RequestConfirmation("modify line style", 1, name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Modify Line Style");
         tx.Start();
@@ -283,7 +289,7 @@ public class ManageAdditionalSettingsTool : ICortexTool
         });
     }
 
-    private static CortexResult<object> SetHalftone(Document doc, JObject input)
+    private static CortexResult<object> SetHalftone(Document doc, JObject input, CortexSession session)
     {
         var (settings, getMethod, setMethod, settingsType) = ResolveHalftoneApi(doc);
         if (settings == null || setMethod == null)
@@ -305,6 +311,9 @@ public class ManageAdditionalSettingsTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "underlayBrightness must be 0–100");
             settingsType!.GetProperty("BackgroundPatternBrightness")?.SetValue(settings, underlayBrightness.Value);
         }
+
+        if (!session.RequestConfirmation("set halftone/underlay settings", 1))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Halftone/Underlay Settings");
         tx.Start();

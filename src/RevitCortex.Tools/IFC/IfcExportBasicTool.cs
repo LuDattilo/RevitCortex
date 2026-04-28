@@ -12,13 +12,14 @@ namespace RevitCortex.Tools.IFC;
 /// <summary>
 /// Exports the active document to IFC using standard IFCExportOptions.
 /// </summary>
-public class IfcExportBasicTool : ICortexTool
+public class IfcExportBasicTool : ICortexTool, ICommandTimeoutTool
 {
     public string Name => "ifc_export_basic";
     public string Category => "IFC";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
     public string Description => "Export the active Revit document to IFC with standard options";
+    public int CommandTimeoutSeconds => 900;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {

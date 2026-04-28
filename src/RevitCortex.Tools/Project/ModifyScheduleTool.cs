@@ -49,17 +49,35 @@ public class ModifyScheduleTool : ICortexTool
             if (schedule == null)
                 return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "Schedule not found");
 
+            var normalizedAction = action.ToLowerInvariant();
+            if (normalizedAction == "set_sort")
+                normalizedAction = "set_sorting";
+
+            if (normalizedAction != "add_field" &&
+                normalizedAction != "remove_field" &&
+                normalizedAction != "set_sorting" &&
+                normalizedAction != "clear_sorting" &&
+                normalizedAction != "rename")
+            {
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"Unknown action: {action}",
+                    suggestion: "Use: add_field, remove_field, set_sorting, clear_sorting, rename");
+            }
+
+            if (!session.RequestConfirmation("modify schedule", 1, schedule.Name))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
             using var tx = new Transaction(doc, "RevitCortex: Modify Schedule");
             tx.Start();
 
-            var result = action.ToLowerInvariant() switch
+            var result = normalizedAction switch
             {
                 "add_field" => AddFields(schedule, input),
                 "remove_field" => RemoveFields(schedule, input),
                 "set_sorting" => SetSorting(schedule, input),
                 "clear_sorting" => ClearSorting(schedule),
                 "rename" => RenameSchedule(schedule, input),
-                _ => (object)new { error = $"Unknown action: {action}" }
+                _ => new object()
             };
 
             tx.Commit();

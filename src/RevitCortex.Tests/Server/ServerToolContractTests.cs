@@ -221,5 +221,21 @@ namespace RevitCortex.Tests.Server
             Assert.True(GetParameter(method, "limit").HasDefaultValue);
             Assert.Null(GetParameter(method, "limit").DefaultValue);
         }
+
+        [Fact]
+        public void ModifySchedule_DescribesPluginNativeSortingActions()
+        {
+            var method = GetMethod(typeof(ProjectTools), nameof(ProjectTools.ModifySchedule));
+            var action = GetParameter(method, "action");
+
+            var description = action.GetCustomAttribute<DescriptionAttribute>()?.Description;
+            Assert.NotNull(description);
+            Assert.Contains("set_sorting", description);
+            Assert.Contains("clear_sorting", description);
+            Assert.DoesNotContain("set_sort |", description);
+
+            AssertDescription(method,
+                "Modify schedule fields, sorting, or rename the schedule. Supported actions: add_field, remove_field, set_sorting, clear_sorting, rename.");
+        }
     }
 }

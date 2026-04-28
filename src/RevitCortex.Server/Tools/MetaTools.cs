@@ -34,4 +34,18 @@ public static class MetaTools
         var result = await revit.ExecuteAsync("get_project_info", p, ct);
         return result.ToString();
     }
+
+    [McpServerTool(Name = "get_cache_stats"), Description("Return diagnostic hit/miss telemetry from the plugin-side tool-result cache.")]
+    public static async Task<string> GetCacheStats(RevitConnectionManager revit, CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("get_cache_stats", new JObject(), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "clear_cache"), Description("Clear every entry from the plugin-side tool-result cache.")]
+    public static async Task<string> ClearCache(RevitConnectionManager revit, CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("clear_cache", new JObject(), ct);
+        return result.ToString();
+    }
 }

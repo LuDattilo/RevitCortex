@@ -34,8 +34,8 @@ public class ManageLinksTool : ICortexTool
             return action.ToLowerInvariant() switch
             {
                 "list" => ListLinks(doc),
-                "reload" => ReloadLink(doc, linkId),
-                "unload" => UnloadLink(doc, linkId),
+                "reload" => ReloadLink(doc, linkId, session),
+                "unload" => UnloadLink(doc, linkId, session),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}", suggestion: "Use: list, reload, unload")
             };
@@ -82,7 +82,7 @@ public class ManageLinksTool : ICortexTool
         return CortexResult<object>.Ok(new { linkCount = links.Count, links });
     }
 
-    private static CortexResult<object> ReloadLink(Document doc, long linkId)
+    private static CortexResult<object> ReloadLink(Document doc, long linkId, CortexSession session)
     {
         if (linkId <= 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "linkId required for reload");
@@ -99,6 +99,9 @@ public class ManageLinksTool : ICortexTool
         if (linkType == null)
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "Link type not found");
 
+        if (!session.RequestConfirmation("reload link", 1, linkInstance.Name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
         using var tx = new Transaction(doc, "RevitCortex: Reload Link");
         tx.Start();
         linkType.Reload();
@@ -107,7 +110,7 @@ public class ManageLinksTool : ICortexTool
         return CortexResult<object>.Ok(new { linkId, name = linkInstance.Name, action = "reloaded" });
     }
 
-    private static CortexResult<object> UnloadLink(Document doc, long linkId)
+    private static CortexResult<object> UnloadLink(Document doc, long linkId, CortexSession session)
     {
         if (linkId <= 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "linkId required for unload");
@@ -123,6 +126,9 @@ public class ManageLinksTool : ICortexTool
         var linkType = doc.GetElement(linkInstance.GetTypeId()) as RevitLinkType;
         if (linkType == null)
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "Link type not found");
+
+        if (!session.RequestConfirmation("unload link", 1, linkInstance.Name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Unload Link");
         tx.Start();

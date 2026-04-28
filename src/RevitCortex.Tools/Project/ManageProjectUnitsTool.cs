@@ -49,7 +49,7 @@ public class ManageProjectUnitsTool : ICortexTool
             return action.ToLowerInvariant() switch
             {
                 "get"               => GetUnits(doc),
-                "set"               => SetUnit(doc, input),
+                "set"               => SetUnit(doc, input, session),
                 "list_valid_units"  => ListValidUnits(doc, input),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}",
@@ -92,7 +92,7 @@ public class ManageProjectUnitsTool : ICortexTool
         });
     }
 
-    private static CortexResult<object> SetUnit(Document doc, JObject input)
+    private static CortexResult<object> SetUnit(Document doc, JObject input, CortexSession session)
     {
         var specType = input["specType"]?.Value<string>();
         var unit     = input["unit"]?.Value<string>();
@@ -130,6 +130,9 @@ public class ManageProjectUnitsTool : ICortexTool
         if (accuracy.HasValue) opts.Accuracy = accuracy.Value;
 
         units.SetFormatOptions(specEntry.specId, opts);
+
+        if (!session.RequestConfirmation("set project units", 1, $"{specType} -> {unit}"))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Project Units");
         tx.Start();

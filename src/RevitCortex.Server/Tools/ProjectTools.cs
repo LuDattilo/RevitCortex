@@ -353,10 +353,10 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "modify_schedule"), Description("Modify schedule fields, sorting, or rename the schedule. Supported actions: add_field, remove_field, set_sort, rename.")]
+    [McpServerTool(Name = "modify_schedule"), Description("Modify schedule fields, sorting, or rename the schedule. Supported actions: add_field, remove_field, set_sorting, clear_sorting, rename.")]
     public static async Task<string> ModifySchedule(
         RevitConnectionManager revit,
-        [Description("Action: add_field | remove_field | set_sort | rename. Default: add_field")] string? action = null,
+        [Description("Action: add_field | remove_field | set_sorting | clear_sorting | rename. Default: add_field")] string? action = null,
         [Description("Schedule element ID (alternative to scheduleName)")] long? scheduleId = null,
         [Description("Schedule name (alternative to scheduleId)")] string? scheduleName = null,
         [Description("Field names for add_field/remove_field actions")] string[]? fieldNames = null,

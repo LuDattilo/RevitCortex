@@ -24,10 +24,9 @@ public class DocumentAnalyzer : IDocumentAnalyzer
             .GetElementCount() > 0;
 
         var elements = new FilteredElementCollector(doc)
-            .WhereElementIsNotElementType()
-            .ToElements();
+            .WhereElementIsNotElementType();
 
-        foreach (var elem in elements)
+        foreach (Element elem in elements)
         {
             var cat = elem.Category;
             if (cat != null)
@@ -45,19 +44,12 @@ public class DocumentAnalyzer : IDocumentAnalyzer
         {
             caps.EnableTool("get_worksets");
             caps.EnableTool("set_element_workset");
-            caps.EnableTool("create_workset");
         }
 
         if (caps.HasPhases)
         {
             caps.EnableTool("get_phases");
-            caps.EnableTool("get_phase_filter");
             caps.EnableTool("set_element_phase");
-        }
-
-        if (caps.HasDesignOptions)
-        {
-            caps.EnableTool("get_design_options");
         }
 
         if (caps.HasLinkedModels)
@@ -76,17 +68,6 @@ public class DocumentAnalyzer : IDocumentAnalyzer
         if (caps.PresentCategories.Contains("OST_Rooms"))
         {
             caps.EnableTool("get_room_openings");
-            caps.EnableTool("create_room_finish_schedule");
-            caps.EnableTool("create_door_schedule_by_room");
-            caps.EnableTool("create_window_schedule_by_room");
-        }
-
-        if (caps.PresentCategories.Contains("OST_Walls") ||
-            caps.PresentCategories.Contains("OST_Floors") ||
-            caps.PresentCategories.Contains("OST_Roofs"))
-        {
-            caps.EnableTool("set_material_properties");
-            caps.EnableTool("create_material_takeoff_schedule");
         }
     }
 }

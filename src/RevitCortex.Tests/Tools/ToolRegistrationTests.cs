@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using RevitCortex.Core.Discovery;
 using RevitCortex.Core.Tools;
 using Xunit;
 
@@ -104,4 +105,17 @@ public class ToolRegistrationTests
             $"If you removed tools intentionally, update this test.");
     }
 
+    [Fact]
+    public void DynamicCapabilityNames_AllMapToRegisteredTools()
+    {
+        var tools = AllToolTypes
+            .Select(t => (ICortexTool)Activator.CreateInstance(t)!)
+            .Select(t => t.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var toolName in DocumentCapabilities.KnownDynamicToolNames)
+        {
+            Assert.Contains(toolName, tools);
+        }
+    }
 }
