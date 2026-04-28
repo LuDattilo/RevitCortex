@@ -47,4 +47,26 @@ public class CrossAppSelectionToolTests
         Assert.Equal("Interop", tool.Category);
         Assert.True(tool.RequiresDocument);
     }
+
+    [Fact]
+    public void Import_ReadsRefsArray_AsCortexElementRef()
+    {
+        var tool = new CrossAppSelectionTool();
+        var session = MakeSession();
+        // No active document in session → the body fails fast on doc-missing,
+        // BUT only AFTER input validation succeeds. We assert it gets past
+        // input validation (i.e., a non-empty refs array no longer triggers
+        // the "refs required" error).
+        var json = JObject.Parse(@"{
+            ""mode"": ""import"",
+            ""refs"": [{
+                ""sourceFile"": ""Strutture.rvt"",
+                ""revitUniqueId"": ""abc-123""
+            }]
+        }");
+        var result = tool.Execute(json, session);
+        Assert.False(result.Success);
+        // Document-missing error, not refs-empty error.
+        Assert.Contains("active", result.Error!.Message, System.StringComparison.OrdinalIgnoreCase);
+    }
 }
