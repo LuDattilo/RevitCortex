@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Caching;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
@@ -14,13 +15,14 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// Lists all linked file types with their instances, load status, path, and transform data.
 /// Groups instances by their parent RevitLinkType.
 /// </summary>
-public class GetLinkedFileInstancesTool : ICortexTool
+public class GetLinkedFileInstancesTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_linked_file_instances";
     public string Category => "LinkedFiles";
     public bool RequiresDocument => true;
     public bool IsDynamic => true;
     public string Description => "Lists all linked Revit files grouped by type, with instance transforms, load status, and file paths.";
+    public CacheScope CacheScope => CacheScope.Document;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {

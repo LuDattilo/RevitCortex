@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Caching;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
@@ -12,13 +13,14 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Lists all project phases with sequence order and optionally phase filters.
 /// </summary>
-public class GetPhasesTool : ICortexTool
+public class GetPhasesTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_phases";
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
     public string Description => "Lists all project phases with sequence order and optionally phase filters.";
+    public CacheScope CacheScope => CacheScope.Document;
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

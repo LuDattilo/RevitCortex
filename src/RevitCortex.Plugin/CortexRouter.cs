@@ -5,7 +5,9 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Caching;
 using RevitCortex.Core.Discovery;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Security;
@@ -101,10 +103,40 @@ public class CortexRouter
 
         var stopwatch = Stopwatch.StartNew();
         CortexResult<object> result;
+
+        // Cache lookup for read-only tools that opted into ICacheableTool.
+        // On hit, skip the dispatcher entirely — no UI-thread marshal is needed
+        // to return a previously-computed value.
+        var cacheable = tool as ICacheableTool;
+        string? paramHash = null;
+        if (cacheable != null)
+        {
+            paramHash = HashParams(input);
+            if (_session.Cache.TryGet(toolName, paramHash, cacheable.CacheScope,
+                    _session.DocumentVersion, out var cached))
+            {
+                stopwatch.Stop();
+                _auditLogger.LogWithPerf(toolName, BuildInputSummary(toolName, input),
+                    cached.Success, cached.Error?.Code, elementsAffected: 0,
+                    durationMs: stopwatch.ElapsedMilliseconds,
+                    responseBytes: EstimateResponseBytes(cached));
+                return cached;
+            }
+        }
+
         if (_dispatcher != null)
             result = _dispatcher.Execute(tool, input, _session);
         else
             result = tool.Execute(input, _session);
+
+        // Only cache successful results. Failures must always re-execute so a
+        // transient error doesn't get stuck in the cache.
+        if (cacheable != null && paramHash != null && result.Success)
+        {
+            _session.Cache.Set(toolName, paramHash, cacheable.CacheScope,
+                _session.DocumentVersion, result);
+        }
+
         stopwatch.Stop();
 
         // Audit log (schema v2): every invocation, with duration and response size.
@@ -153,6 +185,38 @@ public class CortexRouter
         var sb = new StringBuilder(bytes.Length * 2);
         foreach (var b in bytes) sb.Append(b.ToString("x2"));
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Canonical SHA-256 of a tool's input. Keys are sorted recursively and
+    /// the JSON is emitted without whitespace, so calls that differ only in
+    /// key order or formatting hit the same cache entry.
+    /// </summary>
+    internal static string HashParams(JObject input)
+    {
+        var canonical = Canonicalize(input);
+        var json = canonical.ToString(Formatting.None);
+        return ComputeSha256(json);
+    }
+
+    private static JToken Canonicalize(JToken token)
+    {
+        switch (token.Type)
+        {
+            case JTokenType.Object:
+                var src = (JObject)token;
+                var sorted = new JObject();
+                foreach (var prop in src.Properties().OrderBy(p => p.Name, StringComparer.Ordinal))
+                    sorted.Add(prop.Name, Canonicalize(prop.Value));
+                return sorted;
+            case JTokenType.Array:
+                var arr = new JArray();
+                foreach (var item in (JArray)token)
+                    arr.Add(Canonicalize(item));
+                return arr;
+            default:
+                return token.DeepClone();
+        }
     }
 
     /// <summary>

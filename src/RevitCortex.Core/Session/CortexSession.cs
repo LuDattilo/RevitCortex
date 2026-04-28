@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using RevitCortex.Core.Caching;
 using RevitCortex.Core.Discovery;
 
 namespace RevitCortex.Core.Session;
@@ -14,6 +16,25 @@ public class CortexSession
     public ISessionStore Store { get; }
     public DocumentCapabilities Capabilities { get; private set; }
     public string DetectedLocale { get; private set; }
+
+    /// <summary>
+    /// Tool-result cache. Always non-null. Plugin wires invalidation to Revit
+    /// document events; in tests a default cache is created automatically.
+    /// </summary>
+    public IToolResultCache Cache { get; }
+
+    /// <summary>
+    /// Monotonic counter, bumped on each Revit DocumentChanged. Read by the
+    /// router when consulting <see cref="Cache"/>; bumped by the Plugin's
+    /// DocumentChangeWatcher. Tests can bump it directly via <see cref="BumpDocumentVersion"/>.
+    /// </summary>
+    public long DocumentVersion => Interlocked.Read(ref _documentVersion);
+    private long _documentVersion;
+
+    /// <summary>
+    /// Atomically increment <see cref="DocumentVersion"/>. Returns the new value.
+    /// </summary>
+    public long BumpDocumentVersion() => Interlocked.Increment(ref _documentVersion);
 
     /// <summary>
     /// Confirmation callback for destructive operations.
@@ -55,8 +76,14 @@ public class CortexSession
     private DateTime _approveAllTimestamp;
 
     public CortexSession(ISessionStore store)
+        : this(store, new ToolResultCache())
+    {
+    }
+
+    public CortexSession(ISessionStore store, IToolResultCache cache)
     {
         Store = store;
+        Cache = cache;
         Capabilities = new DocumentCapabilities();
         DetectedLocale = "en";
     }
@@ -66,6 +93,13 @@ public class CortexSession
         Store.Clear();
         Capabilities = capabilities;
         DetectedLocale = locale;
+
+        // Switching/reopening a document invalidates everything that's not
+        // session-immutable. Session entries (e.g. project_info if we cached it
+        // for the SAME doc) would be stale here too — be conservative and
+        // drop them all on document boundary.
+        Cache.InvalidateAll();
+        BumpDocumentVersion();
     }
 
     /// <summary>

@@ -3,6 +3,7 @@ using Autodesk.Revit.DB.Events;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
 using RevitCortex.Core.Session;
+using RevitCortex.Plugin.Caching;
 using RevitCortex.Plugin.Communication;
 using RevitCortex.Plugin.Discovery;
 using RevitCortex.Plugin.Threading;
@@ -17,6 +18,7 @@ public class RevitCortexApp : IExternalApplication
     private SocketService? _socketService;
     private CortexRouter? _router;
     private CortexSession? _session;
+    private DocumentChangeWatcher? _cacheWatcher;
     private UIApplication? _uiApplication;
     private int _port = 8080;
     private Autodesk.Revit.UI.PushButton? _connectButton;
@@ -106,6 +108,12 @@ public class RevitCortexApp : IExternalApplication
             application.ControlledApplication.DocumentOpened += OnDocumentOpened;
             application.ControlledApplication.DocumentClosing += OnDocumentClosing;
 
+            // Subscribe the tool-result cache to model-change events. The watcher
+            // bumps DocumentVersion and drops Document/Transaction entries so
+            // cached reads can never outlive the model state they describe.
+            _cacheWatcher = new DocumentChangeWatcher(_session);
+            _cacheWatcher.Attach(application.ControlledApplication);
+
             // Capture UIApplication when Revit is idle (needed for ViewActivated hook)
             application.Idling += OnIdling;
 
@@ -131,6 +139,9 @@ public class RevitCortexApp : IExternalApplication
             application.Idling -= OnIdling;
             if (_uiApplication != null)
                 _uiApplication.ViewActivated -= OnViewActivated;
+
+            _cacheWatcher?.Dispose();
+            _cacheWatcher = null;
 
             // Delete all TEMP scripts generated during this session
             CleanupTempScripts();
