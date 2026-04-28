@@ -48,7 +48,11 @@ namespace RevitCortex.Tools.Interop
                         var element = hostDoc.GetElement(reference.ElementId);
                         if (element == null)
                         {
-                            output.Skipped.Add(new { reason = "host element not found" });
+                            output.Skipped.Add(new
+                            {
+                                reason = "host element not found",
+                                elementId = GetIdValue(reference.ElementId)
+                            });
                             continue;
                         }
                         output.Refs.Add(BuildRef(element, hostFile));
@@ -67,7 +71,9 @@ namespace RevitCortex.Tools.Interop
                                     ? "link instance not found"
                                     : linkDoc == null
                                         ? "link document not loaded"
-                                        : "linked element not found"
+                                        : "linked element not found",
+                                elementId = GetIdValue(reference.LinkedElementId),
+                                linkInstanceId = GetIdValue(reference.ElementId)
                             });
                             continue;
                         }
@@ -79,8 +85,11 @@ namespace RevitCortex.Tools.Interop
                 }
                 catch (Exception ex) when (!IsFatal(ex))
                 {
-                    _ = ex;
-                    output.Skipped.Add(new { reason = "per-ref exception: " + ex.Message });
+                    output.Skipped.Add(new
+                    {
+                        reason = "per-ref exception: " + ex.Message,
+                        elementId = GetIdValue(reference.ElementId)
+                    });
                 }
             }
             return output;
@@ -168,6 +177,16 @@ namespace RevitCortex.Tools.Interop
                 _ = ex;
                 return null;
             }
+        }
+
+        private static long GetIdValue(ElementId id)
+        {
+            if (id == null || id == ElementId.InvalidElementId) return 0;
+#if REVIT2024_OR_GREATER
+            return id.Value;
+#else
+            return (long)id.IntegerValue;
+#endif
         }
 
         private static bool IsFatal(Exception ex)

@@ -31,7 +31,7 @@ namespace RevitCortex.Tools.Interop
             });
         }
 
-        internal static CortexResult<object> ExecuteImport(object docObj, JObject input)
+        internal static CortexResult<object> ExecuteImport(object docObj, JObject input, CortexSession session)
         {
             var doc = (Document)docObj;
             var refsToken = input["refs"] as JArray;
@@ -111,8 +111,9 @@ namespace RevitCortex.Tools.Interop
                 ["usePostCommandIsolate"] = input["usePostCommandIsolate"]?.Value<bool?>() ?? false
             };
 
-            var session = new CortexSession(new SessionStore());
-            session.Store.Set("activeDocument", (object)doc);
+            // Reuse the caller's session so any state seeded upstream
+            // (audit context, per-call flags) flows through to the inner tool.
+            // activeDocument is already set by the outer Execute path.
             var innerResult = inner.Execute(innerInput, session);
 
             return CortexResult<object>.Ok(new
@@ -141,8 +142,8 @@ namespace RevitCortex.Tools.Interop
     /// <summary>
     /// Symmetric Revit↔Navis selection bridge. mode=export emits
     /// CortexElementRefs from the current Revit selection (host + linked).
-    /// mode=import consumes CortexElementRefs and selects/isolates them
-    /// (delegating to show_cross_model_elements; wired in plan task 6).
+    /// mode=import consumes CortexElementRefs and selects/isolates them by
+    /// composing show_cross_model_elements (no source changes there).
     /// </summary>
     public class CrossAppSelectionTool : ICortexTool
     {
@@ -188,7 +189,7 @@ namespace RevitCortex.Tools.Interop
             // this Execute method — which would fail in unit-test hosts.
             return modeLower == "export"
                 ? CrossAppSelectionRevitDispatch.ExecuteExport(docObj)
-                : CrossAppSelectionRevitDispatch.ExecuteImport(docObj, input);
+                : CrossAppSelectionRevitDispatch.ExecuteImport(docObj, input, session);
         }
     }
 }
