@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Caching;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
@@ -13,13 +14,14 @@ namespace RevitCortex.Tools.Project;
 /// Returns comprehensive project metadata: name, address, author, phases,
 /// worksets, Revit links, and levels.
 /// </summary>
-public class GetProjectInfoTool : ICortexTool
+public class GetProjectInfoTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_project_info";
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
     public string Description => "Returns comprehensive project metadata: name, address, author, phases, worksets, Revit links, and levels.";
+    public CacheScope CacheScope => CacheScope.Document;
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

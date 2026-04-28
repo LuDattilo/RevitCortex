@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Caching;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
@@ -12,13 +13,14 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Lists all materials in the project with optional filtering by material class or name.
 /// </summary>
-public class GetMaterialsTool : ICortexTool
+public class GetMaterialsTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_materials";
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
     public string Description => "Lists all materials in the project with optional filtering by material class or name.";
+    public CacheScope CacheScope => CacheScope.Document;
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Caching;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
@@ -13,13 +14,16 @@ namespace RevitCortex.Tools.Project;
 /// Lists worksets with open/close status and ownership info.
 /// Only available for workshared documents (IsDynamic = true).
 /// </summary>
-public class GetWorksetsTool : ICortexTool
+public class GetWorksetsTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_worksets";
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => true;
     public string Description => "Lists worksets with open/close status and ownership info. Only available for workshared documents (IsDynamic = true).";
+    // Transaction scope: ownership can change after a sync-with-central, so we
+    // also drop on Save/Synchronized in addition to model-edit invalidation.
+    public CacheScope CacheScope => CacheScope.Transaction;
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
