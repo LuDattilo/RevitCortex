@@ -54,6 +54,20 @@ public static class ElementTools
         return result.ToString();
     }
 
+    [McpServerTool(Name = "get_elements_by_unique_id"), Description("Resolve Revit UniqueId strings to ElementId records for cross-app workflows.")]
+    public static async Task<string> ResolveElementsByUniqueId(
+        RevitConnectionManager revit,
+        [Description("Array of Revit UniqueId strings to resolve")] string[] uniqueIds,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["uniqueIds"] = new JArray(uniqueIds)
+        };
+        var result = await revit.ExecuteAsync("get_elements_by_unique_id", p, ct);
+        return result.ToString();
+    }
+
     [McpServerTool(Name = "operate_element"), Description("Select, highlight, isolate, hide, or zoom to elements. Actions: select, selectionbox, setcolor, settransparency, hide, temphide, isolate, unhide, resetisolate, delete.")]
     public static async Task<string> OperateElement(
         RevitConnectionManager revit,

@@ -89,6 +89,33 @@ public static class LinkTools
         return result.ToString();
     }
 
+    [McpServerTool(Name = "show_cross_model_elements"), Description("Select host elements plus elements in linked Revit models. Two strategies for visibility: (a) default — create red DirectShape markers in the host doc around each linked element's bounding box (synchronous, transactional, robust); (b) usePostCommandIsolate=true — use Revit's native IsolateElements via PostCommand after SetReferences (canonical Revit API pattern, but asynchronous: tool returns before isolate completes, and cannot be combined with section box / overrides in the same call).")]
+    public static async Task<string> ShowCrossModelElements(
+        RevitConnectionManager revit,
+        [Description("Host document element IDs to include")] long[]? hostElementIds = null,
+        [Description("JSON array of linked targets: [{\"instanceId\":2409055,\"linkedElementId\":1413682}]")] string? linkedElements = null,
+        [Description("Select host elements and linked-element references. Default: true")] bool? select = null,
+        [Description("Temporarily isolate host elements and link instances. Default: true")] bool? isolate = null,
+        [Description("Create a 3D section box around all targets. Default: true. Ignored when usePostCommandIsolate=true.")] bool? createSectionBox = null,
+        [Description("Create red DirectShape markers in the host doc around each linked element's bounding box. Default: true. Ignored when usePostCommandIsolate=true.")] bool? createLinkedMarkers = null,
+        [Description("Use Revit's native PostCommand(IsolateElement) instead of the marker strategy. Default: false. Asynchronous: tool returns before isolate completes; section box and markers are skipped.")] bool? usePostCommandIsolate = null,
+        [Description("Section box padding in mm. Default: 1200")] double? offset = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (hostElementIds != null) p["hostElementIds"] = new JArray(hostElementIds.Cast<object>().ToArray());
+        if (linkedElements != null) p["linkedElements"] = JArray.Parse(linkedElements);
+        if (select != null) p["select"] = select;
+        if (isolate != null) p["isolate"] = isolate;
+        if (createSectionBox != null) p["createSectionBox"] = createSectionBox;
+        if (createLinkedMarkers != null) p["createLinkedMarkers"] = createLinkedMarkers;
+        if (usePostCommandIsolate != null) p["usePostCommandIsolate"] = usePostCommandIsolate;
+        if (offset != null) p["offset"] = offset;
+
+        var result = await revit.ExecuteAsync("show_cross_model_elements", p, ct);
+        return result.ToString();
+    }
+
     [McpServerTool(Name = "manage_links"), Description("List, reload, or unload linked files.")]
     public static async Task<string> ManageLinks(
         RevitConnectionManager revit,

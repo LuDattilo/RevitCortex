@@ -139,6 +139,51 @@ namespace RevitCortex.Tests.Server
         }
 
         [Fact]
+        public void ResolveElementsByUniqueId_ExposesBatchUniqueIds()
+        {
+            var method = GetMethod(typeof(ElementTools), nameof(ElementTools.ResolveElementsByUniqueId));
+            var parameters = method.GetParameters();
+
+            Assert.Collection(
+                parameters.Select(p => p.Name),
+                name => Assert.Equal("revit", name),
+                name => Assert.Equal("uniqueIds", name),
+                name => Assert.Equal("ct", name));
+
+            Assert.Equal(typeof(string[]), GetParameter(method, "uniqueIds").ParameterType);
+            AssertDescription(method, "Resolve Revit UniqueId strings to ElementId records for cross-app workflows.");
+        }
+
+        [Fact]
+        public void ShowCrossModelElements_ExposesHostAndLinkedTargets()
+        {
+            var method = GetMethod(typeof(LinkTools), nameof(LinkTools.ShowCrossModelElements));
+            var parameters = method.GetParameters();
+
+            Assert.Collection(
+                parameters.Select(p => p.Name),
+                name => Assert.Equal("revit", name),
+                name => Assert.Equal("hostElementIds", name),
+                name => Assert.Equal("linkedElements", name),
+                name => Assert.Equal("select", name),
+                name => Assert.Equal("isolate", name),
+                name => Assert.Equal("createSectionBox", name),
+                name => Assert.Equal("createLinkedMarkers", name),
+                name => Assert.Equal("usePostCommandIsolate", name),
+                name => Assert.Equal("offset", name),
+                name => Assert.Equal("ct", name));
+
+            Assert.Equal(typeof(long[]), GetParameter(method, "hostElementIds").ParameterType);
+            Assert.Equal(typeof(string), GetParameter(method, "linkedElements").ParameterType);
+            Assert.Equal(typeof(bool?), GetParameter(method, "select").ParameterType);
+            Assert.Equal(typeof(bool?), GetParameter(method, "isolate").ParameterType);
+            Assert.Equal(typeof(bool?), GetParameter(method, "createSectionBox").ParameterType);
+            Assert.Equal(typeof(bool?), GetParameter(method, "createLinkedMarkers").ParameterType);
+            Assert.Equal(typeof(bool?), GetParameter(method, "usePostCommandIsolate").ParameterType);
+            Assert.Equal(typeof(double?), GetParameter(method, "offset").ParameterType);
+        }
+
+        [Fact]
         public void AuditFamilies_ExposesCompactFlag()
         {
             var method = GetMethod(typeof(ProjectTools), nameof(ProjectTools.AuditFamilies));

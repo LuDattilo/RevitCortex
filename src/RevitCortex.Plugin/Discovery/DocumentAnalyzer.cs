@@ -69,6 +69,7 @@ public class DocumentAnalyzer : IDocumentAnalyzer
             caps.EnableTool("move_link_instance");
             caps.EnableTool("align_link_to_host");
             caps.EnableTool("highlight_linked_element");
+            caps.EnableTool("show_cross_model_elements");
             caps.EnableTool("get_selected_linked_elements");
         }
 
