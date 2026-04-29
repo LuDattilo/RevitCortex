@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
     One-click release for RevitCortex.
@@ -30,8 +30,10 @@
 
 .PARAMETER DownloadUrl
     Optional override for the downloadUrl field in latest.json. If omitted,
-    the existing URL is preserved (typical case: you replaced the file
-    behind the SharePoint link).
+    the URL is auto-derived from -Version using the GitHub Releases asset
+    pattern of the revitcortex-releases repo (the asset is uploaded by
+    this script via `gh release create`). Pass this only when you want to
+    host the zip somewhere else (SharePoint, OneDrive public link, ...).
 
 .EXAMPLE
     .\release.ps1 -Version 1.0.5 -Changelog "Fix X, improve Y"
@@ -77,6 +79,13 @@ Set-Location $RepoRoot
 
 $gitStatus = & git status --porcelain 2>&1
 if ($LASTEXITCODE -ne 0) { throw "Not a git repo or git not in PATH" }
+
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    throw "GitHub CLI (gh) not found in PATH. Install it from https://cli.github.com/ — needed to create the release and upload the asset."
+}
+& gh auth status 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "gh CLI is installed but not authenticated. Run: gh auth login" }
+Write-Ok "gh CLI authenticated"
 $dirty = $gitStatus | Where-Object { $_ -and ($_ -notmatch '^\?\?') -and ($_ -notmatch 'settings\.local\.json$') }
 if ($dirty) {
     Write-Fail "Working tree has uncommitted changes other than allowed files:"
@@ -148,24 +157,68 @@ Write-Step "Copying ZIP to OneDrive"
 Copy-Item $zipPath (Join-Path $oneDriveDir "RevitCortex-v$Version.zip") -Force
 Write-Ok "OneDrive copy complete"
 
-# ── 5. Publish public manifest ──────────────────────────────────────────────
+# ── 5. Create/update GitHub Release (idempotent) ────────────────────────────
+# Uploading the asset BEFORE writing the manifest is what makes the manifest
+# safe to publish: a manifest claiming v$Version is only valid if the
+# corresponding zip is actually downloadable. Doing this in a single script
+# eliminates the historical "manifest says v1.0.19, asset is v1.0.18" loop.
+Write-Step "Publishing GitHub Release v$Version"
+
+$ghRepo = "LuDattilo/revitcortex-releases"
+$assetName = "RevitCortex-v$Version.zip"
+$releaseNotes = if ($Changelog) { $Changelog } else { "v$Version release." }
+
+& gh release view "v$Version" --repo $ghRepo 1>$null 2>&1
+$releaseExists = ($LASTEXITCODE -eq 0)
+
+if ($releaseExists) {
+    Write-Warn "Release v$Version already exists — re-uploading asset (--clobber)"
+    & gh release upload "v$Version" $zipPath --repo $ghRepo --clobber 2>&1 | ForEach-Object { Write-Host "    $_" }
+    if ($LASTEXITCODE -ne 0) { throw "gh release upload failed" }
+} else {
+    & gh release create "v$Version" $zipPath --repo $ghRepo --title "RevitCortex v$Version" --notes "$releaseNotes" 2>&1 | ForEach-Object { Write-Host "    $_" }
+    if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
+}
+Write-Ok "Asset $assetName attached to v$Version on $ghRepo"
+
+# ── 6. Publish public manifest ──────────────────────────────────────────────
 if ($SkipManifest) {
     Write-Warn "Manifest update skipped (SkipManifest flag). Installed plugins will not detect v$Version until you update latest.json manually."
 } else {
     Write-Step "Publishing public update manifest"
 
+    # Auto-derive URL from version unless caller explicitly overrides.
+    # Default matches what step 5 just uploaded.
+    $resolvedUrl = if ($DownloadUrl) { $DownloadUrl } `
+                   else { "https://github.com/$ghRepo/releases/download/v$Version/$assetName" }
+
+    # Hard sanity check: refuse to ship a manifest where (version, url) disagree.
+    # This is the exact check that, if it had been here, would have prevented
+    # the v1.0.19/v1.0.18 mismatch loop.
+    if ($resolvedUrl -notmatch [regex]::Escape("v$Version")) {
+        throw "downloadUrl must reference 'v$Version' but got: $resolvedUrl. Refusing to publish a manifest with mismatched (version, url) — this causes infinite update-available loops on every installed plugin."
+    }
+
+    # Verify the URL actually serves the asset before broadcasting it.
+    try {
+        $head = Invoke-WebRequest -Uri $resolvedUrl -Method Head -MaximumRedirection 5 -UseBasicParsing -TimeoutSec 20 -ErrorAction Stop
+        if ($head.StatusCode -lt 200 -or $head.StatusCode -ge 300) { throw "HEAD returned $($head.StatusCode)" }
+        Write-Ok "downloadUrl reachable (HTTP $($head.StatusCode))"
+    } catch {
+        throw "downloadUrl not reachable: $resolvedUrl`nReason: $_`nThe GitHub Release upload may not have propagated yet, or -DownloadUrl points to a missing file. Retry in a few seconds, or pass -DownloadUrl with a working URL."
+    }
+
     $cloneDir = Join-Path $env:TEMP "rc-releases-$([guid]::NewGuid().ToString('N'))"
     try {
-        & git clone --depth 1 https://github.com/LuDattilo/revitcortex-releases.git $cloneDir 2>&1 | ForEach-Object { Write-Host "    $_" }
+        & git clone --depth 1 "https://github.com/$ghRepo.git" $cloneDir 2>&1 | ForEach-Object { Write-Host "    $_" }
         if ($LASTEXITCODE -ne 0) { throw "git clone failed" }
 
         $manifestPath = Join-Path $cloneDir 'latest.json'
         $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
 
-        $newChangelog = if ($Changelog) { $Changelog } else { "v$Version release." }
         $manifest.version = $Version
-        if ($DownloadUrl) { $manifest.downloadUrl = $DownloadUrl }
-        $manifest.changelog = $newChangelog
+        $manifest.downloadUrl = $resolvedUrl
+        $manifest.changelog = $releaseNotes
 
         $json = $manifest | ConvertTo-Json -Depth 10
         [System.IO.File]::WriteAllText($manifestPath, $json, [System.Text.UTF8Encoding]::new($false))
@@ -179,7 +232,7 @@ if ($SkipManifest) {
             if ($LASTEXITCODE -ne 0) { throw "manifest push failed" }
         } finally { Pop-Location }
 
-        Write-Ok "manifest pushed"
+        Write-Ok "manifest pushed (version=$Version, url=$resolvedUrl)"
     } finally {
         if (Test-Path $cloneDir) { Remove-Item $cloneDir -Recurse -Force -ErrorAction SilentlyContinue }
     }
@@ -194,12 +247,10 @@ Write-Host ""
 Write-Host "  Tag:       v$Version (pushed to origin)"            -ForegroundColor White
 Write-Host "  ZIP:       $zipPath ($zipSizeMB MB)"                  -ForegroundColor White
 Write-Host "  OneDrive:  $oneDriveDir"                              -ForegroundColor White
+Write-Host ("  GH Asset:  https://github.com/{0}/releases/tag/v{1}" -f $ghRepo, $Version) -ForegroundColor White
 if (-not $SkipManifest) {
     Write-Host "  Manifest:  https://raw.githubusercontent.com/LuDattilo/revitcortex-releases/main/latest.json" -ForegroundColor White
 }
 Write-Host ""
-Write-Host "  Manual step remaining:" -ForegroundColor Yellow
-Write-Host "    Replace the file behind the SharePoint download link with" -ForegroundColor Yellow
-Write-Host "    RevitCortex-v$Version.zip, OR pass -DownloadUrl next time"  -ForegroundColor Yellow
-Write-Host "    with a fresh public URL."                                   -ForegroundColor Yellow
+Write-Host "  Installed plugins will detect v$Version on next Revit start." -ForegroundColor Green
 Write-Host ""
