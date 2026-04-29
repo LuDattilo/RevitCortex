@@ -202,14 +202,18 @@ public partial class GeneralSettingsPage : Page
             case UpdateChecker.DownloadState.Ready:
                 UpdateChecker.LaunchInstaller();
                 RefreshUpdateBanner();
-                // Close Revit after a short delay so the installer process has
-                // time to start and enter its Assert-RevitClosed loop before
-                // Revit exits. Without this the DLLs are locked and the install fails.
+                // CloseMainWindow (equivalent to Alt+F4) sends WM_CLOSE so Revit
+                // runs its normal shutdown path including unsaved-changes prompts.
+                // Application.Current.Shutdown() only tears down the WPF subsystem
+                // inside Revit, leaving the Win32 main loop alive with a broken UI;
+                // any subsequent manual close attempt then surfaces an empty
+                // "Revit.exe" dialog. The 1.5s delay lets the elevated installer
+                // reach its Assert-RevitClosed wait loop before Revit exits.
                 var closeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
                 closeTimer.Tick += (_, _) =>
                 {
                     closeTimer.Stop();
-                    try { System.Windows.Application.Current?.Shutdown(); } catch { }
+                    try { System.Diagnostics.Process.GetCurrentProcess().CloseMainWindow(); } catch { }
                 };
                 closeTimer.Start();
                 break;
