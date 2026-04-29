@@ -2,7 +2,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
+using RevitCortex.Server;
 using RevitCortex.Server.Connection;
+
+// Exit when Claude Desktop dies, so we don't pile up as an orphan on
+// every reconnect. See ParentWatchdog for the why.
+ParentWatchdog.Start();
 
 var port = RevitConnectionManager.ResolvePort();
 
