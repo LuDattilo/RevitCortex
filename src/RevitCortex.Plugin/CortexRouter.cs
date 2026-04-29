@@ -96,16 +96,41 @@ public class CortexRouter
                 $"Tool '{toolName}' is blocked in read-only mode",
                 suggestion: "Disable read-only mode in Settings to allow write operations");
 
+        // Stopwatch around dispatch so audit captures the real tool cost
+        // (including main-thread marshal). Excludes router setup checks
+        // above and audit serialization below — those are negligible
+        // compared to the tool itself, which is what we care about.
         CortexResult<object> result;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         if (_dispatcher != null)
             result = _dispatcher.Execute(tool, input, _session);
         else
             result = tool.Execute(input, _session);
+        sw.Stop();
+
+        // Response size — UTF-8 byte count of the serialized data payload.
+        // 0 on failure (no data to send). The actual JSON-RPC envelope is a
+        // bit bigger (id, jsonrpc, error wrapper) but tracking the data
+        // alone is what matters for "is this tool returning a wall of
+        // bytes" diagnostics.
+        var responseBytes = 0;
+        if (result.Success && result.Data != null)
+        {
+            try
+            {
+                var json = Newtonsoft.Json.JsonConvert.SerializeObject(
+                    result.Data, Newtonsoft.Json.Formatting.None);
+                responseBytes = System.Text.Encoding.UTF8.GetByteCount(json);
+            }
+            catch { /* leave at 0 */ }
+        }
 
         // Audit log: record every tool invocation
         var inputSummary = BuildInputSummary(toolName, input);
         _auditLogger.Log(toolName, inputSummary, result.Success,
-            result.Error?.Code, elementsAffected: 0);
+            result.Error?.Code, elementsAffected: 0,
+            durationMs: sw.ElapsedMilliseconds,
+            responseBytes: responseBytes);
 
         return result;
     }
