@@ -140,15 +140,18 @@ public static class ParameterTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "manage_project_parameters"), Description("List, create, delete, or modify project parameters. Modify supports add/remove/replace on the category bindings.")]
+    [McpServerTool(Name = "manage_project_parameters"), Description("List, create, delete, modify, or set_group on project parameters. 'modify' supports add/remove/replace on the category bindings. 'set_group' bulk-changes the 'Group parameter under' assignment for one or more user-defined parameters (built-in parameters are silently skipped).")]
     public static async Task<string> ManageProjectParameters(
         RevitConnectionManager revit,
-        [Description("Action: list | create | delete | modify")] string action = "list",
-        [Description("Parameter name (required for create/delete/modify)")] string? parameterName = null,
+        [Description("Action: list | create | delete | modify | set_group")] string action = "list",
+        [Description("Parameter name (required for create/delete/modify/set_group). For set_group you can also pass parameterNames[].")] string? parameterName = null,
         [Description("Data type for create: Text | Integer | Number | Length | Area | Volume | Angle | YesNo | URL")] string? dataType = null,
         [Description("Instance (true) or type (false) binding — only used on create")] bool? isInstance = null,
         [Description("Categories list (OST_* codes or display names) — for create/modify")] string[]? categories = null,
         [Description("How modify applies 'categories': add (default, union), remove (unbind listed), replace (set to exactly the listed). Ignored for other actions.")] string? categoriesMode = null,
+        [Description("Parameter names array — for set_group bulk operation, e.g. [\"BCA_RES_Stato-Conservazione\",\"BCA_CME_Codice-Tariffa\"]")] string[]? parameterNames = null,
+        [Description("Target group for set_group action. Short names: IdentityData, Data, Constraints, Geometry, Graphics, Materials, Text, General, Phasing, Visibility, Construction, Electrical, ElectricalEngineering, ElectricalLighting, ElectricalLoads, Mechanical, MechanicalAirflow, Plumbing, FireProtection, Ifc, AnalysisResults, Structural, StructuralAnalysis. A full ForgeTypeId is also accepted.")] string? targetGroup = null,
+        [Description("Preview only (set_group). Default: false. When true, returns planned changes without applying.")] bool? dryRun = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["action"] = action };
@@ -157,6 +160,9 @@ public static class ParameterTools
         if (isInstance != null) p["isInstance"] = isInstance;
         if (categories != null) p["categories"] = new JArray(categories);
         if (categoriesMode != null) p["categoriesMode"] = categoriesMode;
+        if (parameterNames != null) p["parameterNames"] = new JArray(parameterNames);
+        if (targetGroup != null) p["targetGroup"] = targetGroup;
+        if (dryRun != null) p["dryRun"] = dryRun;
         var result = await revit.ExecuteAsync("manage_project_parameters", p, ct);
         return result.ToString();
     }

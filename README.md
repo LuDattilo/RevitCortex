@@ -340,7 +340,7 @@ Use the `dryRun: true` parameter (where available) to preview changes without ap
 | Tool | Description |
 |------|-------------|
 | `add_shared_parameter` | Add a shared parameter to a category |
-| `manage_project_parameters` | Add, list, or remove project parameters |
+| `manage_project_parameters` | List, create, delete, modify project parameters; `set_group` action bulk-reassigns "Group Parameter Under" |
 | `manage_global_parameters` | List, create, read, update, or delete global parameters |
 | `add_prefix_suffix` | Add prefix/suffix to parameter values |
 | `get_shared_parameters` | List all shared parameters in the project |

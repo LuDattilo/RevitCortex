@@ -236,7 +236,7 @@ Default: `compact: false` (payload pieno). Chiedere a Claude esplicitamente "in 
 | `add_shared_parameter` | Aggiunge parametro condiviso a categorie |
 | `sync_csv_parameters` | Importa valori da CSV |
 | `transfer_parameters` | Copia parametri tra elementi |
-| `manage_project_parameters` | Lista, crea, elimina o modifica parametri di progetto. L'azione `modify` supporta `categoriesMode: add\|remove\|replace` per gestire le categorie associate (aggiungere, scollegare o sostituire l'intero set). |
+| `manage_project_parameters` | Lista, crea, elimina o modifica parametri di progetto. L'azione `modify` supporta `categoriesMode: add\|remove\|replace` per gestire le categorie associate (aggiungere, scollegare o sostituire l'intero set). L'azione `set_group` cambia massivamente il "Group Parameter Under" di uno o più parametri user-defined: `parameterNames[]` + `targetGroup` (es. `IdentityData`, `Data`, `Geometry`, `Constraints`, `Materials`, `Ifc`, ...). I parametri built-in vengono ignorati silenziosamente. Supporta `dryRun: true`. |
 | `manage_global_parameters` | Gestisce i Global Parameters (azioni: list, get, create, set, delete) |
 
 ### Impostazioni Progetto

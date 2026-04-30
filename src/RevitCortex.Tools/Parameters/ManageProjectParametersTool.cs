@@ -34,13 +34,14 @@ public class ManageProjectParametersTool : ICortexTool
         {
             return action.ToLowerInvariant() switch
             {
-                "list"   => ListParameters(doc),
-                "create" => CreateParameter(doc, input),
-                "delete" => DeleteParameter(doc, input, session),
-                "modify" => ModifyParameter(doc, input),
+                "list"      => ListParameters(doc),
+                "create"    => CreateParameter(doc, input),
+                "delete"    => DeleteParameter(doc, input, session),
+                "modify"    => ModifyParameter(doc, input),
+                "set_group" => SetParameterGroup(doc, input, session),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}",
-                    suggestion: "Use one of: list, create, delete, modify")
+                    suggestion: "Use one of: list, create, delete, modify, set_group")
             };
         }
         catch (Exception ex)
@@ -366,6 +367,182 @@ public class ManageProjectParametersTool : ICortexTool
             removedCategories,
             totalCategories = allCategories
         });
+    }
+
+    private static CortexResult<object> SetParameterGroup(Document doc, JObject input, CortexSession session)
+    {
+        var requestedNames = input["parameterNames"]?.ToObject<List<string>>() ?? new List<string>();
+        // Back-compat: allow single 'parameterName' too
+        var single = input["parameterName"]?.Value<string>();
+        if (!string.IsNullOrEmpty(single)) requestedNames.Add(single!);
+
+        var targetGroup = input["targetGroup"]?.Value<string>();
+        var dryRun = input["dryRun"]?.Value<bool>() ?? false;
+
+        if (requestedNames.Count == 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "parameterNames (string[]) or parameterName is required for set_group action. Example: {\"action\":\"set_group\",\"parameterNames\":[\"BCA_RES_Stato-Conservazione\"],\"targetGroup\":\"IdentityData\"}. Do not retry empty — first call {\"action\":\"list\"} to discover names.");
+
+        if (string.IsNullOrEmpty(targetGroup))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "targetGroup is required. Example values: IdentityData, Data, Constraints, Geometry, Graphics, Materials, Text, General, PhasingFilter, Visibility, Construction, ElectricalEngineering, Mechanical, Plumbing, Energy, ModelProperties, IFC, AnalysisResults, Other.",
+                suggestion: "Pass a GroupTypeId short name (e.g. 'IdentityData') or a full ForgeTypeId (e.g. 'autodesk.parameter.group:identityData-1.0.0').");
+
+        var resolved = ResolveGroupTypeId(targetGroup!);
+        if (resolved == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                $"Unknown targetGroup '{targetGroup}'. Use one of the documented short names or a full ForgeTypeId.",
+                suggestion: "Examples: IdentityData, Data, Constraints, Geometry, Graphics, Materials, Text, General, ModelProperties, IFC.");
+
+        // Collect (Definition) up-front; do not iterate while mutating.
+        var allDefs = new List<InternalDefinition>();
+        {
+            var iter = doc.ParameterBindings.ForwardIterator();
+            while (iter.MoveNext())
+            {
+                if (iter.Key is InternalDefinition d) allDefs.Add(d);
+            }
+        }
+
+        var nameSet = new HashSet<string>(requestedNames, StringComparer.OrdinalIgnoreCase);
+        var matched = allDefs.Where(d => nameSet.Contains(d.Name)).ToList();
+
+        var notFound = requestedNames
+            .Where(n => !matched.Any(d => string.Equals(d.Name, n, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        var planned = new List<object>();
+        var skipped = new List<object>();
+        var modifiable = new List<InternalDefinition>();
+
+        foreach (var def in matched)
+        {
+            // Built-in parameters cannot be regrouped.
+            if (def.BuiltInParameter != BuiltInParameter.INVALID)
+            {
+                skipped.Add(new { name = def.Name, reason = "built-in parameter (cannot be regrouped)" });
+                continue;
+            }
+
+            var current = def.GetGroupTypeId()?.TypeId ?? "";
+            if (current == resolved.TypeId)
+            {
+                skipped.Add(new { name = def.Name, reason = "already in target group", group = current });
+                continue;
+            }
+
+            planned.Add(new { name = def.Name, fromGroup = current, toGroup = resolved.TypeId });
+            modifiable.Add(def);
+        }
+
+        if (dryRun)
+        {
+            return CortexResult<object>.Ok(new
+            {
+                action = "set_group",
+                dryRun = true,
+                targetGroup = resolved.TypeId,
+                plannedCount = planned.Count,
+                skippedCount = skipped.Count,
+                notFoundCount = notFound.Count,
+                planned,
+                skipped,
+                notFound
+            });
+        }
+
+        if (modifiable.Count == 0)
+            return CortexResult<object>.Ok(new
+            {
+                action = "set_group",
+                modifiedCount = 0,
+                skippedCount = skipped.Count,
+                notFoundCount = notFound.Count,
+                skipped,
+                notFound,
+                message = "No parameters required modification."
+            });
+
+        if (!session.RequestConfirmation("change parameter group", modifiable.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        var modified = new List<object>();
+        var failed = new List<object>();
+
+        using (var tx = new Transaction(doc, "RevitCortex: Set Parameter Group"))
+        {
+            tx.Start();
+            foreach (var def in modifiable)
+            {
+                var fromGroup = def.GetGroupTypeId()?.TypeId ?? "";
+                try
+                {
+                    def.SetGroupTypeId(resolved);
+                    modified.Add(new { name = def.Name, fromGroup, toGroup = resolved.TypeId });
+                }
+                catch (Exception ex)
+                {
+                    failed.Add(new { name = def.Name, error = ex.Message });
+                }
+            }
+            tx.Commit();
+        }
+
+        return CortexResult<object>.Ok(new
+        {
+            action = "set_group",
+            targetGroup = resolved.TypeId,
+            modifiedCount = modified.Count,
+            skippedCount = skipped.Count,
+            notFoundCount = notFound.Count,
+            failedCount = failed.Count,
+            modified,
+            skipped,
+            notFound,
+            failed
+        });
+    }
+
+    private static ForgeTypeId? ResolveGroupTypeId(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return null;
+        var trimmed = input.Trim();
+
+        // Full ForgeTypeId form (e.g. "autodesk.parameter.group:identityData-1.0.0")
+        if (trimmed.Contains(":") || trimmed.Contains("."))
+        {
+            try { return new ForgeTypeId(trimmed); } catch { /* fall through */ }
+        }
+
+        // Short-name lookup against GroupTypeId static class
+        var key = trimmed.ToLowerInvariant().Replace("_", "").Replace("-", "");
+        return key switch
+        {
+            "identitydata" => GroupTypeId.IdentityData,
+            "data" => GroupTypeId.Data,
+            "constraints" => GroupTypeId.Constraints,
+            "geometry" => GroupTypeId.Geometry,
+            "graphics" => GroupTypeId.Graphics,
+            "materials" or "materialsandfinishes" => GroupTypeId.Materials,
+            "text" => GroupTypeId.Text,
+            "general" => GroupTypeId.General,
+            "phasing" or "phasingfilter" => GroupTypeId.Phasing,
+            "visibility" => GroupTypeId.Visibility,
+            "construction" => GroupTypeId.Construction,
+            "electrical" => GroupTypeId.Electrical,
+            "electricalengineering" => GroupTypeId.ElectricalEngineering,
+            "electricallighting" => GroupTypeId.ElectricalLighting,
+            "electricalloads" => GroupTypeId.ElectricalLoads,
+            "mechanical" => GroupTypeId.Mechanical,
+            "mechanicalairflow" => GroupTypeId.MechanicalAirflow,
+            "plumbing" => GroupTypeId.Plumbing,
+            "fireprotection" => GroupTypeId.FireProtection,
+            "ifc" => GroupTypeId.Ifc,
+            "analysisresults" => GroupTypeId.AnalysisResults,
+            "structural" => GroupTypeId.Structural,
+            "structuralanalysis" => GroupTypeId.StructuralAnalysis,
+            _ => null
+        };
     }
 
     private static CategorySet BuildCategorySet(Document doc, Autodesk.Revit.ApplicationServices.Application app, IEnumerable<string> categoryNames)
