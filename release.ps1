@@ -28,11 +28,6 @@
     Skip the public manifest update step. Use when you want to build and
     copy to OneDrive first, then publish the manifest later after verifying.
 
-.PARAMETER DownloadUrl
-    Optional override for the downloadUrl field in latest.json. If omitted,
-    the existing URL is preserved (typical case: you replaced the file
-    behind the SharePoint link).
-
 .EXAMPLE
     .\release.ps1 -Version 1.0.5 -Changelog "Fix X, improve Y"
 
@@ -47,9 +42,7 @@ param(
 
     [string] $Changelog,
 
-    [switch] $SkipManifest,
-
-    [string] $DownloadUrl
+    [switch] $SkipManifest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -148,11 +141,32 @@ Write-Step "Copying ZIP to OneDrive"
 Copy-Item $zipPath (Join-Path $oneDriveDir "RevitCortex-v$Version.zip") -Force
 Write-Ok "OneDrive copy complete"
 
-# ── 5. Publish public manifest ──────────────────────────────────────────────
+# ── 5. Publish GitHub release with ZIP asset ────────────────────────────────
+$ghDownloadUrl = "https://github.com/LuDattilo/revitcortex-releases/releases/download/v$Version/RevitCortex-v$Version.zip"
+
 if ($SkipManifest) {
-    Write-Warn "Manifest update skipped (SkipManifest flag). Installed plugins will not detect v$Version until you update latest.json manually."
+    Write-Warn "GitHub release + manifest update skipped (SkipManifest flag). Installed plugins will not detect v$Version until you publish them manually."
 } else {
-    Write-Step "Publishing public update manifest"
+    Write-Step "Publishing GitHub release v$Version"
+
+    $gh = Get-Command gh -ErrorAction SilentlyContinue
+    if (-not $gh) { throw "gh CLI not found in PATH — install GitHub CLI or run with -SkipManifest" }
+
+    # Idempotent: if the tag is already a release, just upload the asset (clobber)
+    & gh release view "v$Version" --repo LuDattilo/revitcortex-releases 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Warn "release v$Version already exists — uploading asset with --clobber"
+        & gh release upload "v$Version" $zipPath --repo LuDattilo/revitcortex-releases --clobber 2>&1 | ForEach-Object { Write-Host "    $_" }
+        if ($LASTEXITCODE -ne 0) { throw "gh release upload failed" }
+    } else {
+        $notes = if ($Changelog) { $Changelog } else { "v$Version release." }
+        & gh release create "v$Version" $zipPath --repo LuDattilo/revitcortex-releases --title "RevitCortex v$Version" --notes $notes 2>&1 | ForEach-Object { Write-Host "    $_" }
+        if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
+    }
+    Write-Ok "GitHub release published with asset"
+
+    # ── 6. Update public manifest (downloadUrl ALWAYS derived from tag) ─────
+    Write-Step "Updating public update manifest"
 
     $cloneDir = Join-Path $env:TEMP "rc-releases-$([guid]::NewGuid().ToString('N'))"
     try {
@@ -163,9 +177,9 @@ if ($SkipManifest) {
         $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
 
         $newChangelog = if ($Changelog) { $Changelog } else { "v$Version release." }
-        $manifest.version = $Version
-        if ($DownloadUrl) { $manifest.downloadUrl = $DownloadUrl }
-        $manifest.changelog = $newChangelog
+        $manifest.version     = $Version
+        $manifest.downloadUrl = $ghDownloadUrl
+        $manifest.changelog   = $newChangelog
 
         $json = $manifest | ConvertTo-Json -Depth 10
         [System.IO.File]::WriteAllText($manifestPath, $json, [System.Text.UTF8Encoding]::new($false))
@@ -179,10 +193,45 @@ if ($SkipManifest) {
             if ($LASTEXITCODE -ne 0) { throw "manifest push failed" }
         } finally { Pop-Location }
 
-        Write-Ok "manifest pushed"
+        Write-Ok "manifest pushed (version=$Version, downloadUrl=$ghDownloadUrl)"
     } finally {
         if (Test-Path $cloneDir) { Remove-Item $cloneDir -Recurse -Force -ErrorAction SilentlyContinue }
     }
+
+    # ── 7. End-to-end verification (the stop-loss) ──────────────────────────
+    Write-Step "Verifying release is consumable end-to-end"
+
+    # 7a. Asset reachable via downloadUrl (HEAD must follow to 200)
+    try {
+        $head = Invoke-WebRequest -Uri $ghDownloadUrl -Method Head -MaximumRedirection 5 -UseBasicParsing -ErrorAction Stop
+        if ($head.StatusCode -ne 200) { throw "HTTP $($head.StatusCode)" }
+        Write-Ok "downloadUrl returns 200 ($($head.Headers.'Content-Length') bytes)"
+    } catch {
+        Write-Fail "downloadUrl unreachable: $_"
+        throw "Verification failed: clients will fail to download v$Version"
+    }
+
+    # 7b. Manifest authoritative source (api.github.com bypasses raw CDN cache)
+    #     and has the matching version + downloadUrl.
+    $apiUrl = 'https://api.github.com/repos/LuDattilo/revitcortex-releases/contents/latest.json?ref=main'
+    try {
+        $apiResp = Invoke-RestMethod -Uri $apiUrl -Headers @{ 'User-Agent' = 'RevitCortex-release-verify' } -ErrorAction Stop
+        $b64 = (($apiResp.content -join '') -replace '\s','')
+        $manifestText = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b64))
+        $live = $manifestText | ConvertFrom-Json
+        if ($live.version -ne $Version) {
+            throw "manifest version is '$($live.version)', expected '$Version'"
+        }
+        if ($live.downloadUrl -ne $ghDownloadUrl) {
+            throw "manifest downloadUrl mismatch.`n      expected: $ghDownloadUrl`n      got:      $($live.downloadUrl)"
+        }
+        Write-Ok "manifest matches release (version + downloadUrl consistent)"
+    } catch {
+        Write-Fail $_.Exception.Message
+        throw "Verification failed: manifest is inconsistent — UpdateChecker will misbehave"
+    }
+
+    Write-Warn "raw.githubusercontent.com CDN may take up to ~5 min to reflect the new manifest. Clients will see the update once that propagates."
 }
 
 # ── Summary ─────────────────────────────────────────────────────────────────
@@ -195,11 +244,7 @@ Write-Host "  Tag:       v$Version (pushed to origin)"            -ForegroundCol
 Write-Host "  ZIP:       $zipPath ($zipSizeMB MB)"                  -ForegroundColor White
 Write-Host "  OneDrive:  $oneDriveDir"                              -ForegroundColor White
 if (-not $SkipManifest) {
+    Write-Host "  Release:   https://github.com/LuDattilo/revitcortex-releases/releases/tag/v$Version" -ForegroundColor White
     Write-Host "  Manifest:  https://raw.githubusercontent.com/LuDattilo/revitcortex-releases/main/latest.json" -ForegroundColor White
 }
-Write-Host ""
-Write-Host "  Manual step remaining:" -ForegroundColor Yellow
-Write-Host "    Replace the file behind the SharePoint download link with" -ForegroundColor Yellow
-Write-Host "    RevitCortex-v$Version.zip, OR pass -DownloadUrl next time"  -ForegroundColor Yellow
-Write-Host "    with a fresh public URL."                                   -ForegroundColor Yellow
 Write-Host ""
