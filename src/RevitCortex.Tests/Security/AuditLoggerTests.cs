@@ -58,12 +58,12 @@ public class AuditLoggerTests : IDisposable
     [Fact]
     public void Log_TruncatesLongInput()
     {
-        var longInput = new string('x', 500);
+        var longInput = new string('x', 600);
         _logger.Log("test_tool", longInput, true);
 
         var content = File.ReadAllText(_tempPath);
         Assert.Contains("...", content);
-        // Should not contain the full 500-char string
+        // Should not contain the full 600-char string
         Assert.DoesNotContain(longInput, content);
     }
 
