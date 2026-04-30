@@ -4,7 +4,7 @@ import { withRevitConnection } from "../connection/ConnectionManager.js";
 import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerManageProjectParametersTool(server: McpServer): void {
-  server.tool("manage_project_parameters", "List, create, delete, or modify project parameters", ManageProjectParametersInput.shape, async (args) => {
+  server.tool("manage_project_parameters", "List, create, delete, modify, or set_group on project parameters. set_group bulk-changes the 'Group Parameter Under' assignment for user-defined parameters.", ManageProjectParametersInput.shape, async (args) => {
     const start = Date.now();
     try {
       const result = await withRevitConnection(async (client) => {

@@ -51,6 +51,21 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 ---
 
+## Riassegnazione Massiva del "Group Parameter Under"
+
+**Sequenza:** `manage_project_parameters` action=`list` (discovery nomi) -> `manage_project_parameters` action=`set_group` con `dryRun: true` -> verificare `plannedCount` -> rieseguire senza `dryRun`
+**Parametri chiave:**
+- `parameterNames: string[]` — bulk; in alternativa `parameterName` singolo
+- `targetGroup` — short name (`IdentityData`, `Data`, `Geometry`, `Constraints`, `Materials`, `Ifc`, `Construction`, `Phasing`, `Visibility`, `Graphics`, `Structural`, ...) o ForgeTypeId completo
+- I parametri **built-in** vengono skippati silenziosamente (non rigruppabili da API)
+- Il file Shared Parameters NON viene toccato (gruppo memorizzato nel binding del progetto)
+- I valori già compilati nelle istanze sono preservati
+**NON fare:** Non ricreare il parametro per cambiarne il gruppo -- si perdono i valori. Non assumere che funzioni sui built-in (Comments, Mark, ecc.) -- vengono skippati.
+
+**Fonte:** API `InternalDefinition.SetGroupTypeId` (Revit 2022+)
+
+---
+
 ## Documentazione ed Esportazione
 
 **Sequenza:** `workflow_data_roundtrip` oppure `export_to_excel` -> (opzionale) `create_preset_schedule` -> `export_schedule`

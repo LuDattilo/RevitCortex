@@ -20,12 +20,12 @@ export const AddSharedParameterInput = z.object({
 
 export const ManageProjectParametersInput = z.object({
   action: z
-    .enum(["list", "create", "delete", "modify"])
+    .enum(["list", "create", "delete", "modify", "set_group"])
     .describe("Action to perform"),
   parameterName: z
     .string()
     .optional()
-    .describe("Parameter name (required for create/delete/modify)"),
+    .describe("Parameter name (required for create/delete/modify/set_group)"),
   dataType: z
     .enum([
       "Text",
@@ -57,6 +57,22 @@ export const ManageProjectParametersInput = z.object({
     .describe(
       "How to apply 'categories' in modify action: 'add' (default, union with existing), 'remove' (unbind listed categories), 'replace' (set bindings to exactly the listed categories). Ignored for other actions.",
     ),
+  parameterNames: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Parameter names array — for set_group bulk operation, e.g. ['BCA_RES_Stato-Conservazione','BCA_CME_Codice-Tariffa']",
+    ),
+  targetGroup: z
+    .string()
+    .optional()
+    .describe(
+      "Target group for set_group action. Short names: IdentityData, Data, Constraints, Geometry, Graphics, Materials, Text, General, Phasing, Visibility, Construction, Electrical, ElectricalEngineering, ElectricalLighting, ElectricalLoads, Mechanical, MechanicalAirflow, Plumbing, FireProtection, Ifc, AnalysisResults, Structural, StructuralAnalysis. A full ForgeTypeId is also accepted.",
+    ),
+  dryRun: z
+    .boolean()
+    .optional()
+    .describe("Preview only (set_group). Default false."),
 });
 
 export const AddPrefixSuffixInput = z.object({
