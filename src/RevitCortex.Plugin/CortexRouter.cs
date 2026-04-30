@@ -252,17 +252,43 @@ public class CortexRouter
 
     private static string BuildInputSummary(string toolName, JObject input)
     {
-        // Extract key identifiers without logging full payload
-        var ids = input["elementIds"]?.ToString();
-        var code = input["code"] != null ? $"code({input["code"]!.ToString().Length} chars)" : null;
-        var category = input["filterCategory"]?.ToString() ?? input["category"]?.ToString();
+        if (input == null || !input.HasValues) return "(no params)";
 
-        var parts = new List<string>();
-        if (ids != null) parts.Add($"ids={ids}");
-        if (code != null) parts.Add(code);
-        if (category != null) parts.Add($"cat={category}");
+        var parts = new List<string>(input.Count);
+        foreach (var prop in input.Properties())
+        {
+            parts.Add($"{prop.Name}={FormatValue(prop.Name, prop.Value)}");
+        }
 
         return parts.Count > 0 ? string.Join(", ", parts) : "(no params)";
+    }
+
+    private static string FormatValue(string name, JToken token)
+    {
+        // send_code_to_revit and similar tools pass large C# snippets — log
+        // length only, never the body.
+        if (token.Type == JTokenType.String &&
+            (name == "code" || name == "snippet"))
+        {
+            return $"({token.ToString().Length} chars)";
+        }
+
+        switch (token.Type)
+        {
+            case JTokenType.Null:
+            case JTokenType.Undefined:
+                return "null";
+            case JTokenType.Array:
+                var arr = (JArray)token;
+                return $"[{arr.Count} items]";
+            case JTokenType.Object:
+                return token.ToString(Newtonsoft.Json.Formatting.None);
+            case JTokenType.String:
+                var s = token.ToString();
+                return s.Length > 80 ? s.Substring(0, 80) + "..." : s;
+            default:
+                return token.ToString();
+        }
     }
 
     public void SetDispatcher(RevitThreadDispatcher dispatcher)

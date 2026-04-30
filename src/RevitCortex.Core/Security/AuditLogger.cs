@@ -32,7 +32,7 @@ public class AuditLogger
         {
             Timestamp = DateTime.UtcNow.ToString("o"),
             Tool = toolName,
-            InputSummary = Truncate(inputSummary, 200),
+            InputSummary = Truncate(inputSummary, 500),
             Result = success ? "ok" : "fail",
             ErrorCode = errorCode?.ToString(),
             ElementsAffected = elementsAffected
@@ -54,7 +54,7 @@ public class AuditLogger
             Timestamp = DateTime.UtcNow.ToString("o"),
             SchemaVersion = 2,
             Tool = toolName,
-            InputSummary = Truncate(inputSummary, 200),
+            InputSummary = Truncate(inputSummary, 500),
             Result = success ? "ok" : "fail",
             ErrorCode = errorCode?.ToString(),
             ElementsAffected = elementsAffected,
