@@ -130,6 +130,7 @@ public class GetCoordinationModelsTool : ICortexTool
 
         var models = new List<object>();
         var totalMatchedInstances = 0;
+        var totalReturnedInstances = 0;
         var remainingInstances = maxInstances;
 
         foreach (var typeId in typeIds)
@@ -160,6 +161,7 @@ public class GetCoordinationModelsTool : ICortexTool
                 foreach (var instance in typeInstances.Take(remainingInstances))
                 {
                     returnedInstances.Add(CreateInstancePayload(instance));
+                    totalReturnedInstances++;
                     remainingInstances--;
 
                     if (remainingInstances == 0)
@@ -186,7 +188,8 @@ public class GetCoordinationModelsTool : ICortexTool
         {
             apiAvailable = true,
             modelCount = models.Count,
-            totalInstances = totalMatchedInstances,
+            totalInstances = totalReturnedInstances,
+            matchedInstances = totalMatchedInstances,
             models,
             message = $"Found {models.Count} coordination model type(s)."
         });
@@ -230,13 +233,45 @@ public class GetCoordinationModelsTool : ICortexTool
 
     private static object? GetOriginPayload(Element instance)
     {
+        var transform = GetInstanceTransform(instance);
+        if (transform != null)
+        {
+            return CreateOriginPayload(transform.Origin);
+        }
+
         var locationPoint = instance.Location as LocationPoint;
         if (locationPoint == null)
         {
             return null;
         }
 
-        var point = locationPoint.Point;
+        return CreateOriginPayload(locationPoint.Point);
+    }
+
+    private static Transform? GetInstanceTransform(Element instance)
+    {
+        var transform = InvokeTransformMethod(instance, "GetTotalTransform");
+        if (transform != null)
+        {
+            return transform;
+        }
+
+        return InvokeTransformMethod(instance, "GetTransform");
+    }
+
+    private static Transform? InvokeTransformMethod(Element instance, string methodName)
+    {
+        var method = instance.GetType().GetMethod(methodName, Type.EmptyTypes);
+        if (method == null)
+        {
+            return null;
+        }
+
+        return method.Invoke(instance, null) as Transform;
+    }
+
+    private static object CreateOriginPayload(XYZ point)
+    {
         return new
         {
             x = Math.Round(point.X * MmPerFoot, 1),

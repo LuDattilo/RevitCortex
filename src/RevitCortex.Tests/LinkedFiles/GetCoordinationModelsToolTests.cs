@@ -5,6 +5,17 @@ namespace RevitCortex.Tests.LinkedFiles;
 
 public class GetCoordinationModelsToolTests
 {
+    [Fact]
+    public void Metadata_DescribesReadOnlyLinkedFilesTool()
+    {
+        var tool = new GetCoordinationModelsTool();
+
+        Assert.Equal("get_coordination_models", tool.Name);
+        Assert.Equal("LinkedFiles", tool.Category);
+        Assert.True(tool.RequiresDocument);
+        Assert.False(tool.IsDynamic);
+    }
+
     [Theory]
     [InlineData(null, 100)]
     [InlineData(0, 0)]
