@@ -86,6 +86,24 @@ public class GetCoordinationModelsTool : ICortexTool
         return candidate.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
+    public static bool MatchesAnyNameFilter(string? filter, string typeName, IEnumerable<string> instanceNames)
+    {
+        if (MatchesNameFilter(filter, typeName))
+        {
+            return true;
+        }
+
+        foreach (var instanceName in instanceNames)
+        {
+            if (MatchesNameFilter(filter, instanceName))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static CortexResult<object> UnsupportedTargetResult()
     {
         return CortexResult<object>.Ok(new
@@ -143,15 +161,15 @@ public class GetCoordinationModelsTool : ICortexTool
 
             var data = CoordinationModelLinkUtils.GetCoordinationModelTypeData(doc, cmType);
             var typeName = GetTypeName(cmType, data);
-            if (!MatchesNameFilter(nameFilter, typeName))
-            {
-                continue;
-            }
-
             List<Element>? typeInstances;
             if (!instancesByType.TryGetValue(typeId, out typeInstances))
             {
                 typeInstances = new List<Element>();
+            }
+
+            if (!MatchesAnyNameFilter(nameFilter, typeName, typeInstances.Select(i => i.Name)))
+            {
+                continue;
             }
 
             totalMatchedInstances += typeInstances.Count;
@@ -191,7 +209,9 @@ public class GetCoordinationModelsTool : ICortexTool
             totalInstances = totalReturnedInstances,
             matchedInstances = totalMatchedInstances,
             models,
-            message = $"Found {models.Count} coordination model type(s)."
+            message = models.Count == 0
+                ? "No coordination models found in the active document."
+                : $"Found {models.Count} coordination model type(s)."
         });
     }
 

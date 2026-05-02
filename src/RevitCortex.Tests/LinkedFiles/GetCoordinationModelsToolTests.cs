@@ -36,4 +36,13 @@ public class GetCoordinationModelsToolTests
     {
         Assert.Equal(expected, GetCoordinationModelsTool.MatchesNameFilter(filter, candidate));
     }
+
+    [Fact]
+    public void MatchesAnyNameFilter_MatchesInstanceNames()
+    {
+        var instanceNames = new[] { "North Wing NWC", "South Wing NWC" };
+
+        Assert.True(GetCoordinationModelsTool.MatchesAnyNameFilter("south", "Campus Model", instanceNames));
+        Assert.False(GetCoordinationModelsTool.MatchesAnyNameFilter("east", "Campus Model", instanceNames));
+    }
 }
