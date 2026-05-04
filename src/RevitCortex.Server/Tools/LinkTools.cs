@@ -66,14 +66,16 @@ public static class LinkTools
         [Description("Optional case-insensitive filter applied to coordination model names.")] string? nameFilter = null,
         [Description("Include instance records. Default: true.")] bool? includeInstances = null,
         [Description("Maximum instance records to include. Default: 100, cap: 250.")] int? maxInstances = null,
+        [Description("Strip per-item verbose metadata (path, pathType, origin, instance name) while preserving counters and identifiers. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (nameFilter != null) p["nameFilter"] = nameFilter;
         if (includeInstances != null) p["includeInstances"] = includeInstances;
         if (maxInstances != null) p["maxInstances"] = maxInstances;
+        if (compact) p["compact"] = compact;
         var result = await revit.ExecuteAsync("get_coordination_models", p, ct);
-        return result.ToString();
+        return ToolResponseShaper.Shape("get_coordination_models", result, compact, summaryOnly: false).ToString();
     }
 
     [McpServerTool(Name = "get_selected_linked_elements"), Description("Returns info about currently selected link instances.")]
