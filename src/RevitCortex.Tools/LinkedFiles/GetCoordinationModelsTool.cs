@@ -86,11 +86,14 @@ public class GetCoordinationModelsTool : ICortexTool
         return candidate.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    public static bool MatchesAnyNameFilter(string? filter, string typeName, IEnumerable<string> instanceNames)
+    public static bool MatchesAnyNameFilter(string? filter, IEnumerable<string> modelAndTypeNames, IEnumerable<string> instanceNames)
     {
-        if (MatchesNameFilter(filter, typeName))
+        foreach (var name in modelAndTypeNames)
         {
-            return true;
+            if (MatchesNameFilter(filter, name))
+            {
+                return true;
+            }
         }
 
         foreach (var instanceName in instanceNames)
@@ -167,7 +170,7 @@ public class GetCoordinationModelsTool : ICortexTool
                 typeInstances = new List<Element>();
             }
 
-            if (!MatchesAnyNameFilter(nameFilter, typeName, typeInstances.Select(i => i.Name)))
+            if (!MatchesAnyNameFilter(nameFilter, GetModelAndTypeNames(cmType, data), typeInstances.Select(i => i.Name)))
             {
                 continue;
             }
@@ -209,10 +212,24 @@ public class GetCoordinationModelsTool : ICortexTool
             totalInstances = totalReturnedInstances,
             matchedInstances = totalMatchedInstances,
             models,
-            message = models.Count == 0
-                ? "No coordination models found in the active document."
-                : $"Found {models.Count} coordination model type(s)."
+            message = CreateResultMessage(models.Count, typeIds.Count, nameFilter)
         });
+    }
+
+    private static string[] GetModelAndTypeNames(ElementType cmType, CoordinationModelLinkData? data)
+    {
+        var names = new List<string>();
+        if (data != null && !string.IsNullOrWhiteSpace(data.ModelName))
+        {
+            names.Add(data.ModelName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(cmType.Name))
+        {
+            names.Add(cmType.Name);
+        }
+
+        return names.ToArray();
     }
 
     private static string GetTypeName(ElementType cmType, CoordinationModelLinkData? data)
@@ -223,6 +240,21 @@ public class GetCoordinationModelsTool : ICortexTool
         }
 
         return cmType.Name;
+    }
+
+    private static string CreateResultMessage(int returnedModelCount, int totalModelCount, string? nameFilter)
+    {
+        if (returnedModelCount > 0)
+        {
+            return $"Found {returnedModelCount} coordination model type(s).";
+        }
+
+        if (!string.IsNullOrWhiteSpace(nameFilter) && totalModelCount > 0)
+        {
+            return $"No coordination models matched nameFilter '{nameFilter}'.";
+        }
+
+        return "No coordination models found in the active document.";
     }
 
     private static string GetPath(CoordinationModelLinkData? data)

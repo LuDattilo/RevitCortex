@@ -40,9 +40,20 @@ public class GetCoordinationModelsToolTests
     [Fact]
     public void MatchesAnyNameFilter_MatchesInstanceNames()
     {
+        var modelAndTypeNames = new[] { "Campus Model", "CM Type 01" };
         var instanceNames = new[] { "North Wing NWC", "South Wing NWC" };
 
-        Assert.True(GetCoordinationModelsTool.MatchesAnyNameFilter("south", "Campus Model", instanceNames));
-        Assert.False(GetCoordinationModelsTool.MatchesAnyNameFilter("east", "Campus Model", instanceNames));
+        Assert.True(GetCoordinationModelsTool.MatchesAnyNameFilter("south", modelAndTypeNames, instanceNames));
+        Assert.False(GetCoordinationModelsTool.MatchesAnyNameFilter("east", modelAndTypeNames, instanceNames));
+    }
+
+    [Fact]
+    public void MatchesAnyNameFilter_MatchesModelAndTypeNames()
+    {
+        var modelAndTypeNames = new[] { "Campus Model", "CM Type 01" };
+        var instanceNames = new[] { "North Wing NWC" };
+
+        Assert.True(GetCoordinationModelsTool.MatchesAnyNameFilter("campus", modelAndTypeNames, instanceNames));
+        Assert.True(GetCoordinationModelsTool.MatchesAnyNameFilter("type 01", modelAndTypeNames, instanceNames));
     }
 }
