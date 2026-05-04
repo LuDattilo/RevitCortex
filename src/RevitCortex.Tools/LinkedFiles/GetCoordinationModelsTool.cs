@@ -6,6 +6,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.ExternalData;
 #endif
 using Newtonsoft.Json.Linq;
+using RevitCortex.Core.Caching;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
@@ -16,7 +17,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// <summary>
 /// Read-only listing of Autodesk Revit Coordination Models.
 /// </summary>
-public class GetCoordinationModelsTool : ICortexTool
+public class GetCoordinationModelsTool : ICortexTool, ICacheableTool
 {
     private const int DefaultMaxInstances = 100;
     private const int MaxInstancesCap = 250;
@@ -27,6 +28,7 @@ public class GetCoordinationModelsTool : ICortexTool
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
     public string Description => "Read-only listing of Autodesk Revit Coordination Models with type metadata and optional instances.";
+    public CacheScope CacheScope => CacheScope.Document;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
