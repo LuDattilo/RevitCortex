@@ -319,7 +319,14 @@ public class GetCoordinationModelsTool : ICortexTool
             return null;
         }
 
-        return method.Invoke(instance, null) as Transform;
+        try
+        {
+            return method.Invoke(instance, null) as Transform;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private static object CreateOriginPayload(XYZ point)
