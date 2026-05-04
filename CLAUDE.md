@@ -32,9 +32,9 @@ R2023 and R2024 target **net48**. Code that compiles on net8+ may fail on net48.
 
 **Rule**: After adding/modifying any C# file, always build for BOTH `Debug R25` (net8) AND `Debug R24` (net48) before committing. A green R25 build does NOT guarantee R24 will compile.
 
-### R27 build requires .NET 10 SDK
+### R27 build requires .NET 10+ SDK
 
-Revit 2027 targets `net10.0-windows7.0`. Building `Debug R27`/`Release R27` requires .NET 10 SDK installed on the build machine; with only SDK 8 the build fails with `NETSDK1045`. `global.json` pins to SDK 8 (`rollForward: latestFeature`) for normal dev work — bump to `latestMajor` only when producing the release ZIP if no SDK 10 is available and an SDK 11 preview is. Runtime: end-user PCs need .NET 10 runtime to load the R27 plugin (Revit 2027 itself ships .NET 10).
+Revit 2027 targets `net10.0-windows7.0`. Building `Debug R27`/`Release R27` requires a .NET SDK ≥ 10 on the build machine; with only SDK 8 the build fails with `NETSDK1045`. `global.json` pins to SDK 8 with `rollForward: latestMajor`, so SDK 11 preview (or any future SDK) is accepted automatically when SDK 10 is absent. Runtime: end-user PCs need .NET 10 runtime to load the R27 plugin (Revit 2027 itself ships .NET 10).
 
 ## Project Structure
 
