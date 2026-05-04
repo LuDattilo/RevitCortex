@@ -37,6 +37,7 @@ public static class ToolResponseShaper
             "audit_families" => ShapeAuditFamilies(payload),
             "get_shared_parameters" => ShapeSharedParameters(payload),
             "get_linked_file_instances" => ShapeLinkedFileInstances(payload),
+            "get_coordination_models" => ShapeCoordinationModels(payload),
             "get_elements_in_spatial_volume" => ShapeElementsInSpatialVolume(payload),
             "get_materials" => ShapeMaterials(payload),
             "export_room_data" => ShapeExportRoomData(payload),
@@ -267,6 +268,40 @@ public static class ToolResponseShaper
         }).ToArray();
 
         result["linkedFiles"] = new JArray(trimmed);
+        return result;
+    }
+
+    /// <summary>
+    /// get_coordination_models → keeps top-level counters (modelCount, totalInstances, matchedInstances, apiAvailable);
+    /// drops verbose per-model fields (pathType, path) and per-instance fields (name, origin); preserves typeId,
+    /// instanceCount, instanceId so the caller can still drill down.
+    /// </summary>
+    private static JToken ShapeCoordinationModels(JToken payload)
+    {
+        if (payload is not JObject obj) return payload;
+        var result = (JObject)obj.DeepClone();
+        if (result["models"] is not JArray models) return result;
+
+        var trimmed = models.Children<JObject>().Select(model =>
+        {
+            var slim = new JObject
+            {
+                ["typeId"] = model["typeId"],
+                ["typeName"] = model["typeName"],
+                ["isCloud"] = model["isCloud"],
+                ["instanceCount"] = model["instanceCount"]
+            };
+            if (model["instances"] is JArray instances)
+            {
+                slim["instances"] = new JArray(instances.Children<JObject>().Select(inst => new JObject
+                {
+                    ["instanceId"] = inst["instanceId"]
+                }));
+            }
+            return slim;
+        }).ToArray();
+
+        result["models"] = new JArray(trimmed);
         return result;
     }
 
