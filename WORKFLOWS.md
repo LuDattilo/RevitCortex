@@ -370,3 +370,16 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 **NON fare:** Non richiamare il tool per verificare -- il risultato e corretto. Accettare -1 come valore valido.
 
 **Fonte:** CLAUDE.md (Anti-Waste Patterns)
+
+---
+
+## Audit SDK Revit Locali
+
+**Sequenza:** elencare `C:\Revit * SDK` -> controllare `Samples`, `RevitAPI.chm`, `Revit Platform API Changes and Additions.docx` -> confrontare i sample tra versioni -> mappare solo gli spunti utili su backlog RevitCortex
+**Parametri chiave:**
+- Le SDK servono come riferimento ufficiale e fonte di pattern API; il build del progetto usa i pacchetti `Nice3point.Revit.Api.*`, non gli assembly della SDK
+- Dare priorita ai sample nuovi tra versioni, per esempio R26: `CoordinationModel`, `ElectricalConductors`, `OperatingScheduleImport`; R27: `AddinsIsolation`, `HostedWall`, `ManageLinks`
+- Usare i sample Autodesk come riferimento tecnico, non copiare codice direttamente nei tool RevitCortex
+**NON fare:** Non cambiare i riferimenti NuGet verso DLL locali della SDK senza una ragione precisa. Non aggiungere feature R27-only senza guardie `REVIT2027_OR_GREATER` e build cross-target R24/R25.
+
+**Fonte:** Sessione audit SDK locali 2026-05-02
