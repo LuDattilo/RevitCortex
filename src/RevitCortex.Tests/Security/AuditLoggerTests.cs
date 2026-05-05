@@ -104,6 +104,41 @@ public class AuditLoggerTests : IDisposable
     }
 
     [Fact]
+    public void LogWithPerf_Failure_IncludesErrorMessage()
+    {
+        _logger.LogWithPerf("bulk_modify_parameter_values", "(no params)", false,
+            errorCode: CortexErrorCode.Unknown,
+            errorMessage: "Failed: Object reference not set to an instance of an object.");
+
+        var content = File.ReadAllText(_tempPath);
+        Assert.Contains("\"error_code\":\"Unknown\"", content);
+        Assert.Contains("\"error_message\":\"Failed: Object reference not set to an instance of an object.\"", content);
+    }
+
+    [Fact]
+    public void LogWithPerf_Success_OmitsErrorMessage()
+    {
+        _logger.LogWithPerf("get_element_parameters", "ids=[1]", true,
+            errorMessage: "ignored when success");
+
+        var content = File.ReadAllText(_tempPath);
+        Assert.DoesNotContain("error_message", content);
+    }
+
+    [Fact]
+    public void LogWithPerf_TruncatesErrorMessageAt200Chars()
+    {
+        var longMessage = new string('e', 500);
+        _logger.LogWithPerf("some_tool", "x", false,
+            errorCode: CortexErrorCode.Unknown,
+            errorMessage: longMessage);
+
+        var content = File.ReadAllText(_tempPath);
+        Assert.Contains("...", content);
+        Assert.DoesNotContain(longMessage, content);
+    }
+
+    [Fact]
     public void Log_CreatesDirectoryIfMissing()
     {
         var nestedPath = Path.Combine(Path.GetTempPath(),

@@ -43,11 +43,15 @@ public class AuditLogger
     /// Log a tool execution with performance data and optional send_code_to_revit
     /// snippet/hash (schema v2). Used by CortexRouter so rclog can diagnose
     /// perf bottlenecks and token-heavy tools.
+    /// errorMessage is the human-readable failure detail (truncated to 200 chars)
+    /// and lets triage distinguish e.g. "Unhandled exception: NRE" from
+    /// "No result from tool execution" when both surface as Unknown.
     /// </summary>
     public void LogWithPerf(string toolName, string inputSummary, bool success,
         CortexErrorCode? errorCode = null, int elementsAffected = 0,
         long? durationMs = null, long? responseBytes = null,
-        string? codeSnippet = null, string? codeHash = null)
+        string? codeSnippet = null, string? codeHash = null,
+        string? errorMessage = null)
     {
         WriteEntry(new AuditEntryV2
         {
@@ -57,6 +61,7 @@ public class AuditLogger
             InputSummary = Truncate(inputSummary, 500),
             Result = success ? "ok" : "fail",
             ErrorCode = errorCode?.ToString(),
+            ErrorMessage = success ? null : Truncate(errorMessage ?? "", 200),
             ElementsAffected = elementsAffected,
             DurationMs = durationMs,
             ResponseBytes = responseBytes,
@@ -114,6 +119,8 @@ public class AuditLogger
         [JsonProperty("result")] public string Result { get; set; } = "";
         [JsonProperty("error_code", NullValueHandling = NullValueHandling.Ignore)]
         public string? ErrorCode { get; set; }
+        [JsonProperty("error_message", NullValueHandling = NullValueHandling.Ignore)]
+        public string? ErrorMessage { get; set; }
         [JsonProperty("elements_affected")] public int ElementsAffected { get; set; }
         [JsonProperty("duration_ms", NullValueHandling = NullValueHandling.Ignore)]
         public long? DurationMs { get; set; }

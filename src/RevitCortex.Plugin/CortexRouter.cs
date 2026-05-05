@@ -119,7 +119,8 @@ public class CortexRouter
                 _auditLogger.LogWithPerf(toolName, BuildInputSummary(toolName, input),
                     cached.Success, cached.Error?.Code, elementsAffected: 0,
                     durationMs: stopwatch.ElapsedMilliseconds,
-                    responseBytes: EstimateResponseBytes(cached));
+                    responseBytes: EstimateResponseBytes(cached),
+                    errorMessage: cached.Error?.Message);
                 return cached;
             }
         }
@@ -172,7 +173,8 @@ public class CortexRouter
             durationMs: stopwatch.ElapsedMilliseconds,
             responseBytes: responseBytes,
             codeSnippet: codeSnippet,
-            codeHash: codeHash);
+            codeHash: codeHash,
+            errorMessage: result.Error?.Message);
 
         return result;
     }
