@@ -15,14 +15,12 @@ namespace RevitCortex.Tools.Elements;
 /// Executes custom C# code snippets in the Revit context.
 /// Uses Roslyn (net8) on Revit 2025+, CSharpCodeProvider (net48) on Revit 2023/2024.
 /// HARD-GATED by CortexSettings.EnableCodeExecution — default false.
-/// Every invocation is recorded via AuditLogger.
+/// CortexRouter records every invocation in audit.jsonl with code snippet + SHA-256.
 /// Scripts are persisted to ~/.revitcortex/scripts/ and cleaned up at Revit shutdown
 /// unless marked as reusable.
 /// </summary>
 public class SendCodeToRevitTool : ICortexTool
 {
-    private static readonly AuditLogger _audit = new AuditLogger();
-
     public static readonly string ScriptsFolder = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".revitcortex", "scripts");
@@ -39,8 +37,6 @@ public class SendCodeToRevitTool : ICortexTool
         var settings = CortexSettings.Load();
         if (!settings.EnableCodeExecution)
         {
-            _audit.Log(Name, "BLOCKED: EnableCodeExecution=false", success: false,
-                errorCode: CortexErrorCode.PermissionDenied);
             return CortexResult<object>.Fail(
                 CortexErrorCode.PermissionDenied,
                 "send_code_to_revit is disabled in this installation. STOP: do NOT retry this tool. Ask the user to enable code execution via Settings > Tools (or \"EnableCodeExecution\": true in ~/.revitcortex/settings.json), or solve the task with dedicated tools instead.",
@@ -63,8 +59,6 @@ public class SendCodeToRevitTool : ICortexTool
         var sandboxResult = CodeSandbox.Validate(code!);
         if (sandboxResult != null)
         {
-            _audit.Log(Name, "BLOCKED: sandbox violation", success: false,
-                errorCode: CortexErrorCode.PermissionDenied);
             return sandboxResult;
         }
 
@@ -96,11 +90,6 @@ public class SendCodeToRevitTool : ICortexTool
 #else
         result = CodeDomExecutor.Execute(code!, globals, transactionMode);
 #endif
-
-        // Audit: always log code execution attempts
-        var summaryLen = System.Math.Min(code!.Length, 200);
-        _audit.Log(Name, $"code[{code.Length}ch]: {code.Substring(0, summaryLen)}",
-            success: result.Success, errorCode: result.Error?.Code);
 
         // Attach script path to result so the caller knows where it was saved
         if (result.Success && result.Data is not null)
