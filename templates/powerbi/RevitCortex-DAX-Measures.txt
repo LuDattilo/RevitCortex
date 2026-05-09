@@ -1,0 +1,63 @@
+// ════════════════════════════════════════════════════════════════════════
+// RevitCortex Power BI starter measures
+//
+// Copy each measure individually:
+//   Modello → New measure → paste → ✓
+//
+// All measures live in a "Measures" table you can create with:
+//   Home → New table → Misure = ROW("Placeholder", "")
+//   then move all measures into it.
+// ════════════════════════════════════════════════════════════════════════
+
+// ── Counters ────────────────────────────────────────────────────────────
+
+Total Elements =
+COUNTROWS('RevitCortex')
+
+Walls Count =
+CALCULATE(COUNTROWS('RevitCortex'), 'RevitCortex'[Category] = "Walls")
+
+Floors Count =
+CALCULATE(COUNTROWS('RevitCortex'), 'RevitCortex'[Category] = "Floors")
+
+Doors Count =
+CALCULATE(COUNTROWS('RevitCortex'), 'RevitCortex'[Category] = "Doors")
+
+// ── Quantities ──────────────────────────────────────────────────────────
+
+Total Volume m3 =
+SUMX('RevitCortex', COALESCE('RevitCortex'[Volume_num], 0))
+
+Total Area m2 =
+SUMX('RevitCortex', COALESCE('RevitCortex'[Area_num], 0))
+
+Avg Volume per Wall =
+DIVIDE(
+    CALCULATE([Total Volume m3], 'RevitCortex'[Category] = "Walls"),
+    [Walls Count]
+)
+
+// ── Coverage / data quality ─────────────────────────────────────────────
+
+% Walls with Mark =
+DIVIDE(
+    CALCULATE(COUNTROWS('RevitCortex'), 'RevitCortex'[Category] = "Walls", 'RevitCortex'[Mark] <> ""),
+    [Walls Count]
+)
+
+% Elements with Comments =
+DIVIDE(
+    CALCULATE(COUNTROWS('RevitCortex'), 'RevitCortex'[Comments] <> ""),
+    [Total Elements]
+)
+
+% Elements with WBS Code =
+DIVIDE(
+    CALCULATE(COUNTROWS('RevitCortex'), 'RevitCortex'[WBS_Code] <> ""),
+    [Total Elements]
+)
+
+// ── Time ────────────────────────────────────────────────────────────────
+
+Last Refresh =
+"Aggiornato " & FORMAT(NOW(), "dd/MM/yyyy HH:mm")

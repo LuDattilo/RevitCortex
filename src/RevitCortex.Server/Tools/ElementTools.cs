@@ -378,4 +378,114 @@ public static class ElementTools
         var result = await revit.ExecuteAsync("modify_element", p, ct);
         return result.ToString();
     }
+
+    [McpServerTool(Name = "push_to_powerbi"), Description("Export element parameters or existing schedules to CSV files in a local/OneDrive folder for Power BI refresh. Two modes: (1) categories + parameterNames -> one elements.csv; (2) scheduleIds -> one schedule_<Name>.csv per schedule. Scope can be limited to active view or current selection. Defaults to OneDrive GPA Ingegneria Srl\\RevitCortex\\<DocumentName>\\.")]
+    public static async Task<string> PushToPowerBi(
+        RevitConnectionManager revit,
+        [Description("Categories to export (OST_* codes or display names). Omit for all. Used in category mode.")] string[]? categories = null,
+        [Description("Parameter names to include as columns. Omit to auto-discover from first 100 elements. Used in category mode.")] string[]? parameterNames = null,
+        [Description("Existing schedule (ViewSchedule) IDs to export. When set, switches to schedule mode (one CSV per schedule).")] long[]? scheduleIds = null,
+        [Description("Also include type-level parameters. Default: false. Category mode only.")] bool includeTypeParameters = false,
+        [Description("Max elements to export. Default: 10000. Category mode only.")] int maxElements = 10000,
+        [Description("Scope: WholeModel (default), ActiveView, Selection.")] string? scopeMode = null,
+        [Description("Element IDs for Selection scope.")] long[]? selectionIds = null,
+        [Description("View ID for ActiveView scope (defaults to the document's active view).")] long? activeViewId = null,
+        [Description("Output folder path. Defaults to OneDrive GPA Ingegneria Srl\\RevitCortex\\<DocumentName>.")] string? outputFolder = null,
+        [Description("CSV file name (without path). Defaults to elements_<timestamp>.csv. Category mode only.")] string? fileName = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["includeTypeParameters"] = includeTypeParameters,
+            ["maxElements"] = maxElements,
+        };
+        if (categories != null) p["categories"] = new JArray(categories);
+        if (parameterNames != null) p["parameterNames"] = new JArray(parameterNames);
+        if (scheduleIds != null) p["scheduleIds"] = new JArray(scheduleIds.Cast<object>().ToArray());
+        if (scopeMode != null) p["scopeMode"] = scopeMode;
+        if (selectionIds != null) p["selectionIds"] = new JArray(selectionIds.Cast<object>().ToArray());
+        if (activeViewId != null) p["activeViewId"] = activeViewId;
+        if (outputFolder != null) p["outputFolder"] = outputFolder;
+        if (fileName != null) p["fileName"] = fileName;
+        var result = await revit.ExecuteAsync("push_to_powerbi", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "select_from_powerbi"), Description("Selects/zooms/isolates elements in the active Revit view from a Power BI drillthrough. Action: select | highlight | isolate.")]
+    public static async Task<string> SelectFromPowerBi(
+        RevitConnectionManager revit,
+        [Description("Element IDs to focus")] long[] elementIds,
+        [Description("Action: select | highlight | isolate. Default: select")] string action = "select",
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["elementIds"] = new JArray(elementIds.Cast<object>().ToArray()),
+            ["action"] = action,
+        };
+        var result = await revit.ExecuteAsync("select_from_powerbi", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "push_table_to_powerbi"), Description("Writes an arbitrary table (headers + rows) to a CSV in the RevitCortex/OneDrive folder for Power BI. Use when the data was computed by you (LLM analysis, multi-doc aggregation, etc.) and is NOT a direct dump of Revit elements. Pass headers as a JSON array of strings; pass rows as a JSON array where each item is either an array (positional) or an object keyed by header. The file lives next to push_to_powerbi outputs and can be picked up by the same Power BI folder source.")]
+    public static async Task<string> PushTableToPowerBi(
+        RevitConnectionManager revit,
+        [Description("JSON array of column header strings, e.g. [\"Level\",\"Volume\",\"Count\"].")] string headers,
+        [Description("JSON array of rows. Each row is either an array of values matching headers' order, or an object keyed by header name.")] string rows,
+        [Description("Output folder. Defaults to OneDrive\\RevitCortex\\<DocumentName-or-ChatTables>.")] string? outputFolder = null,
+        [Description("Optional subfolder name appended to outputFolder for grouping (e.g. 'Analyses').")] string? subfolder = null,
+        [Description("CSV file name. Defaults to table_<timestamp>.csv. Use a stable name for repeated overwrites.")] string? fileName = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["headers"] = JArray.Parse(headers),
+            ["rows"] = JArray.Parse(rows),
+        };
+        if (outputFolder != null) p["outputFolder"] = outputFolder;
+        if (subfolder != null) p["subfolder"] = subfolder;
+        if (fileName != null) p["fileName"] = fileName;
+        var result = await revit.ExecuteAsync("push_table_to_powerbi", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_check_auth"), Description("Reports the user's Power BI sign-in state. With signIn=true, starts an MSAL device-code flow inside Revit (a TaskDialog will show the URL + code; the user finishes login in their browser). Token is cached DPAPI-encrypted in %LOCALAPPDATA%\\.revitcortex\\msal_cache.bin.")]
+    public static async Task<string> PbiCheckAuth(
+        RevitConnectionManager revit,
+        [Description("If true and not already signed in, kick off device-code flow and wait until the user signs in.")] bool signIn = false,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["signIn"] = signIn };
+        var result = await revit.ExecuteAsync("pbi_check_auth", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_list_workspaces"), Description("Lists Power BI workspaces (groups) accessible to the signed-in user. Read-only.")]
+    public static async Task<string> PbiListWorkspaces(
+        RevitConnectionManager revit,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("pbi_list_workspaces", new JObject(), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "import_from_powerbi"), Description("Reads a previously-exported (or hand-edited) Power BI CSV and writes parameter values back to Revit elements. Identifies elements via the ElementId column. Built-in fields and read-only parameters are skipped. Defaults to dryRun=true so callers can preview first.")]
+    public static async Task<string> ImportFromPowerBi(
+        RevitConnectionManager revit,
+        [Description("Path to the CSV file (typically the one written by push_to_powerbi).")] string filePath,
+        [Description("Preview mode: report what would change without committing. Default: true.")] bool dryRun = true,
+        [Description("Name of the column holding the Revit ElementId. Default: 'ElementId'.")] string idColumn = "ElementId",
+        [Description("Optional whitelist of column headers to write (others ignored).")] string[]? columns = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["filePath"] = filePath,
+            ["dryRun"] = dryRun,
+            ["idColumn"] = idColumn,
+        };
+        if (columns != null) p["columns"] = new JArray(columns);
+        var result = await revit.ExecuteAsync("import_from_powerbi", p, ct);
+        return result.ToString();
+    }
 }
