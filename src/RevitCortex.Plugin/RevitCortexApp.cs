@@ -84,6 +84,11 @@ public class RevitCortexApp : IExternalApplication
                 _router.RegisterToolsFromAssembly(toolsAssembly);
             }
 
+            // Also scan the Plugin assembly itself: a few tools (Power BI Live
+            // auth/REST) live here because they depend on MSAL.NET which is
+            // referenced by the Plugin, not the Tools project.
+            _router.RegisterToolsFromAssembly(Assembly.GetExecutingAssembly());
+
             // Create thread dispatcher for Revit main thread execution
             var executionHandler = new ToolExecutionHandler();
             var externalEvent = ExternalEvent.Create(executionHandler);
@@ -215,6 +220,19 @@ public class RevitCortexApp : IExternalApplication
         settingsBtn.Image = IconFactory.CreateSettingsIcon(16);
         settingsBtn.LargeImage = IconFactory.CreateSettingsIcon(32);
         panel.AddItem(settingsBtn);
+
+        // Power BI export button
+        var powerBiBtn = new PushButtonData(
+            "ID_CORTEX_POWERBI", "Power BI\r\nExport",
+            assemblyLocation, "RevitCortex.Plugin.Commands.OpenPowerBiExport");
+        powerBiBtn.ToolTip = "Esporta dati e parametri in CSV per Power BI";
+        powerBiBtn.LongDescription =
+            "Apre il wizard di export Power BI: scegli categorie e parametri, " +
+            "salva profili riutilizzabili, abilita auto-export al salvataggio e " +
+            "registra il protocol handler revitcortex:// per drillthrough da PBI a Revit.";
+        powerBiBtn.Image = IconFactory.CreatePowerBiIcon(16);
+        powerBiBtn.LargeImage = IconFactory.CreatePowerBiIcon(32);
+        panel.AddItem(powerBiBtn);
 
         // Send support report button
         var supportBtn = new PushButtonData(

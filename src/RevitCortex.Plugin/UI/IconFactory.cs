@@ -134,6 +134,32 @@ public static class IconFactory
         });
     }
 
+    /// <summary>
+    /// Power BI icon: four bars of increasing height (analytics/dashboard motif)
+    /// on a yellow-amber background to evoke the Power BI brand without using
+    /// the trademarked logo.
+    /// </summary>
+    public static BitmapSource CreatePowerBiIcon(int size)
+    {
+        var amber = Color.FromRgb(245, 158, 11); // #F59E0B (warm amber)
+        return CreateIconWithDrawing(size, amber, (dc, s) =>
+        {
+            double margin = s * 0.18;
+            double baseY = s - margin;
+            double barW = (s - 2 * margin) / 4 * 0.7;
+            double gap = (s - 2 * margin) / 4 * 0.3;
+            var fill = Brushes.White;
+
+            for (int i = 0; i < 4; i++)
+            {
+                double h = (i + 1) * (s - 2 * margin) / 5;
+                double x = margin + i * (barW + gap);
+                double y = baseY - h;
+                dc.DrawRectangle(fill, null, new Rect(x, y, barW, h));
+            }
+        });
+    }
+
     /// <summary>Support icon: stylized envelope on indigo background.</summary>
     public static BitmapSource CreateSupportIcon(int size)
     {

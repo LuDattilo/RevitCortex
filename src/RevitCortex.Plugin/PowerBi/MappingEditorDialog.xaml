@@ -1,0 +1,83 @@
+<Window x:Class="RevitCortex.Plugin.PowerBi.MappingEditorDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Mappa colonne CSV" Height="600" Width="900"
+        WindowStartupLocation="CenterOwner"
+        Background="#FAFAFA">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" FontSize="16" FontWeight="SemiBold" Foreground="#00838F"
+                   Text="Personalizza le colonne del CSV" Margin="0,0,0,4"/>
+        <TextBlock Grid.Row="1" Foreground="#616161" TextWrapping="Wrap" Margin="0,0,0,12" FontSize="12">
+            <Run Text="Modifica l'header CSV (alias) di ogni colonna; aggiungi colonne calcolate con formule che combinano parametri."/>
+            <LineBreak/>
+            <Run Text="Sintassi formula: testo libero + token tra graffe. Token disponibili:"/>
+            <Run FontFamily="Consolas" Text=" {ElementId} {Category} {Family} {Type} {NomeParametro} {[Type] NomeParametro}"/>
+            <LineBreak/>
+            <Run Text="Esempio:"/>
+            <Run FontFamily="Consolas" Text=" {Family} - {Type} ({Mark})"/>
+        </TextBlock>
+
+        <DataGrid Grid.Row="2" x:Name="MappingsGrid"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  AlternatingRowBackground="#F5F5F5"
+                  RowHeight="32"
+                  BorderBrush="#E0E0E0" BorderThickness="1">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="#" Width="40" Binding="{Binding OrderIndex}" IsReadOnly="True"/>
+                <DataGridComboBoxColumn Header="Tipo" Width="90"
+                                        SelectedItemBinding="{Binding Source, UpdateSourceTrigger=PropertyChanged}">
+                    <DataGridComboBoxColumn.ItemsSource>
+                        <x:Array Type="{x:Type sys:String}" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                            <sys:String>param</sys:String>
+                            <sys:String>field</sys:String>
+                            <sys:String>formula</sys:String>
+                        </x:Array>
+                    </DataGridComboBoxColumn.ItemsSource>
+                </DataGridComboBoxColumn>
+                <DataGridTextColumn Header="Origine (parametro / campo / formula)" Width="320"
+                                    Binding="{Binding SourceText, UpdateSourceTrigger=PropertyChanged}"/>
+                <DataGridComboBoxColumn Header="Scope" Width="80"
+                                        SelectedItemBinding="{Binding Scope, UpdateSourceTrigger=PropertyChanged}">
+                    <DataGridComboBoxColumn.ItemsSource>
+                        <x:Array Type="{x:Type sys:String}" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                            <sys:String>Instance</sys:String>
+                            <sys:String>Type</sys:String>
+                        </x:Array>
+                    </DataGridComboBoxColumn.ItemsSource>
+                </DataGridComboBoxColumn>
+                <DataGridTextColumn Header="Header CSV (alias)" Width="*"
+                                    Binding="{Binding Header, UpdateSourceTrigger=PropertyChanged}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Button Content="+ Calcolata" Width="110" Margin="0,0,8,0" Click="AddFormula_Click"
+                        ToolTip="Aggiungi una colonna calcolata con formula a token"/>
+                <Button Content="↑" Width="36" Margin="0,0,4,0" Click="MoveUp_Click"/>
+                <Button Content="↓" Width="36" Margin="0,0,8,0" Click="MoveDown_Click"/>
+                <Button Content="Rimuovi" Width="80" Click="Remove_Click"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button Content="Annulla" Width="80" Margin="0,0,8,0" Click="Cancel_Click"/>
+                <Button Content="OK" Width="80" IsDefault="True" Click="Ok_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
