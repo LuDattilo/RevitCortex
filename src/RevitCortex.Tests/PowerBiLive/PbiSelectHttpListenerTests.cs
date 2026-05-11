@@ -155,6 +155,113 @@ public class PbiSelectHttpListenerTests : IDisposable
         Assert.Contains("\"validated\":\"queued\"", body);
     }
 
+    // ─── New endpoint tests (color, reset, create-view) ────────────────────
+
+    [Fact]
+    public async Task UnknownEndpoint_Returns404()
+    {
+        MakeListener();
+        var resp = await _http.PostAsync(
+            "http://localhost:27099/pbi-bogus",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+        Assert.Equal(404, (int)resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task ColorEndpoint_WithoutCallback_Returns501()
+    {
+        // Listener created via legacy ctor → only selection callback wired
+        MakeListener();
+        var resp = await _http.PostAsync(
+            "http://localhost:27099/pbi-color",
+            new StringContent("{\"items\":[{\"id\":1,\"hex\":\"#FF0000\"}]}", Encoding.UTF8, "application/json"));
+        Assert.Equal(501, (int)resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task ColorEndpoint_WithCallback_PassesItems()
+    {
+        var receivedItems = new List<PbiSelectHttpListener.ColorOverride>();
+        _listener = new PbiSelectHttpListener(
+            new PbiSelectHttpListener.Callbacks(
+                selection: (_, _) => "",
+                color: items => { foreach (var it in items) receivedItems.Add(it); return "ok"; }),
+            port: 27099);
+        _listener.Start();
+
+        var resp = await _http.PostAsync(
+            "http://localhost:27099/pbi-color",
+            new StringContent("{\"items\":[{\"id\":111,\"hex\":\"#E53935\"},{\"id\":222,\"hex\":\"#1E88E5\"}]}",
+                Encoding.UTF8, "application/json"));
+        var body = await resp.Content.ReadAsStringAsync();
+        Assert.Equal(200, (int)resp.StatusCode);
+        Assert.Contains("\"success\":true", body);
+        Assert.Equal(2, receivedItems.Count);
+        Assert.Equal(111, receivedItems[0].Id);
+        Assert.Equal("#E53935", receivedItems[0].Hex);
+    }
+
+    [Fact]
+    public async Task ResetEndpoint_WithCallback_IsInvoked()
+    {
+        var called = false;
+        _listener = new PbiSelectHttpListener(
+            new PbiSelectHttpListener.Callbacks(
+                selection: (_, _) => "",
+                resetOverrides: () => { called = true; return "42"; }),
+            port: 27099);
+        _listener.Start();
+
+        var resp = await _http.PostAsync(
+            "http://localhost:27099/pbi-reset-overrides",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+        var body = await resp.Content.ReadAsStringAsync();
+        Assert.Equal(200, (int)resp.StatusCode);
+        Assert.Contains("\"success\":true", body);
+        Assert.Contains("\"validated\":\"42\"", body);
+        Assert.True(called);
+    }
+
+    [Fact]
+    public async Task CreateViewEndpoint_WithCallback_PassesIdsAndName()
+    {
+        IList<long>? receivedIds = null;
+        string? receivedName = null;
+        _listener = new PbiSelectHttpListener(
+            new PbiSelectHttpListener.Callbacks(
+                selection: (_, _) => "",
+                createView: (ids, name) => { receivedIds = ids; receivedName = name; return "View 01"; }),
+            port: 27099);
+        _listener.Start();
+
+        var resp = await _http.PostAsync(
+            "http://localhost:27099/pbi-create-view",
+            new StringContent("{\"elementIds\":[1,2,3],\"viewName\":\"My View\"}",
+                Encoding.UTF8, "application/json"));
+        var body = await resp.Content.ReadAsStringAsync();
+        Assert.Equal(200, (int)resp.StatusCode);
+        Assert.Contains("\"validated\":\"View 01\"", body);
+        Assert.NotNull(receivedIds);
+        Assert.Equal(3, receivedIds!.Count);
+        Assert.Equal("My View", receivedName);
+    }
+
+    [Fact]
+    public async Task CreateViewEndpoint_EmptyIds_Returns400()
+    {
+        _listener = new PbiSelectHttpListener(
+            new PbiSelectHttpListener.Callbacks(
+                selection: (_, _) => "",
+                createView: (_, _) => "View"),
+            port: 27099);
+        _listener.Start();
+
+        var resp = await _http.PostAsync(
+            "http://localhost:27099/pbi-create-view",
+            new StringContent("{\"elementIds\":[]}", Encoding.UTF8, "application/json"));
+        Assert.Equal(400, (int)resp.StatusCode);
+    }
+
     public void Dispose()
     {
         _listener?.Dispose();

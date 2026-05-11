@@ -2,7 +2,7 @@
 
 **Data:** 2026-05-11
 **Versione plugin:** post v1.0.18 (in `main`)
-**Visual PBIVIZ:** `1.0.0.3`
+**Visual PBIVIZ:** `1.0.0.4`
 **Stato:** ✅ End-to-end validato il 2026-05-11
 
 > Documento di sintesi tecnica per chi voglia capire o riprendere il lavoro su Phase 2C senza rileggere spec, plan e tutti i commit. Pensato anche come base per un post di stato del WIP.
@@ -259,6 +259,39 @@ Restyling finale:
 
 ---
 
+## Espansione multi-azione (v1.0.0.4)
+
+Dopo il primo test end-to-end l'utente ha richiesto altre 3 azioni oltre a select/isolate. Il listener è stato esteso a 4 endpoint, il visual ha 5 pulsanti, l'`ExternalEventHandler` gestisce 4 kind in un solo handler:
+
+| Endpoint | Azione Revit | Pulsante nel visual |
+|----------|--------------|---------------------|
+| `POST /pbi-select` (action="select"\|"isolate") | `Selection.SetElementIds` + opzionale `IsolateElementsTemporary` | "Seleziona in Revit" (primario), "Isola in Revit" |
+| `POST /pbi-color` | `View.SetElementOverrides` con `ProjectionLineColor` + solid fill pattern | "Colora in Revit" — abilitato solo se mappata colonna Color (hex) |
+| `POST /pbi-reset-overrides` | Reset `OverrideGraphicSettings` di tutti gli elementi visibili nella vista attiva | "Reset override" |
+| `POST /pbi-create-view` | `View3D.CreateIsometric` + `SetSectionBox` + `IsolateElementsTemporary` sulla nuova vista | "Crea vista 3D da selezione" |
+
+**Decisioni di design:**
+
+- **No confirmation dialog**: l'utente preferisce flusso "click → done" senza interruzioni. Ctrl+Z e "Reset override" sono il recovery.
+- **Crea vista non sostituisce la vista corrente**: la nuova View3D viene aggiunta al Project Browser; l'utente la apre manualmente. Mantiene il flusso di lavoro PBI ⇄ Revit senza spostare il focus.
+- **Sync HTTP per actions**: il listener attende il completamento di Execute via `ManualResetEventSlim` prima di rispondere. Timeout 10s. Lock condiviso (`AcquireLock`) per serializzare le azioni — solo una in flight alla volta.
+- **Color column opzionale**: il data role `colorHex` è `kind: "GroupingOrMeasure"` per permettere sia colonne fisse che misure DAX dinamiche. Validazione hex regex `^#?[0-9a-f]{6}([0-9a-f]{2})?$` lato visual + ri-validazione lato C#.
+
+**File C# nuovi/modificati:**
+- `PbiSelectHttpListener.cs` — refactor con `Callbacks` class + router su path
+- `PbiActionEventHandler.cs` — sostituisce `PbiSelectionEventHandler.cs`; gestisce 4 kind con `ManualResetEventSlim`
+- `RevitCortexApp.cs` — wire-up con 4 dispatcher locali
+
+**Test nuovi (totale ora 16):**
+- `UnknownEndpoint_Returns404`
+- `ColorEndpoint_WithoutCallback_Returns501` (501 quando il listener legacy non ha il color callback)
+- `ColorEndpoint_WithCallback_PassesItems`
+- `ResetEndpoint_WithCallback_IsInvoked`
+- `CreateViewEndpoint_WithCallback_PassesIdsAndName`
+- `CreateViewEndpoint_EmptyIds_Returns400`
+
+---
+
 ## Punti aperti / Idee per il futuro
 
 ### Selezione inversa (Revit → PBI Desktop)
@@ -297,7 +330,7 @@ Se in futuro si volesse esporre via HTTP operazioni come `modify_parameter`, pri
 
 Sintesi narrativa breve (per LinkedIn / blog):
 
-> RevitCortex Phase 2C aggiunge una connessione live bidirezionale tra Power BI Desktop e Revit. Un custom visual `.pbiviz` (TypeScript + React, palette in linea con il plugin) si connette a un piccolo HTTP listener integrato nel plugin Revit (porta 27016, thread di background, sandbox loopback). L'utente trascina la colonna ElementId sul visual; un click su "Seleziona in Revit" propaga la selezione filtrata o cross-filtrata istantaneamente. Niente file intermedi, niente API cloud, niente autenticazione MSAL — comunicazione locale 100% via HTTP/JSON. Lingua del visual auto-rilevata dal locale di PBI (EN/IT). Stack: C# `System.Net.HttpListener` + Revit `IExternalEventHandler`, TypeScript ES2022 + React 18 + `powerbi-visuals-tools` 5.2.
+> RevitCortex Phase 2C aggiunge un ponte live tra Power BI Desktop e Revit. Un custom visual `.pbiviz` (TypeScript + React, palette in linea con il plugin) si connette a un piccolo HTTP listener integrato nel plugin Revit (porta 27016, thread di background, sandbox loopback) e offre cinque azioni: **selezione**, **isolamento**, **override colore** (linea + pattern di riempimento, basato su una misura DAX), **reset degli override**, e **creazione di una nuova vista 3D** con section box attorno agli elementi filtrati. L'utente trascina la colonna ElementId sul visual e, opzionalmente, una colonna Color (hex); ogni click si propaga in Revit in modo sincrono. Niente file intermedi, niente API cloud, niente autenticazione MSAL, niente confirmation dialog — comunicazione locale 100% via HTTP/JSON. Lingua del visual auto-rilevata dal locale di PBI (EN/IT). Stack: C# `System.Net.HttpListener` + Revit `IExternalEventHandler` con `ManualResetEventSlim` per il roundtrip sincrono, TypeScript ES2022 + React 18 + `powerbi-visuals-tools` 5.2.
 
 Screenshot consigliati per il post:
 - Visual dentro PBI Desktop con un grafico a fianco (cross-filter attivo)

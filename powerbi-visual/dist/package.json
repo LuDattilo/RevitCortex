@@ -1,5 +1,5 @@
 {
-		"version": "1.0.0.3",
+		"version": "1.0.0.4",
 		"author": {"name":"GPA Ingegneria Srl","email":"luigi.dattilo@gpapartners.com"},
 		"resources": [
 			{
@@ -8,7 +8,7 @@
 				"file": "resources/revitcortexselectionvisual1A2B3C4D.pbiviz.json"
 			}
 		],
-		"visual": {"name":"RevitCortexSelection","displayName":"RevitCortex Selection","guid":"revitcortexselectionvisual1A2B3C4D","visualClassName":"RevitCortexSelectionVisual","version":"1.0.0.3","description":"Select Revit elements from a Power BI Desktop report","supportUrl":"https://github.com/LuDattilo/revitcortex-releases","gitHubUrl":""},
+		"visual": {"name":"RevitCortexSelection","displayName":"RevitCortex Selection","guid":"revitcortexselectionvisual1A2B3C4D","visualClassName":"RevitCortexSelectionVisual","version":"1.0.0.4","description":"Select, isolate, color-override, reset overrides and create 3D views in Revit from a Power BI Desktop report","supportUrl":"https://github.com/LuDattilo/revitcortex-releases","gitHubUrl":""},
 		"metadata": {
 			"pbivizjson": {
 				"resourceId": "rId0"

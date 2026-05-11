@@ -5,13 +5,22 @@
       "kind": "Grouping",
       "displayName": "Element ID",
       "description": "Map the ElementId column from the Elements table"
+    },
+    {
+      "name": "colorHex",
+      "kind": "GroupingOrMeasure",
+      "displayName": "Color (hex)",
+      "description": "Optional. Map a DAX measure or column that returns a hex color like '#E53935' for each ElementId. Enables the 'Color in Revit' button."
     }
   ],
   "dataViewMappings": [
     {
       "table": {
         "rows": {
-          "for": { "in": "elementIds" },
+          "select": [
+            { "for": { "in": "elementIds" } },
+            { "for": { "in": "colorHex" } }
+          ],
           "dataReductionAlgorithm": {
             "top": { "count": 30000 }
           }

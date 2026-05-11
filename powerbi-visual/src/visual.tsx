@@ -5,7 +5,11 @@ import IVisual = powerbi.extensibility.visual.IVisual;
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 
-const PBI_SELECT_URL = "http://localhost:27016/pbi-select";
+const BASE_URL = "http://localhost:27016";
+const PBI_SELECT_URL = `${BASE_URL}/pbi-select`;
+const PBI_COLOR_URL = `${BASE_URL}/pbi-color`;
+const PBI_RESET_URL = `${BASE_URL}/pbi-reset-overrides`;
+const PBI_CREATE_VIEW_URL = `${BASE_URL}/pbi-create-view`;
 const CHECK_INTERVAL_MS = 30_000;
 
 // ─── RevitCortex palette ────────────────────────────────────────────────────
@@ -33,16 +37,26 @@ interface Strings {
   title: string;
   selectButton: string;
   isolateButton: string;
+  colorButton: string;
+  resetButton: string;
+  createViewButton: string;
   highlighted: string;     // "evidenziati" / "highlighted"
   filtered: string;        // "filtrati" / "filtered"
   totals: string;          // "totali" / "total"
   sent: (n: number) => string;
+  colored: (n: number) => string;
+  reset: (n: number) => string;
+  viewCreated: (name: string) => string;
   connected: string;
   notConnected: string;
   nothingToSelect: string;
   hintConnect: string;
   hintSelect: (n: number, label: string) => string;
   isolateHint: string;
+  colorHint: string;
+  resetHint: string;
+  createViewHint: string;
+  noColorColumnHint: string;
 }
 
 const STRINGS: Record<Lang, Strings> = {
@@ -50,31 +64,51 @@ const STRINGS: Record<Lang, Strings> = {
     title: "RevitCortex Selection",
     selectButton: "Select in Revit",
     isolateButton: "Isolate in Revit",
+    colorButton: "Color in Revit",
+    resetButton: "Reset overrides",
+    createViewButton: "Create 3D view from selection",
     highlighted: "highlighted",
     filtered: "filtered",
     totals: "total",
     sent: (n) => `✓ Sent ${n} element${n === 1 ? "" : "s"}`,
+    colored: (n) => `✓ Colored ${n} element${n === 1 ? "" : "s"}`,
+    reset: (n) => `✓ Reset ${n} element${n === 1 ? "" : "s"}`,
+    viewCreated: (name) => `✓ View created: ${name}`,
     connected: "Connected to Revit",
     notConnected: "RevitCortex not running",
     nothingToSelect: "Nothing to select",
     hintConnect: "RevitCortex not active — start the server in Revit",
     hintSelect: (n, label) => `Select ${n} ${label} element${n === 1 ? "" : "s"} in Revit`,
     isolateHint: "Isolate the elements in the active view (in addition to selection)",
+    colorHint: "Apply color override on the active view using the mapped Color column",
+    resetHint: "Reset all view overrides on the active view",
+    createViewHint: "Create a new 3D view with a section box around the elements (added to Project Browser; current view is preserved)",
+    noColorColumnHint: "Map a 'Color (hex)' column to enable this button",
   },
   it: {
     title: "RevitCortex Selection",
     selectButton: "Seleziona in Revit",
     isolateButton: "Isola in Revit",
+    colorButton: "Colora in Revit",
+    resetButton: "Reset override",
+    createViewButton: "Crea vista 3D da selezione",
     highlighted: "evidenziati",
     filtered: "filtrati",
     totals: "totali",
     sent: (n) => `✓ Inviati ${n} element${n === 1 ? "o" : "i"}`,
+    colored: (n) => `✓ Colorati ${n} element${n === 1 ? "o" : "i"}`,
+    reset: (n) => `✓ Reset di ${n} element${n === 1 ? "o" : "i"}`,
+    viewCreated: (name) => `✓ Vista creata: ${name}`,
     connected: "Connesso a Revit",
     notConnected: "RevitCortex non attivo",
     nothingToSelect: "Nessun elemento da selezionare",
     hintConnect: "RevitCortex non attivo — avvia il server in Revit",
     hintSelect: (n, label) => `Seleziona ${n} elementi ${label} in Revit`,
     isolateHint: "Isola gli elementi nella vista attiva (oltre alla selezione)",
+    colorHint: "Applica un override colore sulla vista attiva usando la colonna 'Color' mappata",
+    resetHint: "Rimuove tutti gli override grafici sulla vista attiva",
+    createViewHint: "Crea una nuova vista 3D con section box attorno agli elementi (aggiunta al Project Browser; la vista corrente resta invariata)",
+    noColorColumnHint: "Mappa una colonna 'Color (hex)' per abilitare questo pulsante",
   },
 };
 
@@ -97,43 +131,103 @@ function detectLang(host?: powerbi.extensibility.visual.IVisualHost): Lang {
 
 // ─── Data helpers ──────────────────────────────────────────────────────────
 
-function getFilteredIds(dataView: powerbi.DataView): number[] {
-  const rows = dataView.table?.rows ?? [];
-  return rows.map(row => row[0] as number).filter(id => typeof id === "number");
+interface ColoredRow {
+  id: number;
+  hex: string;
 }
 
-function getHighlightedIds(dataView: powerbi.DataView): number[] {
+interface ExtractedData {
+  filteredIds: number[];
+  highlightedIds: number[];
+  filteredColored: ColoredRow[];
+  highlightedColored: ColoredRow[];
+  hasColorColumn: boolean;
+}
+
+/**
+ * Extract all the data we need from the table data view in a single pass.
+ * Column order matches the `dataViewMappings.table.rows.select` declaration:
+ *   [0] elementIds
+ *   [1] colorHex (optional)
+ */
+function extractData(dataView: powerbi.DataView): ExtractedData {
+  const empty: ExtractedData = {
+    filteredIds: [],
+    highlightedIds: [],
+    filteredColored: [],
+    highlightedColored: [],
+    hasColorColumn: false,
+  };
   const rows = dataView.table?.rows ?? [];
-  // powerbi-visuals-api does not type `highlights` on DataViewTable,
-  // but Power BI Desktop populates it at runtime when supportsHighlight=true.
-  // Cast through unknown to access it safely.
-  const tableAny = dataView.table as unknown as { highlights?: (powerbi.PrimitiveValue | null)[] };
+  if (rows.length === 0) return empty;
+
+  // Detect column order from the metadata, in case PBI re-orders.
+  const columns = dataView.table?.columns ?? [];
+  let idIdx = 0;
+  let hexIdx = -1;
+  columns.forEach((col, i) => {
+    if (col?.roles?.["elementIds"]) idIdx = i;
+    if (col?.roles?.["colorHex"]) hexIdx = i;
+  });
+  const hasColorColumn = hexIdx >= 0;
+
+  // Highlights array (cross-filter). Not in the public type — runtime-populated.
+  const tableAny = dataView.table as unknown as {
+    highlights?: (powerbi.PrimitiveValue | null)[];
+  };
   const highlights = tableAny?.highlights;
-  if (!highlights) return [];
-  // Use loose inequality (!= null) to catch both null (not highlighted) and
-  // undefined (highlights array not populated / no cross-filter active).
-  return rows
-    .filter((_, i) => highlights[i] != null)
-    .map(row => row[0] as number)
-    .filter(id => typeof id === "number");
+
+  const filteredIds: number[] = [];
+  const highlightedIds: number[] = [];
+  const filteredColored: ColoredRow[] = [];
+  const highlightedColored: ColoredRow[] = [];
+
+  rows.forEach((row, i) => {
+    const id = row[idIdx];
+    if (typeof id !== "number") return;
+    filteredIds.push(id);
+    const hex = hasColorColumn ? (row[hexIdx] as string | null | undefined) : undefined;
+    if (hex && typeof hex === "string" && /^#?[0-9a-f]{6}([0-9a-f]{2})?$/i.test(hex)) {
+      filteredColored.push({ id, hex });
+    }
+    if (highlights && highlights[i] != null) {
+      highlightedIds.push(id);
+      if (hex && typeof hex === "string" && /^#?[0-9a-f]{6}([0-9a-f]{2})?$/i.test(hex)) {
+        highlightedColored.push({ id, hex });
+      }
+    }
+  });
+
+  return {
+    filteredIds,
+    highlightedIds,
+    filteredColored,
+    highlightedColored,
+    hasColorColumn,
+  };
 }
 
 // ─── HTTP helpers ───────────────────────────────────────────────────────────
 
-async function sendToRevit(
-  elementIds: number[],
-  action: "select" | "isolate"
-): Promise<boolean> {
+interface PostResult {
+  ok: boolean;
+  status: number;
+  body: any;
+}
+
+async function post(url: string, payload: any): Promise<PostResult> {
   try {
-    const resp = await fetch(PBI_SELECT_URL, {
+    const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ elementIds, action }),
-      signal: AbortSignal.timeout(5000),
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000), // create-view can take longer
     });
-    return resp.ok;
+    let body: any = null;
+    try { body = await resp.json(); } catch { /* non-JSON response */ }
+    return { ok: resp.ok, status: resp.status, body };
   } catch {
-    return false;
+    return { ok: false, status: 0, body: null };
   }
 }
 
@@ -151,29 +245,51 @@ async function checkConnection(): Promise<boolean> {
 
 // ─── React component ────────────────────────────────────────────────────────
 
+type Feedback =
+  | { kind: "sent"; count: number }
+  | { kind: "colored"; count: number }
+  | { kind: "reset"; count: number }
+  | { kind: "view"; name: string };
+
 interface Props {
   filteredIds: number[];
   highlightedIds: number[];
+  filteredColored: ColoredRow[];
+  highlightedColored: ColoredRow[];
+  hasColorColumn: boolean;
   connected: boolean;
-  lastSent: number | null;
+  feedback: Feedback | null;
   strings: Strings;
   onSelect: (ids: number[], action: "select" | "isolate") => void;
+  onColor: (items: ColoredRow[]) => void;
+  onReset: () => void;
+  onCreateView: (ids: number[]) => void;
 }
 
 function SelectionPanel({
   filteredIds,
   highlightedIds,
+  filteredColored,
+  highlightedColored,
+  hasColorColumn,
   connected,
-  lastSent,
+  feedback,
   strings: t,
   onSelect,
+  onColor,
+  onReset,
+  onCreateView,
 }: Props) {
   // Cross-filter active → use highlighted; otherwise → all filtered rows
   const useHighlighted = highlightedIds.length > 0;
   const activeIds = useHighlighted ? highlightedIds : filteredIds;
   const activeLabel = useHighlighted ? t.highlighted : t.filtered;
+  const activeColored = useHighlighted ? highlightedColored : filteredColored;
 
   const canSelect = connected && activeIds.length > 0;
+  const canColor = connected && hasColorColumn && activeColored.length > 0;
+  const canReset = connected;
+  const canCreateView = connected && activeIds.length > 0;
 
   // Status pill ("Server running" style from RevitCortex Settings)
   const statusBg = connected ? PALETTE.successBg : PALETTE.bgSubtle;
@@ -189,12 +305,13 @@ function SelectionPanel({
         padding: 10,
         display: "flex",
         flexDirection: "column",
-        gap: 10,
+        gap: 8,
         height: "100%",
         boxSizing: "border-box",
+        overflow: "auto",
       }}
     >
-      {/* Title — teal like the Settings header */}
+      {/* Title */}
       <div
         style={{
           fontSize: 14,
@@ -255,18 +372,49 @@ function SelectionPanel({
         </div>
       </button>
 
-      {/* Secondary action */}
-      <button
-        onClick={() => onSelect(activeIds, "isolate")}
-        disabled={!canSelect}
-        style={secondaryBtnStyle(canSelect)}
-        title={t.isolateHint}
-      >
-        {t.isolateButton}
-      </button>
+      {/* Secondary actions row 1: Isolate + Color */}
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          onClick={() => onSelect(activeIds, "isolate")}
+          disabled={!canSelect}
+          style={{ ...secondaryBtnStyle(canSelect), flex: 1 }}
+          title={t.isolateHint}
+        >
+          {t.isolateButton}
+        </button>
+        <button
+          onClick={() => onColor(activeColored)}
+          disabled={!canColor}
+          style={{ ...secondaryBtnStyle(canColor), flex: 1 }}
+          title={hasColorColumn ? t.colorHint : t.noColorColumnHint}
+        >
+          {t.colorButton}
+          {hasColorColumn && activeColored.length > 0 ? ` (${activeColored.length})` : ""}
+        </button>
+      </div>
+
+      {/* Secondary actions row 2: Create view + Reset overrides */}
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          onClick={() => onCreateView(activeIds)}
+          disabled={!canCreateView}
+          style={{ ...secondaryBtnStyle(canCreateView), flex: 1 }}
+          title={t.createViewHint}
+        >
+          {t.createViewButton}
+        </button>
+        <button
+          onClick={() => onReset()}
+          disabled={!canReset}
+          style={{ ...resetBtnStyle(canReset), flex: 1 }}
+          title={t.resetHint}
+        >
+          {t.resetButton}
+        </button>
+      </div>
 
       {/* Feedback */}
-      {lastSent !== null && (
+      {feedback && (
         <div
           style={{
             fontSize: 11,
@@ -277,7 +425,10 @@ function SelectionPanel({
             padding: "4px 8px",
           }}
         >
-          {t.sent(lastSent)}
+          {feedback.kind === "sent" ? t.sent(feedback.count) :
+           feedback.kind === "colored" ? t.colored(feedback.count) :
+           feedback.kind === "reset" ? t.reset(feedback.count) :
+           t.viewCreated(feedback.name)}
         </div>
       )}
     </div>
@@ -307,7 +458,19 @@ function secondaryBtnStyle(enabled: boolean): React.CSSProperties {
     color: enabled ? PALETTE.teal : PALETTE.textMuted,
     border: `1px solid ${enabled ? PALETTE.teal : PALETTE.border}`,
     borderRadius: 3,
-    width: "100%",
+  };
+}
+
+function resetBtnStyle(enabled: boolean): React.CSSProperties {
+  // Reset uses amber tint to signal "undo / destructive-ish" without being scary
+  return {
+    padding: "6px 10px",
+    fontSize: 12,
+    cursor: enabled ? "pointer" : "not-allowed",
+    background: "transparent",
+    color: enabled ? PALETTE.amber : PALETTE.textMuted,
+    border: `1px solid ${enabled ? PALETTE.amber : PALETTE.border}`,
+    borderRadius: 3,
   };
 }
 
@@ -318,8 +481,11 @@ export class RevitCortexSelectionVisual implements IVisual {
   private readonly strings: Strings;
   private filteredIds: number[] = [];
   private highlightedIds: number[] = [];
+  private filteredColored: ColoredRow[] = [];
+  private highlightedColored: ColoredRow[] = [];
+  private hasColorColumn: boolean = false;
   private connected: boolean = false;
-  private lastSent: number | null = null;
+  private feedback: Feedback | null = null;
   private checkTimer: ReturnType<typeof setInterval> | null = null;
   private feedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -337,7 +503,7 @@ export class RevitCortexSelectionVisual implements IVisual {
         this.render();
       }
     };
-    check(); // immediate check on mount
+    check();
     this.checkTimer = setInterval(check, CHECK_INTERVAL_MS);
   }
 
@@ -346,11 +512,71 @@ export class RevitCortexSelectionVisual implements IVisual {
     if (!dv) {
       this.filteredIds = [];
       this.highlightedIds = [];
+      this.filteredColored = [];
+      this.highlightedColored = [];
+      this.hasColorColumn = false;
     } else {
-      this.filteredIds = getFilteredIds(dv);
-      this.highlightedIds = getHighlightedIds(dv);
+      const data = extractData(dv);
+      this.filteredIds = data.filteredIds;
+      this.highlightedIds = data.highlightedIds;
+      this.filteredColored = data.filteredColored;
+      this.highlightedColored = data.highlightedColored;
+      this.hasColorColumn = data.hasColorColumn;
     }
     this.render();
+  }
+
+  private showFeedback(f: Feedback): void {
+    this.feedback = f;
+    this.render();
+    if (this.feedbackTimer !== null) clearTimeout(this.feedbackTimer);
+    this.feedbackTimer = setTimeout(() => {
+      this.feedback = null;
+      this.render();
+    }, 3000);
+  }
+
+  private async onSelect(ids: number[], action: "select" | "isolate"): Promise<void> {
+    const r = await post(PBI_SELECT_URL, { elementIds: ids, action });
+    if (r.ok && r.body?.success) {
+      this.showFeedback({ kind: "sent", count: ids.length });
+    } else {
+      this.connected = await checkConnection();
+      this.render();
+    }
+  }
+
+  private async onColor(items: ColoredRow[]): Promise<void> {
+    const r = await post(PBI_COLOR_URL, { items });
+    if (r.ok && r.body?.success) {
+      const count = parseInt(r.body.validated ?? `${items.length}`, 10) || items.length;
+      this.showFeedback({ kind: "colored", count });
+    } else {
+      this.connected = await checkConnection();
+      this.render();
+    }
+  }
+
+  private async onReset(): Promise<void> {
+    const r = await post(PBI_RESET_URL, {});
+    if (r.ok && r.body?.success) {
+      const count = parseInt(r.body.validated ?? "0", 10) || 0;
+      this.showFeedback({ kind: "reset", count });
+    } else {
+      this.connected = await checkConnection();
+      this.render();
+    }
+  }
+
+  private async onCreateView(ids: number[]): Promise<void> {
+    const r = await post(PBI_CREATE_VIEW_URL, { elementIds: ids });
+    if (r.ok && r.body?.success) {
+      const name = String(r.body.validated ?? "");
+      this.showFeedback({ kind: "view", name });
+    } else {
+      this.connected = await checkConnection();
+      this.render();
+    }
   }
 
   private render(): void {
@@ -358,24 +584,16 @@ export class RevitCortexSelectionVisual implements IVisual {
       React.createElement(SelectionPanel, {
         filteredIds: this.filteredIds,
         highlightedIds: this.highlightedIds,
+        filteredColored: this.filteredColored,
+        highlightedColored: this.highlightedColored,
+        hasColorColumn: this.hasColorColumn,
         connected: this.connected,
-        lastSent: this.lastSent,
+        feedback: this.feedback,
         strings: this.strings,
-        onSelect: async (ids, action) => {
-          const ok = await sendToRevit(ids, action);
-          if (ok) {
-            this.lastSent = ids.length;
-            this.render();
-            if (this.feedbackTimer !== null) clearTimeout(this.feedbackTimer);
-            this.feedbackTimer = setTimeout(() => {
-              this.lastSent = null;
-              this.render();
-            }, 3000);
-          } else {
-            this.connected = await checkConnection();
-            this.render();
-          }
-        },
+        onSelect: (ids, action) => { void this.onSelect(ids, action); },
+        onColor: (items) => { void this.onColor(items); },
+        onReset: () => { void this.onReset(); },
+        onCreateView: (ids) => { void this.onCreateView(ids); },
       }),
       this.target
     );

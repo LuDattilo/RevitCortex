@@ -269,7 +269,15 @@ Integrazione diretta con Power BI push datasets (senza file intermedi).
 | `pbi_query` | Esegue una query DAX sul dataset PBI e seleziona/isola in Revit gli elementi corrispondenti | datasetId?, workspaceId?, exportRunId?, category?, ostCode?, action?, maxElements? |
 | `pbi_sign_out` | Revoca il token MSAL; necessario per cambiare account |
 
-**Visual Power BI Desktop (Phase 2C):** Il file `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.3.pbiviz` è un custom visual importabile in Power BI Desktop che aggiunge un pulsante grande **"Seleziona in Revit (N)"** (usa automaticamente le righe evidenziate da un altro visual se presenti, altrimenti tutto il filtro corrente), un pulsante secondario **"Isola in Revit"**, e un indicatore di connessione al listener HTTP su porta 27016. Non richiede autenticazione MSAL — comunica direttamente con Revit tramite richiesta POST locale. La colonna ElementId va trascinata nel campo "Element ID"; il data role è `kind: Grouping` quindi PBI non aggrega mai (niente "Count of..."). **Palette e lingua:** l'UI usa la palette RevitCortex (teal `#00838F` come il Settings); la lingua si adatta automaticamente al locale di Power BI — italiano se PBI è in italiano, inglese altrimenti. Per dettagli tecnici vedere `docs/powerbi-live-phase2c-handoff.md`.
+**Visual Power BI Desktop (Phase 2C):** Il file `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.4.pbiviz` è un custom visual importabile in Power BI Desktop con 5 azioni:
+
+- **Seleziona in Revit** (pulsante grande primario) — invia gli ElementId filtrati / evidenziati a Revit
+- **Isola in Revit** — `IsolateElementsTemporary` sulla vista attiva
+- **Colora in Revit** — override grafico (linea di proiezione + pattern di riempimento solido) usando la colonna opzionale **Color (hex)**: una misura DAX o colonna che ritorna `#RRGGBB`
+- **Crea vista 3D da selezione** — nuova `View3D` con section box sugli elementi; aggiunta al Project Browser, la vista corrente resta invariata
+- **Reset override** — pulisce gli `OverrideGraphicSettings` della vista attiva
+
+Comunica via HTTP POST su `localhost:27016` (4 endpoint: `/pbi-select`, `/pbi-color`, `/pbi-reset-overrides`, `/pbi-create-view`). Niente autenticazione MSAL, niente confirmation dialog (per annullare: Ctrl+Z in Revit o "Reset override"). Field well **Element ID** (obbligatorio, `kind: Grouping` → niente aggregazione "Count of"), **Color (hex)** (opzionale). **Palette e lingua:** UI in teal `#00838F` come il Settings; locale auto-rilevato (italiano/inglese). Dettagli tecnici in `docs/powerbi-live-phase2c-handoff.md`.
 
 **Flusso tipico (primo utilizzo):**
 1. `pbi_check_auth(signIn=true)` → copia il codice mostrato e aprilo su `https://microsoft.com/devicelogin`

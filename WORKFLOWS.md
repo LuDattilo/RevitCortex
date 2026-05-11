@@ -697,20 +697,36 @@ Query the bound Power BI dataset and select matching Revit elements by returned 
 
 **Prerequisiti:**
 - Plugin RevitCortex installato e Cortex Switch attivo (porta 27016 si apre automaticamente)
-- Power BI Desktop (non Service) con il visual `revitcortexselectionvisual1A2B3C4D.1.0.0.3.pbiviz` importato
+- Power BI Desktop (non Service) con il visual `revitcortexselectionvisual1A2B3C4D.1.0.0.4.pbiviz` importato
 
 **Installazione del visual:**
 1. Aprire Power BI Desktop
 2. Nel pannello Visualizzazioni → "…" → Importa un visual da un file
-3. Selezionare `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.3.pbiviz`
+3. Selezionare `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.4.pbiviz`
 4. Trascinare il visual sulla pagina del report
 5. Nel pannello Campi, trascinare `Elements[ElementId]` nel ruolo **Element ID**
 
-**Utilizzo (v1.0.0.3):**
-- **Seleziona in Revit / Select in Revit** — pulsante principale, label in italiano se PBI è in italiano, inglese altrimenti. Quando un altro visual evidenzia righe (cross-filter), invia solo quelle; altrimenti invia tutti gli elementi visibili. Mostra anche il totale tra parentesi quando i due valori differiscono.
-- **Isola in Revit / Isolate in Revit** — pulsante secondario outline; esegue `IsolateElementsTemporary` nella vista attiva oltre alla selezione.
-- Feedback "✓ Inviati N elementi" / "✓ Sent N elements" per 3 secondi dopo il click.
+**Utilizzo (v1.0.0.4):**
+- **Seleziona in Revit / Select in Revit** — pulsante principale grande, label in italiano se PBI è in italiano, inglese altrimenti. Quando un altro visual evidenzia righe (cross-filter), invia solo quelle; altrimenti invia tutti gli elementi visibili. Mostra anche il totale tra parentesi quando i due valori differiscono.
+- **Isola in Revit / Isolate in Revit** — outline; esegue `IsolateElementsTemporary` nella vista attiva oltre alla selezione.
+- **Colora in Revit / Color in Revit** — outline; applica override grafici (linea di proiezione + pattern di riempimento solido) usando i colori hex dalla colonna **Color (hex)** mappata nel visual. Richiede una misura DAX o una colonna che ritorni colori hex `#RRGGBB`. Disabilitato se la colonna Color non è mappata o nessun valore valido.
+- **Crea vista 3D da selezione / Create 3D view from selection** — outline; genera una nuova vista 3D isometrica con `SectionBox` attorno agli elementi selezionati, isolando quegli elementi. La vista viene aggiunta al Project Browser; **la vista corrente non cambia**.
+- **Reset override** — outline ambra; pulisce tutti gli `OverrideGraphicSettings` sulla vista attiva. Utile per ripartire dopo aver usato "Colora in Revit".
+- Feedback "✓ Inviati/Colorati/Reset/Vista creata" per 3 secondi dopo ogni azione.
 - Indicatore connessione (status pill): verde con sfondo verde chiaro = "Connesso a Revit / Connected to Revit"; grigio = "RevitCortex non attivo / RevitCortex not running".
+- **Niente confirmation dialog**: i pulsanti agiscono direttamente. Per annullare, usa Ctrl+Z in Revit oppure "Reset override".
+
+**Esempio misura DAX per la colonna Color:**
+```dax
+ColorByCategory =
+    SWITCH(
+        SELECTEDVALUE(Elements[Category]),
+        "Walls",  "#E53935",
+        "Floors", "#1E88E5",
+        "Doors",  "#43A047",
+        "#9E9E9E"
+    )
+```
 
 **Branding:** UI in linea con la palette del plugin RevitCortex (teal `#00838F` per titolo e pulsante primario, palette importata da `IconFactory.cs`).
 

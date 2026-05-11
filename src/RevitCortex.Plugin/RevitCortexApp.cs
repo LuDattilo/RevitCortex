@@ -25,8 +25,8 @@ public class RevitCortexApp : IExternalApplication
     private Autodesk.Revit.UI.PushButton? _connectButton;
     private bool _updateNotificationShown;
     private PbiSelectHttpListener? _pbiSelectListener;
-    private PbiSelectionEventHandler? _pbiSelectionHandler;
-    private ExternalEvent? _pbiSelectionEvent;
+    private PbiActionEventHandler? _pbiActionHandler;
+    private ExternalEvent? _pbiActionEvent;
 
     public static RevitCortexApp? Instance { get; private set; }
 
@@ -110,10 +110,10 @@ public class RevitCortexApp : IExternalApplication
             RevitCortex.Plugin.Updates.UpdateChecker.UpdateAvailable += OnUpdateAvailable;
             RevitCortex.Plugin.Updates.UpdateChecker.CheckInBackground();
 
-            // Create the PBI selection ExternalEvent (registered once at startup,
-            // used whenever the Power BI Desktop visual sends a pbi-select request)
-            _pbiSelectionHandler = new PbiSelectionEventHandler();
-            _pbiSelectionEvent = ExternalEvent.Create(_pbiSelectionHandler);
+            // Create the PBI action ExternalEvent (registered once at startup,
+            // used whenever the Power BI Desktop visual sends a pbi-* request)
+            _pbiActionHandler = new PbiActionEventHandler();
+            _pbiActionEvent = ExternalEvent.Create(_pbiActionHandler);
 
             // Create socket service but do NOT start automatically
             _socketService = new SocketService(_router, _port);
@@ -188,31 +188,71 @@ public class RevitCortexApp : IExternalApplication
             _socketService.Start();
 
             // Start PBI Desktop → Revit HTTP listener on port 27016
-            if (_pbiSelectListener == null && _pbiSelectionHandler != null && _pbiSelectionEvent != null)
+            if (_pbiSelectListener == null && _pbiActionHandler != null && _pbiActionEvent != null)
             {
-                var handler = _pbiSelectionHandler;
-                var evt = _pbiSelectionEvent;
-                _pbiSelectListener = new PbiSelectHttpListener(
-                    handleSelection: (rawIds, action) =>
-                    {
-                        // The Revit API is single-threaded — we cannot touch
-                        // Document from this background thread. Only check that
-                        // a UIApplication exists at all (cheap pointer read);
-                        // ElementId validation happens later on the main thread
-                        // inside PbiSelectionEventHandler.Execute().
-                        var uiApp = _uiApplication;
-                        System.Diagnostics.Trace.WriteLine(
-                            $"[RevitCortex.PbiSelect] callback: rawIds={rawIds.Count}, " +
-                            $"uiApp={(uiApp == null ? "null" : "ok")}");
-                        if (uiApp == null) return null;
+                var handler = _pbiActionHandler;
+                var evt = _pbiActionEvent;
 
-                        // Queue on main thread. Validation is deferred to Execute()
-                        // which runs on the Revit UI thread — the only place where
-                        // Document.GetElement is legal.
-                        handler.Prepare(rawIds, action);
+                // All four callbacks share the same pattern: acquire the handler
+                // lock, prepare the request, raise the event, wait for the main
+                // thread Execute to complete. Returning null = "no doc / failed";
+                // a non-null string is whatever the action wants to report
+                // (count, view name, etc.).
+
+                string? DispatchSelect(System.Collections.Generic.IList<long> ids, string action)
+                {
+                    if (_uiApplication == null) return null;
+                    using (handler.AcquireLock())
+                    {
+                        handler.PrepareSelection(ids, action);
                         evt.Raise();
-                        return "queued";
-                    },
+                        if (!handler.WaitForCompletion()) return null;
+                        return handler.LastResult;
+                    }
+                }
+
+                string? DispatchColor(System.Collections.Generic.IList<PbiSelectHttpListener.ColorOverride> items)
+                {
+                    if (_uiApplication == null) return null;
+                    using (handler.AcquireLock())
+                    {
+                        handler.PrepareColor(items);
+                        evt.Raise();
+                        if (!handler.WaitForCompletion()) return null;
+                        return handler.LastResult;
+                    }
+                }
+
+                string? DispatchReset()
+                {
+                    if (_uiApplication == null) return null;
+                    using (handler.AcquireLock())
+                    {
+                        handler.PrepareReset();
+                        evt.Raise();
+                        if (!handler.WaitForCompletion()) return null;
+                        return handler.LastResult;
+                    }
+                }
+
+                string? DispatchCreateView(System.Collections.Generic.IList<long> ids, string? viewName)
+                {
+                    if (_uiApplication == null) return null;
+                    using (handler.AcquireLock())
+                    {
+                        handler.PrepareCreateView(ids, viewName);
+                        evt.Raise();
+                        if (!handler.WaitForCompletion()) return null;
+                        return handler.LastResult;
+                    }
+                }
+
+                _pbiSelectListener = new PbiSelectHttpListener(
+                    new PbiSelectHttpListener.Callbacks(
+                        selection:       DispatchSelect,
+                        color:           DispatchColor,
+                        resetOverrides:  DispatchReset,
+                        createView:      DispatchCreateView),
                     port: 27016);
                 _pbiSelectListener.Start();
             }
