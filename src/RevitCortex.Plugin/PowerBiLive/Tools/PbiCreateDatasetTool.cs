@@ -16,8 +16,8 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 /// Inputs:
 ///   workspaceId  (string, required): Power BI group GUID.
 ///   datasetName  (string, optional): Override default name.
-///                Default: "RevitCortex Live - {ProjectName} - v1",
-///                or "RevitCortex Live - v1" when no document is open.
+///                Default: "RevitCortex Live - {ProjectName} - v{schema}",
+///                or "RevitCortex Live - v{schema}" when no document is open.
 ///   tables       (string[], optional): Which tables to include.
 ///                Allowed: "Metadata", "Elements", "Schedules",
 ///                "ElementParameters", "Selection".
@@ -60,9 +60,7 @@ public class PbiCreateDatasetTool : ICortexTool
                     projectName = doc.ProjectInformation?.Name ?? doc.Title ?? "";
             }
             catch { }
-            datasetName = string.IsNullOrWhiteSpace(projectName)
-                ? "RevitCortex Live - v1"
-                : $"RevitCortex Live - {projectName} - v1";
+            datasetName = PowerBiDatasetSchema.BuildDefaultDatasetName(projectName);
         }
 
         // Resolve tables

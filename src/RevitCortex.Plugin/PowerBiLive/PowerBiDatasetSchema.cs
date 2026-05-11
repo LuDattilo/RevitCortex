@@ -10,7 +10,7 @@ namespace RevitCortex.Plugin.PowerBiLive;
 /// </summary>
 public static class PowerBiDatasetSchema
 {
-    public const string CurrentVersion = "1.0";
+    public const string CurrentVersion = "1.1";
 
     // ─── Table names ────────────────────────────────────────────────────────
     public const string TableMetadata          = "Metadata";
@@ -18,6 +18,14 @@ public static class PowerBiDatasetSchema
     public const string TableSchedules         = "Schedules";
     public const string TableElementParameters = "ElementParameters";
     public const string TableSelection         = "Selection";
+
+    public static string BuildDefaultDatasetName(string projectName)
+    {
+        var suffix = "v" + CurrentVersion;
+        return string.IsNullOrWhiteSpace(projectName)
+            ? "RevitCortex Live - " + suffix
+            : "RevitCortex Live - " + projectName + " - " + suffix;
+    }
 
     /// <summary>
     /// Builds the full Power BI REST API dataset creation body for the requested tables.
@@ -117,6 +125,8 @@ public static class PowerBiDatasetSchema
             Col("DocumentGuid",   "String"),
             Col("ScheduleId",     "Int64"),
             Col("ScheduleName",   "String"),
+            Col("ElementId",      "Int64"),
+            Col("UniqueId",       "String"),
             Col("RowIndex",       "Int64"),
             Col("ColumnName",     "String"),
             Col("ValueString",    "String"),

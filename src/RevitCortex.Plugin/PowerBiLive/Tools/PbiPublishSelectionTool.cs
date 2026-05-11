@@ -72,22 +72,24 @@ public class PbiPublishSelectionTool : ICortexTool
         // Resolve workspaceId / datasetId / datasetName from ProjectBindings
         var docKey = ProjectDocumentKey.Compute(doc);
         var existingBinding = settings.GetBinding(docKey);
+        var compatibleBinding = existingBinding != null &&
+            existingBinding.SchemaVersion == PowerBiDatasetSchema.CurrentVersion
+                ? existingBinding
+                : null;
 
         if (string.IsNullOrWhiteSpace(workspaceId) && existingBinding != null)
             workspaceId = existingBinding.WorkspaceId;
-        if (string.IsNullOrWhiteSpace(datasetId) && existingBinding != null)
-            datasetId = existingBinding.DatasetId;
+        if (string.IsNullOrWhiteSpace(datasetId) && compatibleBinding != null)
+            datasetId = compatibleBinding.DatasetId;
         if (string.IsNullOrWhiteSpace(datasetName))
         {
-            if (existingBinding != null && !string.IsNullOrWhiteSpace(existingBinding.DatasetName))
-                datasetName = existingBinding.DatasetName;
+            if (compatibleBinding != null && !string.IsNullOrWhiteSpace(compatibleBinding.DatasetName))
+                datasetName = compatibleBinding.DatasetName;
             else
             {
                 string projectName = "";
                 try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; } catch { }
-                datasetName = string.IsNullOrWhiteSpace(projectName)
-                    ? "RevitCortex Live - v1"
-                    : $"RevitCortex Live - {projectName} - v1";
+                datasetName = PowerBiDatasetSchema.BuildDefaultDatasetName(projectName);
             }
         }
 

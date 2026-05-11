@@ -27,7 +27,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///   datasetId     (string, optional): Use existing dataset. If omitted,
 ///                 the dataset is looked up by datasetName.
 ///   datasetName   (string, optional): Dataset name used for lookup/create.
-///                 Default: "RevitCortex Live - {ProjectName} - v1".
+///                 Default: "RevitCortex Live - {ProjectName} - v{schema}".
 ///   mode          (string, optional): "replace" (default), "append", "create".
 ///                 replace: DELETE rows then POST snapshot.
 ///                 append:  POST snapshot, keeping existing rows.
@@ -116,30 +116,32 @@ public class PbiPublishElementsTool : ICortexTool
         // Compute stable document key for ProjectBindings
         var docKey = ProjectDocumentKey.Compute(doc);
         var existingBinding = settings.GetBinding(docKey);
+        var compatibleBinding = existingBinding != null &&
+            existingBinding.SchemaVersion == PowerBiDatasetSchema.CurrentVersion
+                ? existingBinding
+                : null;
 
         // Resolve workspaceId from binding if not provided
         if (string.IsNullOrWhiteSpace(workspaceId) && existingBinding != null)
             workspaceId = existingBinding.WorkspaceId;
 
         // Resolve datasetId from binding if not provided
-        if (string.IsNullOrWhiteSpace(datasetId) && existingBinding != null)
-            datasetId = existingBinding.DatasetId;
+        if (string.IsNullOrWhiteSpace(datasetId) && compatibleBinding != null)
+            datasetId = compatibleBinding.DatasetId;
 
         // Resolve dataset name
         if (string.IsNullOrWhiteSpace(datasetName))
         {
-            if (existingBinding != null && !string.IsNullOrWhiteSpace(existingBinding.DatasetName))
+            if (compatibleBinding != null && !string.IsNullOrWhiteSpace(compatibleBinding.DatasetName))
             {
-                datasetName = existingBinding.DatasetName;
+                datasetName = compatibleBinding.DatasetName;
             }
             else
             {
                 string projectName = "";
                 try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; }
                 catch { }
-                datasetName = string.IsNullOrWhiteSpace(projectName)
-                    ? "RevitCortex Live - v1"
-                    : $"RevitCortex Live - {projectName} - v1";
+                datasetName = PowerBiDatasetSchema.BuildDefaultDatasetName(projectName);
             }
         }
 

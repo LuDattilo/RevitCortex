@@ -14,9 +14,9 @@ namespace RevitCortex.Plugin.PowerBiLive;
 /// PowerBiDatasetSchema.
 ///
 /// Long-form rationale: a single generic schema works for every schedule
-/// regardless of number of columns or localization. Each cell becomes a row
-/// with ScheduleId, ScheduleName, RowIndex, ColumnName, ValueString,
-/// ValueNumber.
+/// regardless of number of columns or localization. Each schedule field becomes
+/// a row per visible element with ScheduleId, ElementId, ColumnName,
+/// ValueString, ValueNumber.
 /// </summary>
 public class PowerBiScheduleExporter
 {
@@ -93,8 +93,10 @@ public class PowerBiScheduleExporter
         string scheduleName = SafeString(() => sch.Name) ?? "";
         string exportedAtStr = exportedAtUtc.ToString("o");
 
-        // Get column names from schedule definition
-        var columnNames = new List<string>();
+        // Get schedule fields from schedule definition. Fields without a
+        // parameter id are kept with blank values so the published shape still
+        // reflects the schedule definition.
+        var fields = new List<ScheduleExportField>();
         try
         {
             var def = sch.Definition;
@@ -104,60 +106,43 @@ public class PowerBiScheduleExporter
                 try
                 {
                     var field = def!.GetField(i);
-                    columnNames.Add(field?.ColumnHeading ?? $"Column{i}");
+                    fields.Add(new ScheduleExportField(
+                        field?.ColumnHeading ?? $"Column{i}",
+                        field != null ? field.ParameterId : ElementId.InvalidElementId));
                 }
                 catch
                 {
-                    columnNames.Add($"Column{i}");
+                    fields.Add(new ScheduleExportField($"Column{i}", ElementId.InvalidElementId));
                 }
             }
         }
         catch { }
 
-        if (columnNames.Count == 0) return rows;
+        if (fields.Count == 0) return rows;
 
-        // Get table data
-        TableData? tableData = null;
-        TableSectionData? body = null;
+        IList<Element> elements;
         try
         {
-            tableData = sch.GetTableData();
-            body = tableData?.GetSectionData(SectionType.Body);
+            elements = new FilteredElementCollector(doc, sch.Id)
+                .WhereElementIsNotElementType()
+                .ToElements();
         }
         catch { return rows; }
 
-        if (body == null) return rows;
-
-        int totalRows = body.NumberOfRows;
-        // Row 0 is the header in Revit schedules — start from row 1
-        int startRow = 1;
         int rowCount = 0;
-
-        for (int r = startRow; r < totalRows; r++)
+        foreach (var elem in elements)
         {
             ct.ThrowIfCancellationRequested();
             if (rowCount >= maxRowsPerSchedule) break;
+            if (elem == null) continue;
 
-            int dataRowIndex = r - startRow; // 0-based data row index
+            long elementId = GetElementIdValue(elem.Id);
+            string uniqueId = SafeString(() => elem.UniqueId) ?? "";
 
-            for (int c = 0; c < columnNames.Count; c++)
+            foreach (var field in fields)
             {
-                string cellValue = "";
-                try
-                {
-                    cellValue = body.GetCellText(r, c) ?? "";
-                }
-                catch { }
-
-                string columnName = columnNames[c];
-                double? valueNumber = null;
-                if (double.TryParse(cellValue,
-                    System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out double parsed))
-                {
-                    valueNumber = parsed;
-                }
+                var parameter = ResolveScheduleFieldParameter(doc, elem, field.ParameterId);
+                var value = ReadParameterValue(doc, parameter);
 
                 rows.Add(new Dictionary<string, object?>
                 {
@@ -168,10 +153,12 @@ public class PowerBiScheduleExporter
                     ["DocumentGuid"]   = documentGuid,
                     ["ScheduleId"]     = schId,
                     ["ScheduleName"]   = scheduleName,
-                    ["RowIndex"]       = (long)dataRowIndex,
-                    ["ColumnName"]     = columnName,
-                    ["ValueString"]    = cellValue,
-                    ["ValueNumber"]    = valueNumber ?? 0.0
+                    ["ElementId"]      = elementId,
+                    ["UniqueId"]       = uniqueId,
+                    ["RowIndex"]       = (long)rowCount,
+                    ["ColumnName"]     = field.ColumnName,
+                    ["ValueString"]    = value.ValueString,
+                    ["ValueNumber"]    = value.ValueNumber ?? 0.0
                 });
             }
 
@@ -192,6 +179,113 @@ public class PowerBiScheduleExporter
 #endif
     }
 
+    private static Parameter? ResolveScheduleFieldParameter(
+        Document doc,
+        Element elem,
+        ElementId parameterId)
+    {
+        if (parameterId == null || parameterId == ElementId.InvalidElementId)
+            return null;
+
+        var parameter = FindParameterById(elem, parameterId);
+        if (parameter != null) return parameter;
+
+        try
+        {
+            var typeId = elem.GetTypeId();
+            if (typeId != null && typeId != ElementId.InvalidElementId)
+            {
+                var typeElem = doc.GetElement(typeId);
+                if (typeElem != null)
+                    return FindParameterById(typeElem, parameterId);
+            }
+        }
+        catch { }
+
+        return null;
+    }
+
+    private static Parameter? FindParameterById(Element elem, ElementId parameterId)
+    {
+        try
+        {
+            var raw = GetElementIdValue(parameterId);
+            if (raw < 0)
+            {
+                var builtin = (BuiltInParameter)(int)raw;
+                var byBuiltin = elem.get_Parameter(builtin);
+                if (byBuiltin != null) return byBuiltin;
+            }
+
+            foreach (Parameter p in elem.Parameters)
+            {
+                if (p != null && p.Id == parameterId)
+                    return p;
+            }
+        }
+        catch { }
+
+        return null;
+    }
+
+    private static ParameterValue ReadParameterValue(Document doc, Parameter? parameter)
+    {
+        if (parameter == null)
+            return new ParameterValue("", null);
+
+        try
+        {
+            switch (parameter.StorageType)
+            {
+                case StorageType.Double:
+                {
+                    var number = parameter.AsDouble();
+                    var text = parameter.AsValueString();
+                    if (string.IsNullOrWhiteSpace(text))
+                        text = number.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    return new ParameterValue(text ?? "", number);
+                }
+                case StorageType.Integer:
+                {
+                    var number = parameter.AsInteger();
+                    var text = parameter.AsValueString();
+                    if (string.IsNullOrWhiteSpace(text))
+                        text = number.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    return new ParameterValue(text ?? "", number);
+                }
+                case StorageType.String:
+                {
+                    var text = parameter.AsString() ?? "";
+                    double parsed;
+                    double? number = double.TryParse(text,
+                        System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out parsed)
+                        ? parsed
+                        : (double?)null;
+                    return new ParameterValue(text, number);
+                }
+                case StorageType.ElementId:
+                {
+                    var id = parameter.AsElementId();
+                    var referenced = SafeString(() => doc.GetElement(id)?.Name);
+                    var text = referenced;
+                    if (string.IsNullOrWhiteSpace(text))
+                        text = parameter.AsValueString();
+                    if (string.IsNullOrWhiteSpace(text))
+                        text = GetElementIdValue(id).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    return new ParameterValue(text ?? "", null);
+                }
+                default:
+                    return new ParameterValue(parameter.AsValueString() ?? "", null);
+            }
+        }
+        catch
+        {
+            return new ParameterValue("", null);
+        }
+    }
+
     private static string? SafeString(Func<string?> fn)
     {
         try { return fn(); }
@@ -209,5 +303,29 @@ public class PowerBiScheduleExporter
         catch { }
         try { return doc.PathName ?? ""; }
         catch { return ""; }
+    }
+
+    private class ScheduleExportField
+    {
+        public ScheduleExportField(string columnName, ElementId parameterId)
+        {
+            ColumnName = columnName;
+            ParameterId = parameterId;
+        }
+
+        public string ColumnName { get; }
+        public ElementId ParameterId { get; }
+    }
+
+    private class ParameterValue
+    {
+        public ParameterValue(string valueString, double? valueNumber)
+        {
+            ValueString = valueString;
+            ValueNumber = valueNumber;
+        }
+
+        public string ValueString { get; }
+        public double? ValueNumber { get; }
     }
 }

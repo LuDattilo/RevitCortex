@@ -92,27 +92,29 @@ public class PbiPublishSchedulesTool : ICortexTool
         // Resolve from ProjectBindings when not supplied by caller
         var docKey = ProjectDocumentKey.Compute(doc);
         var existingBinding = settings.GetBinding(docKey);
+        var compatibleBinding = existingBinding != null &&
+            existingBinding.SchemaVersion == PowerBiDatasetSchema.CurrentVersion
+                ? existingBinding
+                : null;
 
         if (string.IsNullOrWhiteSpace(workspaceId) && existingBinding != null)
             workspaceId = existingBinding.WorkspaceId;
 
-        if (string.IsNullOrWhiteSpace(datasetId) && existingBinding != null)
-            datasetId = existingBinding.DatasetId;
+        if (string.IsNullOrWhiteSpace(datasetId) && compatibleBinding != null)
+            datasetId = compatibleBinding.DatasetId;
 
         if (string.IsNullOrWhiteSpace(datasetName))
         {
-            if (existingBinding != null && !string.IsNullOrWhiteSpace(existingBinding.DatasetName))
+            if (compatibleBinding != null && !string.IsNullOrWhiteSpace(compatibleBinding.DatasetName))
             {
-                datasetName = existingBinding.DatasetName;
+                datasetName = compatibleBinding.DatasetName;
             }
             else
             {
                 string projectName = "";
                 try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; }
                 catch { }
-                datasetName = string.IsNullOrWhiteSpace(projectName)
-                    ? "RevitCortex Live - v1"
-                    : $"RevitCortex Live - {projectName} - v1";
+                datasetName = PowerBiDatasetSchema.BuildDefaultDatasetName(projectName);
             }
         }
 
@@ -128,12 +130,21 @@ public class PbiPublishSchedulesTool : ICortexTool
         var exporter = new PowerBiScheduleExporter();
         List<Dictionary<string, object?>> scheduleRows;
         int scheduleCount = 0;
+        int rowsDeduped = 0;
+        var warnings = new List<string>();
 
         try
         {
             scheduleRows = exporter.ExportSchedules(
                 doc, exportRunId, exportedAt,
                 scheduleIds, maxRowsPerSchedule);
+
+            rowsDeduped = DeduplicateScheduleRows(scheduleRows);
+            if (mode == "append")
+            {
+                warnings.Add(
+                    "Append mode posts rows without clearing Power BI first; rerunning the same logical export can create duplicates across runs.");
+            }
 
             // Count distinct schedules
             var seen = new System.Collections.Generic.HashSet<object?>();
@@ -168,7 +179,6 @@ public class PbiPublishSchedulesTool : ICortexTool
 
         // ── HTTP publish on background thread ─────────────────────────────────
         var sw = Stopwatch.StartNew();
-        var warnings = new List<string>();
 
         try
         {
@@ -214,6 +224,7 @@ public class PbiPublishSchedulesTool : ICortexTool
                 exportRunId,
                 scheduleCount,
                 rowCount = result.RowCount,
+                rowsDeduped,
                 batchCount = result.BatchCount,
                 durationMs = sw.ElapsedMilliseconds,
                 warnings
@@ -245,6 +256,43 @@ public class PbiPublishSchedulesTool : ICortexTool
     }
 
     // ─── Async publish logic ──────────────────────────────────────────────────
+
+    private static int DeduplicateScheduleRows(List<Dictionary<string, object?>> rows)
+    {
+        var byKey = new Dictionary<string, Dictionary<string, object?>>();
+        var order = new List<string>();
+
+        foreach (var row in rows)
+        {
+            var key = BuildScheduleRowKey(row);
+            if (!byKey.ContainsKey(key))
+                order.Add(key);
+            byKey[key] = row; // last write wins
+        }
+
+        int removed = rows.Count - byKey.Count;
+        if (removed <= 0) return 0;
+
+        rows.Clear();
+        foreach (var key in order)
+            rows.Add(byKey[key]);
+        return removed;
+    }
+
+    private static string BuildScheduleRowKey(Dictionary<string, object?> row)
+    {
+        return GetKeyPart(row, "ScheduleId") + "|" +
+               GetKeyPart(row, "ElementId") + "|" +
+               GetKeyPart(row, "ColumnName");
+    }
+
+    private static string GetKeyPart(Dictionary<string, object?> row, string name)
+    {
+        object? value;
+        return row.TryGetValue(name, out value) && value != null
+            ? value.ToString() ?? ""
+            : "";
+    }
 
     private static async System.Threading.Tasks.Task<PublishSummary> PublishAsync(
         string accessToken,
