@@ -6,9 +6,11 @@ using RevitCortex.Core.Session;
 using RevitCortex.Plugin.Caching;
 using RevitCortex.Plugin.Communication;
 using RevitCortex.Plugin.Discovery;
+using RevitCortex.Plugin.PowerBiLive;
 using RevitCortex.Plugin.Threading;
 using RevitCortex.Plugin.UI;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace RevitCortex.Plugin;
@@ -23,6 +25,9 @@ public class RevitCortexApp : IExternalApplication
     private int _port = 8080;
     private Autodesk.Revit.UI.PushButton? _connectButton;
     private bool _updateNotificationShown;
+    private PbiSelectHttpListener? _pbiSelectListener;
+    private PbiSelectionEventHandler? _pbiSelectionHandler;
+    private ExternalEvent? _pbiSelectionEvent;
 
     public static RevitCortexApp? Instance { get; private set; }
 
@@ -106,6 +111,11 @@ public class RevitCortexApp : IExternalApplication
             RevitCortex.Plugin.Updates.UpdateChecker.UpdateAvailable += OnUpdateAvailable;
             RevitCortex.Plugin.Updates.UpdateChecker.CheckInBackground();
 
+            // Create the PBI selection ExternalEvent (registered once at startup,
+            // used whenever the Power BI Desktop visual sends a pbi-select request)
+            _pbiSelectionHandler = new PbiSelectionEventHandler();
+            _pbiSelectionEvent = ExternalEvent.Create(_pbiSelectionHandler);
+
             // Create socket service but do NOT start automatically
             _socketService = new SocketService(_router, _port);
 
@@ -138,6 +148,8 @@ public class RevitCortexApp : IExternalApplication
     {
         try
         {
+            _pbiSelectListener?.Dispose();
+            _pbiSelectListener = null;
             _socketService?.Stop();
             application.ControlledApplication.DocumentOpened -= OnDocumentOpened;
             application.ControlledApplication.DocumentClosing -= OnDocumentClosing;
@@ -175,6 +187,40 @@ public class RevitCortexApp : IExternalApplication
             }
 
             _socketService.Start();
+
+            // Start PBI Desktop → Revit HTTP listener on port 27016
+            if (_pbiSelectListener == null && _pbiSelectionHandler != null && _pbiSelectionEvent != null)
+            {
+                var handler = _pbiSelectionHandler;
+                var evt = _pbiSelectionEvent;
+                var app = _uiApplication;
+                _pbiSelectListener = new PbiSelectHttpListener(
+                    handleSelection: (rawIds, action) =>
+                    {
+                        var doc = app?.ActiveUIDocument?.Document;
+                        if (doc == null) return null;
+
+                        // Validate ElementIds and queue selection on main thread
+                        var validIds = new List<ElementId>(rawIds.Count);
+                        foreach (var idVal in rawIds)
+                        {
+#if REVIT2024_OR_GREATER
+                            var eid = new ElementId(idVal);
+#else
+                            var eid = new ElementId((int)idVal);
+#endif
+                            if (doc.GetElement(eid) != null)
+                                validIds.Add(eid);
+                        }
+
+                        handler.Prepare(validIds, action);
+                        evt.Raise();
+                        return validIds.Count.ToString();
+                    },
+                    port: 27016);
+                _pbiSelectListener.Start();
+            }
+
             UpdateConnectionButtonIcon();
             ServiceStateChanged?.Invoke();
         }
@@ -182,6 +228,8 @@ public class RevitCortexApp : IExternalApplication
 
     public void StopService()
     {
+        _pbiSelectListener?.Stop();
+        _pbiSelectListener = null;
         _socketService?.Stop();
         UpdateConnectionButtonIcon();
         ServiceStateChanged?.Invoke();
