@@ -199,7 +199,11 @@ public class RevitCortexApp : IExternalApplication
                         // Read _uiApplication dynamically — it may be null when StartService
                         // is called (assigned lazily on first Idling event) but non-null by
                         // the time the first PBI request arrives.
-                        var doc = _uiApplication?.ActiveUIDocument?.Document;
+                        var uiApp = _uiApplication;
+                        var doc = uiApp?.ActiveUIDocument?.Document;
+                        System.Diagnostics.Trace.WriteLine(
+                            $"[RevitCortex.PbiSelect] callback start: rawIds={rawIds.Count}, " +
+                            $"uiApp={(uiApp == null ? "null" : "ok")}, doc={(doc == null ? "null" : doc.Title)}");
                         if (doc == null) return null;
 
                         // Validate ElementIds and queue selection on main thread
@@ -215,6 +219,8 @@ public class RevitCortexApp : IExternalApplication
                                 validIds.Add(eid);
                         }
 
+                        System.Diagnostics.Trace.WriteLine(
+                            $"[RevitCortex.PbiSelect] validated {validIds.Count}/{rawIds.Count} ids; raising ExternalEvent.");
                         handler.Prepare(validIds, action);
                         evt.Raise();
                         return validIds.Count.ToString();

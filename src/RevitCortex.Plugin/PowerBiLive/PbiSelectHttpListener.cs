@@ -223,15 +223,22 @@ public class PbiSelectHttpListener : IDisposable
             catch { /* skip unparseable tokens */ }
         }
 
+        System.Diagnostics.Trace.WriteLine(
+            $"[PbiSelectHttpListener] POST received: ids={ids.Count}, action={action}");
+
         // Dispatch to callback — returns null if no active document
         var result = _handleSelection(ids, action);
         if (result == null)
         {
+            System.Diagnostics.Trace.WriteLine(
+                "[PbiSelectHttpListener] Callback returned null (no active document).");
             WriteJson(resp, 200, new { success = false, error = "No active Revit document." });
             return;
         }
 
-        WriteJson(resp, 200, new { success = true, elementCount = ids.Count, action });
+        System.Diagnostics.Trace.WriteLine(
+            $"[PbiSelectHttpListener] Callback ok: result={result}");
+        WriteJson(resp, 200, new { success = true, elementCount = ids.Count, action, validated = result });
     }
 
     private static void WriteJson(HttpListenerResponse resp, int statusCode, object payload)

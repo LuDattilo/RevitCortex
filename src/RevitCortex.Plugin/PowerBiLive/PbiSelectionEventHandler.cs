@@ -36,15 +36,25 @@ public class PbiSelectionEventHandler : IExternalEventHandler
         var action = _pendingAction;
         _pendingIds = null;
 
+        System.Diagnostics.Trace.WriteLine(
+            $"[PbiSelectionEventHandler] Execute called: ids={ids?.Count ?? 0}, action={action}");
+
         if (ids == null || ids.Count == 0) return;
 
         var doc = app?.ActiveUIDocument?.Document;
-        if (doc == null) return;
+        if (doc == null)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                "[PbiSelectionEventHandler] Execute aborted: doc is null on UI thread.");
+            return;
+        }
 
         try
         {
             var uiDoc = new UIDocument(doc);
             uiDoc.Selection.SetElementIds(ids);
+            System.Diagnostics.Trace.WriteLine(
+                $"[PbiSelectionEventHandler] SetElementIds applied: count={ids.Count}");
 
             if (action == "isolate")
             {
