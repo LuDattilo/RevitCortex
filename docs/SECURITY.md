@@ -56,6 +56,41 @@ Il rischio residuo e il fork originale: se mcp-servers-for-revit o il fork LuDat
 - **Audit log locale**: ogni operazione registrata in `~/.revitcortex/audit.jsonl` (tool, elementi, timestamp)
 - **Modalita read-only**: flag configurabile che disabilita tutti i tool di scrittura
 
+## PBI Live Phase 2C — listener HTTP locale (porta 27016)
+
+Per consentire al custom visual di Power BI Desktop di guidare la selezione in Revit, il plugin avvia un `HttpListener` sulla porta locale `27016` mentre Cortex Switch è attivo. Caratteristiche:
+
+- **Binding solo localhost**: il prefisso è `http://localhost:27016/`, non `+` o `*` -- il sistema operativo rifiuta connessioni da altri host
+- **Nessuna autenticazione**: il listener accetta qualunque POST localhost senza token
+- **Operazioni esposte**: selezione e isolamento temporaneo di elementi (entrambi non distruttivi: nessun salvataggio, nessuna modifica al modello)
+- **Auto-stop**: il listener si ferma quando l'utente clicca Cortex Switch, quando il documento viene chiuso, o quando Revit termina
+
+### Modello di trust
+
+Il listener si fida di **qualunque processo locale** che possa aprire una connessione TCP a `localhost:27016`. In pratica:
+
+- Altri utenti sulla stessa macchina (sessioni Windows separate) NON possono raggiungerlo (Windows isola il loopback per sessione)
+- Browser web aperti dallo stesso utente potrebbero teoricamente fare richieste cross-origin -- mitigato dai CORS preflight (i browser bloccano POST con `Content-Type: application/json` senza preflight, e il listener risponde solo `Access-Control-Allow-Origin: *` su OPTIONS, non echo dell'origin)
+- Altri programmi avviati dallo stesso utente possono inviare POST e forzare una selezione Revit
+
+### Impatto
+
+Le operazioni esposte (select, isolate temporary) **non modificano il modello e non scrivono su disco**. L'unico effetto è cambiare cosa l'utente vede o ha selezionato in Revit -- fastidioso ma non distruttivo. Una `Selection.SetElementIds` non può corrompere il file, non può eseguire codice, non può esfiltrare dati.
+
+### Mitigazioni future (non implementate)
+
+Se in futuro venissero esposte operazioni distruttive via HTTP:
+
+1. **Token per-sessione**: generare un token random in `~/.revitcortex/pbi-token.json` (permessi solo utente), il custom visual lo leggerebbe però il PBIVIZ sandbox non permette filesystem access -- alternativa: token passato via query string PBI-side e configurato dall'utente
+2. **Allowlist `Host` header**: rifiutare richieste con `Host` diverso da `localhost:27016` (mitiga DNS rebinding)
+3. **Rate limiting**: max N richieste/secondo per evitare flooding
+
+### Stato attuale (v1.0.0.2)
+
+Il listener Phase 2C è classificato come **rischio basso**: operazioni non distruttive, binding loopback, auto-stop al cambio documento. Il rischio principale residuo è un'altra app locale che fa selezioni indesiderate (UX, non security).
+
+---
+
 ## Livello di rischio
 
 | Area | Livello rischio | Stato |
@@ -66,3 +101,4 @@ Il rischio residuo e il fork originale: se mcp-servers-for-revit o il fork LuDat
 | Supply chain dipendenze | Basso | Strategia riscrittura guidata |
 | Corruzione modello per errore | Basso | Transazioni con rollback |
 | Audit trail operazioni | Basso | Implementato audit log |
+| PBI listener localhost (Phase 2C) | Basso | Loopback + operazioni non distruttive + auto-stop |

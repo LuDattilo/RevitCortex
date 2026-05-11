@@ -127,6 +127,34 @@ public class PbiSelectHttpListenerTests : IDisposable
         Assert.Equal("select", _received[0].action);
     }
 
+    [Fact]
+    public async Task Post_IsolateAction_CallbackReceivesIsolate()
+    {
+        MakeListener(hasDocument: true);
+        await _http.PostAsync(
+            "http://localhost:27099/pbi-select",
+            new StringContent("{\"elementIds\":[42],\"action\":\"isolate\"}", Encoding.UTF8, "application/json"));
+        Assert.Single(_received);
+        Assert.Equal("isolate", _received[0].action);
+    }
+
+    [Fact]
+    public async Task Post_SuccessResponse_IncludesValidatedField()
+    {
+        _listener = new PbiSelectHttpListener(
+            handleSelection: (_, _) => "queued",
+            port: 27099);
+        _listener.Start();
+
+        var resp = await _http.PostAsync(
+            "http://localhost:27099/pbi-select",
+            new StringContent("{\"elementIds\":[1,2]}", Encoding.UTF8, "application/json"));
+        var body = await resp.Content.ReadAsStringAsync();
+        Assert.Equal(200, (int)resp.StatusCode);
+        Assert.Contains("\"success\":true", body);
+        Assert.Contains("\"validated\":\"queued\"", body);
+    }
+
     public void Dispose()
     {
         _listener?.Dispose();

@@ -10,7 +10,6 @@ using RevitCortex.Plugin.PowerBiLive;
 using RevitCortex.Plugin.Threading;
 using RevitCortex.Plugin.UI;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
 
 namespace RevitCortex.Plugin;
@@ -196,34 +195,23 @@ public class RevitCortexApp : IExternalApplication
                 _pbiSelectListener = new PbiSelectHttpListener(
                     handleSelection: (rawIds, action) =>
                     {
-                        // Read _uiApplication dynamically — it may be null when StartService
-                        // is called (assigned lazily on first Idling event) but non-null by
-                        // the time the first PBI request arrives.
+                        // The Revit API is single-threaded — we cannot touch
+                        // Document from this background thread. Only check that
+                        // a UIApplication exists at all (cheap pointer read);
+                        // ElementId validation happens later on the main thread
+                        // inside PbiSelectionEventHandler.Execute().
                         var uiApp = _uiApplication;
-                        var doc = uiApp?.ActiveUIDocument?.Document;
                         System.Diagnostics.Trace.WriteLine(
-                            $"[RevitCortex.PbiSelect] callback start: rawIds={rawIds.Count}, " +
-                            $"uiApp={(uiApp == null ? "null" : "ok")}, doc={(doc == null ? "null" : doc.Title)}");
-                        if (doc == null) return null;
+                            $"[RevitCortex.PbiSelect] callback: rawIds={rawIds.Count}, " +
+                            $"uiApp={(uiApp == null ? "null" : "ok")}");
+                        if (uiApp == null) return null;
 
-                        // Validate ElementIds and queue selection on main thread
-                        var validIds = new List<ElementId>(rawIds.Count);
-                        foreach (var idVal in rawIds)
-                        {
-#if REVIT2024_OR_GREATER
-                            var eid = new ElementId(idVal);
-#else
-                            var eid = new ElementId((int)idVal);
-#endif
-                            if (doc.GetElement(eid) != null)
-                                validIds.Add(eid);
-                        }
-
-                        System.Diagnostics.Trace.WriteLine(
-                            $"[RevitCortex.PbiSelect] validated {validIds.Count}/{rawIds.Count} ids; raising ExternalEvent.");
-                        handler.Prepare(validIds, action);
+                        // Queue on main thread. Validation is deferred to Execute()
+                        // which runs on the Revit UI thread — the only place where
+                        // Document.GetElement is legal.
+                        handler.Prepare(rawIds, action);
                         evt.Raise();
-                        return validIds.Count.ToString();
+                        return "queued";
                     },
                     port: 27016);
                 _pbiSelectListener.Start();

@@ -105,6 +105,12 @@ public class PbiSelectHttpListener : IDisposable
         _running = false;
         try { _httpListener?.Stop(); } catch { }
         _httpListener = null;
+
+        // Wait briefly for the background thread to exit GetContext.
+        // Without this, Revit can unload the assembly while the thread is
+        // still in a blocking call → AppDomainUnloadedException on shutdown.
+        try { _thread?.Join(500); } catch { }
+        _thread = null;
     }
 
     public void Dispose() => Stop();
@@ -253,6 +259,12 @@ public class PbiSelectHttpListener : IDisposable
             resp.OutputStream.Write(bytes, 0, bytes.Length);
             resp.OutputStream.Close();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            // The client may have disconnected before we finished writing.
+            // Log so we can distinguish "client gone" from "logic broken".
+            System.Diagnostics.Trace.WriteLine(
+                $"[PbiSelectHttpListener] WriteJson failed (status={statusCode}): {ex.Message}");
+        }
     }
 }

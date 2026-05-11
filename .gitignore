@@ -30,3 +30,8 @@ docs/RevitCortex-Survey.*
 
 # Local run logs from deploy/install scripts
 /*.log
+
+# Power BI custom visual build artefacts (pbiviz)
+powerbi-visual/.tmp/
+powerbi-visual/webpack.statistics.prod.html
+powerbi-visual/package-lock.json
