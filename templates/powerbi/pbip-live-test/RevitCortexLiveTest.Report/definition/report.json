@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/report/3.1.0/schema.json",
+  "themeCollection": {
+    "baseTheme": {
+      "name": "CY25SU12",
+      "reportVersionAtImport": {
+        "visual": "2.5.0",
+        "report": "3.1.0",
+        "page": "2.3.0"
+      },
+      "type": "SharedResources"
+    }
+  },
+  "layoutOptimization": "None",
+  "reportSource": "Default",
+  "publicCustomVisuals": [],
+  "settings": {
+    "useStylableVisualContainerHeader": true,
+    "defaultFilterActionIsDataFilter": false,
+    "defaultDrillFilterOtherVisuals": true,
+    "allowChangeFilterTypes": true,
+    "allowInlineExploration": true,
+    "useEnhancedTooltips": true,
+    "exportDataMode": "AllowSummarizedAndUnderlying",
+    "pagesPosition": "Bottom"
+  },
+  "slowDataSourceSettings": {
+    "isCrossHighlightingDisabled": false,
+    "isSlicerSelectionsButtonEnabled": false,
+    "isFilterSelectionsButtonEnabled": false,
+    "isFieldWellButtonEnabled": false,
+    "isApplyAllButtonEnabled": false
+  },
+  "annotations": [
+    {
+      "name": "revitcortexTemplate",
+      "value": "Power BI Live test template for RevitCortex schema v1.1"
+    }
+  ]
+}

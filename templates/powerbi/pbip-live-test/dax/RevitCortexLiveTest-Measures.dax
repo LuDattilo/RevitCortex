@@ -1,0 +1,80 @@
+// RevitCortex Power BI Live test measures
+// Target schema: v1.1 tables: Metadata, Elements, Schedules, Selection.
+//
+// Note: if the report is a thin report connected live to a Power BI service
+// semantic model, some tenants/Desktop versions may require these measures to
+// be added to the semantic model instead of the report. Keep this file as the
+// canonical test-measure source either way.
+
+Total Elements =
+DISTINCTCOUNT(Elements[ElementId])
+
+Wall Elements =
+CALCULATE(
+    [Total Elements],
+    Elements[OstCode] = "OST_Walls"
+)
+
+Selected Elements =
+DISTINCTCOUNT(Selection[ElementId])
+
+Schedules Cells =
+COUNTROWS(Schedules)
+
+Schedules Elements =
+DISTINCTCOUNT(Schedules[ElementId])
+
+Schedules Count =
+DISTINCTCOUNT(Schedules[ScheduleId])
+
+Duplicate Element Rows =
+COUNTROWS(Elements) - DISTINCTCOUNT(Elements[ElementId])
+
+Duplicate Schedule Cells Approx =
+COUNTROWS(Schedules)
+    - COUNTROWS(
+        SUMMARIZE(
+            Schedules,
+            Schedules[ScheduleId],
+            Schedules[ElementId],
+            Schedules[ColumnName]
+        )
+    )
+
+Schedule ElementIds Without Element =
+COUNTROWS(
+    EXCEPT(
+        VALUES(Schedules[ElementId]),
+        VALUES(Elements[ElementId])
+    )
+)
+
+Selection ElementIds Without Element =
+COUNTROWS(
+    EXCEPT(
+        VALUES(Selection[ElementId]),
+        VALUES(Elements[ElementId])
+    )
+)
+
+Schedule Text Rows With Numeric Zero =
+COUNTROWS(
+    FILTER(
+        Schedules,
+        NOT ISBLANK(Schedules[ValueString])
+            && Schedules[ValueString] <> "0"
+            && Schedules[ValueNumber] = 0
+    )
+)
+
+Latest Elements Export =
+MAX(Elements[ExportedAtUtc])
+
+Latest Selection Update =
+MAX(Selection[UpdatedAtUtc])
+
+Schema Version =
+VAR SchemaRows =
+    FILTER(Metadata, Metadata[Key] = "SchemaVersion")
+RETURN
+    MAXX(SchemaRows, Metadata[Value])
