@@ -65,7 +65,9 @@ public class PbiQueryTool : ICortexTool
 
         // ── Validate filter params ────────────────────────────────────────────
         bool hasTemplate = !string.IsNullOrWhiteSpace(category)
-                        || !string.IsNullOrWhiteSpace(exportRunId);
+                        || !string.IsNullOrWhiteSpace(exportRunId)
+                        || !string.IsNullOrWhiteSpace(level)
+                        || (!string.IsNullOrWhiteSpace(parameterName) && !string.IsNullOrWhiteSpace(parameterValue));
         bool hasDax      = !string.IsNullOrWhiteSpace(daxQuery);
 
         if (!hasTemplate && !hasDax)
@@ -147,16 +149,18 @@ public class PbiQueryTool : ICortexTool
 
         // ── HTTP on background thread ─────────────────────────────────────────
         var sw = Stopwatch.StartNew();
-        List<long> rawIds;
+        List<long> rawIds = new List<long>();
+        QuerySummary querySummary = new QuerySummary();
 
         try
         {
-            rawIds = PowerBiToolHelper.RunWithoutContext(() => QueryAsync(
+            querySummary = PowerBiToolHelper.RunWithoutContext(() => QueryAsync(
                 authState.AccessToken!,
                 workspaceId!,
                 datasetId,
                 datasetName,
                 finalDax));
+            rawIds = querySummary.ElementIds;
         }
         catch (PowerBiApiException ex) when (ex.StatusCode == 401)
         {
@@ -184,6 +188,26 @@ public class PbiQueryTool : ICortexTool
 
         sw.Stop();
         long queryMs = sw.ElapsedMilliseconds;
+
+        // Persist resolved datasetId so subsequent queries skip the ListDatasetsAsync round-trip
+        try
+        {
+            string projectName = "";
+            string documentGuid = "";
+            try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; } catch { }
+            try { documentGuid = doc.ProjectInformation?.UniqueId ?? ""; } catch { }
+            settings.SetBinding(docKey, new ProjectBinding
+            {
+                WorkspaceId   = workspaceId!,
+                DatasetId     = querySummary.DatasetId,
+                DatasetName   = datasetName,
+                ProjectName   = projectName,
+                DocumentGuid  = documentGuid,
+                LastPathHash  = ProjectDocumentKey.ComputePathHash(doc.PathName ?? ""),
+                SchemaVersion = PowerBiDatasetSchema.CurrentVersion
+            });
+        }
+        catch { /* non-critical */ }
 
         // ── 0 results → return without touching selection ─────────────────────
         if (rawIds.Count == 0)
@@ -235,7 +259,10 @@ public class PbiQueryTool : ICortexTool
         {
             try
             {
+                using var tx = new Transaction(doc, "pbi_query isolate");
+                tx.Start();
                 doc.ActiveView.IsolateElementsTemporary(validIds);
+                tx.Commit();
             }
             catch
             {
@@ -244,9 +271,7 @@ public class PbiQueryTool : ICortexTool
             }
         }
 
-        // Retrieve resolved datasetId from binding (updated by QueryAsync if stale)
-        var updatedBinding = settings.GetBinding(docKey);
-        var resolvedDatasetId = updatedBinding?.DatasetId ?? datasetId ?? "";
+        var resolvedDatasetId = querySummary.DatasetId;
 
         return CortexResult<object>.Ok(new
         {
@@ -287,6 +312,9 @@ public class PbiQueryTool : ICortexTool
 
         string filterExpr = string.Join(" && ", conditions);
 
+        if (conditions.Count == 0)
+            throw new InvalidOperationException("Cannot build DAX with no filter conditions.");
+
         return
             "EVALUATE SELECTCOLUMNS(\r\n" +
             $"  FILTER(Elements, {filterExpr}),\r\n" +
@@ -302,7 +330,7 @@ public class PbiQueryTool : ICortexTool
 
     // ─── Async HTTP ───────────────────────────────────────────────────────────
 
-    private static async System.Threading.Tasks.Task<List<long>> QueryAsync(
+    private static async System.Threading.Tasks.Task<QuerySummary> QueryAsync(
         string accessToken,
         string workspaceId,
         string? datasetId,
@@ -344,7 +372,14 @@ public class PbiQueryTool : ICortexTool
             catch { /* proceed with cached id */ }
         }
 
-        return await client.ExecuteQueryAsync(workspaceId, datasetId!, daxQuery)
+        var ids = await client.ExecuteQueryAsync(workspaceId, datasetId!, daxQuery)
             .ConfigureAwait(false);
+        return new QuerySummary { DatasetId = datasetId!, ElementIds = ids };
+    }
+
+    private class QuerySummary
+    {
+        public string DatasetId { get; set; } = "";
+        public List<long> ElementIds { get; set; } = new List<long>();
     }
 }

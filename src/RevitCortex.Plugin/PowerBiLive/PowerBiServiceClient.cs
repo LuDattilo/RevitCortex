@@ -200,7 +200,7 @@ public class PowerBiServiceClient : IDisposable
             var val = row["[ElementId]"] ?? row["ElementId"];
             if (val == null) continue;
             try { result.Add(val.Value<long>()); }
-            catch { /* skip unparseable values */ }
+            catch (Exception) { /* skip unparseable values */ }
         }
         return result;
     }
