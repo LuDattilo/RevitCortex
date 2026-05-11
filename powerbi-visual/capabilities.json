@@ -20,5 +20,6 @@
     }
   ],
   "supportsHighlight": true,
-  "objects": {}
+  "objects": {},
+  "privileges": []
 }
