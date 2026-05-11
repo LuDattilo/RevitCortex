@@ -4,7 +4,7 @@
     "displayName": "RevitCortex Selection",
     "guid": "revitcortexselectionvisual1A2B3C4D",
     "visualClassName": "RevitCortexSelectionVisual",
-    "version": "1.0.0.1",
+    "version": "1.0.0.2",
     "description": "Select Revit elements from a Power BI Desktop report",
     "supportUrl": "https://github.com/LuDattilo/revitcortex-releases",
     "gitHubUrl": ""

@@ -697,12 +697,12 @@ Query the bound Power BI dataset and select matching Revit elements by returned 
 
 **Prerequisiti:**
 - Plugin RevitCortex installato e Cortex Switch attivo (porta 27016 si apre automaticamente)
-- Power BI Desktop (non Service) con il visual `revitcortexselectionvisual1A2B3C4D.1.0.0.1.pbiviz` importato
+- Power BI Desktop (non Service) con il visual `revitcortexselectionvisual1A2B3C4D.1.0.0.2.pbiviz` importato
 
 **Installazione del visual:**
 1. Aprire Power BI Desktop
 2. Nel pannello Visualizzazioni → "…" → Importa un visual da un file
-3. Selezionare `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.1.pbiviz`
+3. Selezionare `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.2.pbiviz`
 4. Trascinare il visual sulla pagina del report
 5. Nel pannello Campi, trascinare `Elements[ElementId]` nel ruolo **Element ID**
 
