@@ -527,13 +527,15 @@ public static class ElementTools
         [Description("Dataset name used for lookup. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
         [Description("Specific schedule element ids to export. Omit to export all non-template schedules.")] long[]? scheduleIds = null,
         [Description("Publish mode: 'replace' (default, clears existing rows) or 'append'.")] string mode = "replace",
-        [Description("Maximum rows per schedule to export. Default 5000.")] int maxRowsPerSchedule = 5000,
+        [Description("Maximum number of source elements to visit per schedule. Default 5000.")] int maxElementsPerSchedule = 5000,
+        [Description("Maximum number of long-form rows (cells) to emit per schedule. 0 = no cell cap (only the element cap applies). Useful for bounding rows = elements * fields.")] int maxCellsPerSchedule = 0,
         CancellationToken ct = default)
     {
         var p = new JObject
         {
             ["mode"] = mode,
-            ["maxRowsPerSchedule"] = maxRowsPerSchedule
+            ["maxElementsPerSchedule"] = maxElementsPerSchedule,
+            ["maxCellsPerSchedule"] = maxCellsPerSchedule
         };
         if (workspaceId != null) p["workspaceId"] = workspaceId;
         if (datasetId != null) p["datasetId"] = datasetId;

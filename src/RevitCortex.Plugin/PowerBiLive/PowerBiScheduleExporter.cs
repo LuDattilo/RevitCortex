@@ -24,33 +24,64 @@ public class PowerBiScheduleExporter
 
     /// <summary>
     /// Exports one or more schedules from the document into long-form rows.
-    /// If scheduleIds is null or empty, exports all non-template schedules.
+    /// Backward-compatible wrapper around <see cref="ExportSchedulesDetailed"/>
+    /// that returns only the rows (no diagnostics). Prefer the Detailed variant
+    /// for new callers — silent skip is a footgun for data-integrity workflows.
     /// </summary>
     public List<Dictionary<string, object?>> ExportSchedules(
         Document doc,
         string exportRunId,
         DateTime exportedAtUtc,
         IEnumerable<long>? scheduleIds = null,
-        int maxRowsPerSchedule = 5_000,
+        int maxElementsPerSchedule = 5_000,
         CancellationToken ct = default)
     {
+        return ExportSchedulesDetailed(doc, exportRunId, exportedAtUtc,
+            scheduleIds, maxElementsPerSchedule, maxCellsPerSchedule: 0, ct).Rows;
+    }
+
+    /// <summary>
+    /// Exports schedules and returns rows together with a diagnostic envelope
+    /// covering skipped schedules, skipped fields, truncations, and read errors.
+    ///
+    /// Caps:
+    ///  - <paramref name="maxElementsPerSchedule"/> bounds the number of source
+    ///    elements visited per schedule. Default 5000.
+    ///  - <paramref name="maxCellsPerSchedule"/> bounds the number of long-form
+    ///    rows emitted per schedule. 0 means no cell cap (only element cap).
+    ///    Useful to guarantee the Push API row-budget per single schedule.
+    ///
+    /// Silent failures are NOT swallowed: the result envelope reports every
+    /// schedule that was skipped and why, so callers can decide whether to fail
+    /// the workflow or report partial success.
+    /// </summary>
+    public ScheduleExportResult ExportSchedulesDetailed(
+        Document doc,
+        string exportRunId,
+        DateTime exportedAtUtc,
+        IEnumerable<long>? scheduleIds = null,
+        int maxElementsPerSchedule = 5_000,
+        int maxCellsPerSchedule = 0,
+        CancellationToken ct = default)
+    {
+        var result = new ScheduleExportResult();
         string projectId = SafeString(() => doc.ProjectInformation?.UniqueId) ?? "";
         string documentGuid = GetDocumentGuid(doc);
 
-        // Build lookup set of requested ids (empty = all)
         var idFilter = new HashSet<long>();
         if (scheduleIds != null)
             foreach (var id in scheduleIds)
                 idFilter.Add(id);
 
         var collector = new FilteredElementCollector(doc).OfClass(typeof(ViewSchedule));
-        var rows = new List<Dictionary<string, object?>>();
 
         foreach (ViewSchedule sch in collector)
         {
             ct.ThrowIfCancellationRequested();
             if (sch == null) continue;
 
+            long schId = 0;
+            string scheduleName = "";
             try
             {
                 if (sch.IsTemplate) continue;
@@ -59,43 +90,50 @@ public class PowerBiScheduleExporter
                 try { isRev = sch.IsTitleblockRevisionSchedule; } catch { }
                 if (isRev) continue;
 
-                long schId = GetElementIdValue(sch.Id);
+                schId = GetElementIdValue(sch.Id);
+                scheduleName = SafeString(() => sch.Name) ?? "";
 
                 if (idFilter.Count > 0 && !idFilter.Contains(schId)) continue;
 
-                var scheduleRows = ExportSingleSchedule(
-                    doc, sch, schId, exportRunId, exportedAtUtc,
-                    projectId, documentGuid, maxRowsPerSchedule, ct);
-
-                rows.AddRange(scheduleRows);
+                ExportSingleSchedule(
+                    doc, sch, schId, scheduleName, exportRunId, exportedAtUtc,
+                    projectId, documentGuid, maxElementsPerSchedule, maxCellsPerSchedule,
+                    result, ct);
             }
-            catch
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
             {
-                // Skip schedules that fail — never break the whole export
+                // Surface the failure instead of swallowing — callers need to
+                // know which schedules were lost so they can retry or notify.
+                result.SkippedSchedules.Add(new SkippedSchedule(
+                    scheduleId: schId,
+                    scheduleName: scheduleName,
+                    reason: ex.GetType().Name + ": " + ex.Message));
             }
         }
 
-        return rows;
+        return result;
     }
 
-    private List<Dictionary<string, object?>> ExportSingleSchedule(
+    private void ExportSingleSchedule(
         Document doc,
         ViewSchedule sch,
         long schId,
+        string scheduleName,
         string exportRunId,
         DateTime exportedAtUtc,
         string projectId,
         string documentGuid,
-        int maxRowsPerSchedule,
+        int maxElementsPerSchedule,
+        int maxCellsPerSchedule,
+        ScheduleExportResult result,
         CancellationToken ct)
     {
-        var rows = new List<Dictionary<string, object?>>();
-        string scheduleName = SafeString(() => sch.Name) ?? "";
+        var rows = result.Rows;
         string exportedAtStr = exportedAtUtc.ToString("o");
 
-        // Get schedule fields from schedule definition. Fields without a
-        // parameter id are kept with blank values so the published shape still
-        // reflects the schedule definition.
+        // Resolve fields once. Fields without a parameter id still produce a
+        // column so the published shape reflects the schedule definition.
         var fields = new List<ScheduleExportField>();
         try
         {
@@ -110,15 +148,27 @@ public class PowerBiScheduleExporter
                         field?.ColumnHeading ?? $"Column{i}",
                         field != null ? field.ParameterId : ElementId.InvalidElementId));
                 }
-                catch
+                catch (Exception fex)
                 {
                     fields.Add(new ScheduleExportField($"Column{i}", ElementId.InvalidElementId));
+                    result.SkippedFields.Add(new SkippedField(schId, scheduleName, $"Column{i}",
+                        $"{fex.GetType().Name}: {fex.Message}"));
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            result.SkippedSchedules.Add(new SkippedSchedule(schId, scheduleName,
+                $"definition unreadable: {ex.GetType().Name}: {ex.Message}"));
+            return;
+        }
 
-        if (fields.Count == 0) return rows;
+        if (fields.Count == 0)
+        {
+            result.SkippedSchedules.Add(new SkippedSchedule(schId, scheduleName,
+                "schedule has no fields"));
+            return;
+        }
 
         IList<Element> elements;
         try
@@ -127,13 +177,25 @@ public class PowerBiScheduleExporter
                 .WhereElementIsNotElementType()
                 .ToElements();
         }
-        catch { return rows; }
+        catch (Exception ex)
+        {
+            result.SkippedSchedules.Add(new SkippedSchedule(schId, scheduleName,
+                $"element collector failed: {ex.GetType().Name}: {ex.Message}"));
+            return;
+        }
 
-        int rowCount = 0;
+        int elementCount = 0;
+        int cellsEmitted = 0;
+        bool truncatedByElements = false;
+        bool truncatedByCells = false;
         foreach (var elem in elements)
         {
             ct.ThrowIfCancellationRequested();
-            if (rowCount >= maxRowsPerSchedule) break;
+            if (elementCount >= maxElementsPerSchedule)
+            {
+                truncatedByElements = true;
+                break;
+            }
             if (elem == null) continue;
 
             long elementId = GetElementIdValue(elem.Id);
@@ -141,6 +203,12 @@ public class PowerBiScheduleExporter
 
             foreach (var field in fields)
             {
+                if (maxCellsPerSchedule > 0 && cellsEmitted >= maxCellsPerSchedule)
+                {
+                    truncatedByCells = true;
+                    break;
+                }
+
                 var parameter = ResolveScheduleFieldParameter(doc, elem, field.ParameterId);
                 var value = ReadParameterValue(doc, parameter);
 
@@ -155,21 +223,27 @@ public class PowerBiScheduleExporter
                     ["ScheduleName"]   = scheduleName,
                     ["ElementId"]      = elementId,
                     ["UniqueId"]       = uniqueId,
-                    ["RowIndex"]       = (long)rowCount,
+                    ["RowIndex"]       = (long)elementCount,
                     ["ColumnName"]     = field.ColumnName,
                     ["ValueString"]    = value.ValueString,
                     // ValueNumber is null for non-numeric fields (text, levels,
                     // family/type names). 0.0 would corrupt SUM/AVG measures in
                     // Power BI; null is treated as BLANK and ignored by aggregates.
                     ["ValueNumber"]    = value.ValueNumber
-
                 });
+                cellsEmitted++;
             }
+            if (truncatedByCells) break;
 
-            rowCount++;
+            elementCount++;
         }
 
-        return rows;
+        if (truncatedByElements)
+            result.Truncations.Add(new Truncation(schId, scheduleName,
+                $"reached maxElementsPerSchedule={maxElementsPerSchedule}; further elements skipped"));
+        if (truncatedByCells)
+            result.Truncations.Add(new Truncation(schId, scheduleName,
+                $"reached maxCellsPerSchedule={maxCellsPerSchedule}; further cells skipped"));
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -331,5 +405,58 @@ public class PowerBiScheduleExporter
 
         public string ValueString { get; }
         public double? ValueNumber { get; }
+    }
+}
+
+/// <summary>
+/// Detailed export result used by callers that need diagnostics (which schedules
+/// were skipped, which fields failed to read, whether output was truncated by
+/// caps). Silent skip is dangerous for data-integrity flows; this DTO exposes
+/// every degradation explicitly so callers can surface it to the user.
+/// </summary>
+public sealed class ScheduleExportResult
+{
+    public List<Dictionary<string, object?>> Rows { get; } = new();
+    public List<SkippedSchedule> SkippedSchedules { get; } = new();
+    public List<SkippedField> SkippedFields { get; } = new();
+    public List<Truncation> Truncations { get; } = new();
+
+    /// <summary>True iff every requested schedule produced at least one row and no caps fired.</summary>
+    public bool IsClean => SkippedSchedules.Count == 0
+                        && SkippedFields.Count == 0
+                        && Truncations.Count == 0;
+}
+
+public sealed class SkippedSchedule
+{
+    public long ScheduleId { get; }
+    public string ScheduleName { get; }
+    public string Reason { get; }
+    public SkippedSchedule(long scheduleId, string scheduleName, string reason)
+    {
+        ScheduleId = scheduleId; ScheduleName = scheduleName; Reason = reason;
+    }
+}
+
+public sealed class SkippedField
+{
+    public long ScheduleId { get; }
+    public string ScheduleName { get; }
+    public string FieldName { get; }
+    public string Reason { get; }
+    public SkippedField(long scheduleId, string scheduleName, string fieldName, string reason)
+    {
+        ScheduleId = scheduleId; ScheduleName = scheduleName; FieldName = fieldName; Reason = reason;
+    }
+}
+
+public sealed class Truncation
+{
+    public long ScheduleId { get; }
+    public string ScheduleName { get; }
+    public string Reason { get; }
+    public Truncation(long scheduleId, string scheduleName, string reason)
+    {
+        ScheduleId = scheduleId; ScheduleName = scheduleName; Reason = reason;
     }
 }

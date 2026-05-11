@@ -23,7 +23,12 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///   scheduleIds     (long[], optional): Specific schedule element ids to export.
 ///                   If omitted, all non-template schedules are exported.
 ///   mode            (string, optional): "replace" (default) or "append".
-///   maxRowsPerSchedule (int, optional): Row cap per schedule. Default 5000.
+///   maxElementsPerSchedule (int, optional): Element cap per schedule. Default 5000.
+///                   Alias: maxRowsPerSchedule (kept for backward compatibility,
+///                   despite its misleading name — it always counted elements).
+///   maxCellsPerSchedule (int, optional): Emitted-row cap per schedule. 0 means
+///                   no cell cap. Use this to bound long-form row count when
+///                   schedules have many fields (rows = elements * fields).
 /// </summary>
 public class PbiPublishSchedulesTool : ICortexTool
 {
@@ -43,7 +48,15 @@ public class PbiPublishSchedulesTool : ICortexTool
         var datasetId = input["datasetId"]?.Value<string>();
         var datasetName = input["datasetName"]?.Value<string>();
         var mode = (input["mode"]?.Value<string>() ?? "replace").ToLowerInvariant();
-        var maxRowsPerSchedule = input["maxRowsPerSchedule"]?.Value<int>() ?? 5_000;
+        // maxElementsPerSchedule replaces the misleadingly-named maxRowsPerSchedule
+        // (which actually limited elements, not emitted long-form rows). Both are
+        // accepted; the new name wins if both are provided.
+        var maxElementsPerSchedule = input["maxElementsPerSchedule"]?.Value<int>()
+                                  ?? input["maxRowsPerSchedule"]?.Value<int>()
+                                  ?? 5_000;
+        // maxCellsPerSchedule caps the actual emitted rows per schedule.
+        // 0 means no cell cap (only element cap applies).
+        var maxCellsPerSchedule = input["maxCellsPerSchedule"]?.Value<int>() ?? 0;
 
         if (mode != "replace" && mode != "append")
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
@@ -132,12 +145,33 @@ public class PbiPublishSchedulesTool : ICortexTool
         int scheduleCount = 0;
         int rowsDeduped = 0;
         var warnings = new List<string>();
+        var skippedSchedules = new List<object>();
+        var skippedFields = new List<object>();
+        var truncations = new List<object>();
 
         try
         {
-            scheduleRows = exporter.ExportSchedules(
+            var detail = exporter.ExportSchedulesDetailed(
                 doc, exportRunId, exportedAt,
-                scheduleIds, maxRowsPerSchedule);
+                scheduleIds, maxElementsPerSchedule, maxCellsPerSchedule);
+            scheduleRows = detail.Rows;
+
+            // Diagnostics: surface skipped/truncated so the caller cannot mistake
+            // a partial export for a complete one.
+            foreach (var s in detail.SkippedSchedules)
+            {
+                skippedSchedules.Add(new { scheduleId = s.ScheduleId, scheduleName = s.ScheduleName, reason = s.Reason });
+                warnings.Add($"Schedule '{s.ScheduleName}' (id={s.ScheduleId}) skipped: {s.Reason}");
+            }
+            foreach (var f in detail.SkippedFields)
+            {
+                skippedFields.Add(new { scheduleId = f.ScheduleId, scheduleName = f.ScheduleName, fieldName = f.FieldName, reason = f.Reason });
+            }
+            foreach (var t in detail.Truncations)
+            {
+                truncations.Add(new { scheduleId = t.ScheduleId, scheduleName = t.ScheduleName, reason = t.Reason });
+                warnings.Add($"Schedule '{t.ScheduleName}' (id={t.ScheduleId}) truncated: {t.Reason}");
+            }
 
             rowsDeduped = DeduplicateScheduleRows(scheduleRows);
             if (mode == "append")
@@ -227,7 +261,11 @@ public class PbiPublishSchedulesTool : ICortexTool
                 rowsDeduped,
                 batchCount = result.BatchCount,
                 durationMs = sw.ElapsedMilliseconds,
-                warnings
+                warnings,
+                // Diagnostics — empty arrays when nothing was skipped/truncated.
+                skippedSchedules,
+                skippedFields,
+                truncations
             });
         }
         catch (PowerBiApiException ex) when (ex.StatusCode == 401)
