@@ -384,66 +384,331 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 **Fonte:** Sessione audit SDK locali 2026-05-02
 
+
 ---
 
-## Power BI Live — Flusso Bi-Direzionale Revit ↔ PBI
+## Export Dati Revit → Power BI via OneDrive (B2 workflow)
 
-Integrazione live tra Revit e Power BI per pubblicazione dati e selezione elementi da DAX query.
-
-### Phase 2A — pbi_publish_*
-
-Pubblica snapshot degli elementi Revit verso il Power BI dataset.
-
-**Sequenza:** `pbi_check_auth` -> `pbi_list_workspaces` -> `pbi_create_dataset` (opzionale) -> `pbi_publish_elements` / `pbi_publish_schedules` / `pbi_publish_selection`
+**Sequenza:**
+1. `get_project_info` (solo prima call della sessione, tutti i campi)
+2. `push_to_powerbi` con le categorie e i parametri di interesse
 
 **Parametri chiave:**
-- `pbi_check_auth`: verificare lo stato di autenticazione; `signIn: true` avvia il device-code flow
-- `pbi_publish_elements`: esportare tutto il modello o filtrare per categoria (es. `OST_Walls`)
-- `pbi_publish_schedules`: specifiche `scheduleIds` per export singoli schedule
-- `pbi_publish_selection`: pubblica gli elementi attualmente selezionati in Revit
-- Tutti i publish supportano `mode: replace` (snapshot completo) o `append` (aggiunge righe mantenendo quelle vecchie)
+- `categories`: usa codici OST_* (es. `["OST_Walls","OST_Floors"]`). Ometti per esportare tutto.
+- `parameterNames`: lista dei parametri da includere come colonne. Ometti per auto-discover dai primi 100 elementi.
+- `outputFolder`: default `OneDrive - GPA Ingegneria Srl\RevitCortex\<NomeDocumento>\`. Puoi sovrascrivere con un path assoluto.
+- `fileName`: default `elements_<timestamp>.csv`. Usa un nome fisso (es. `walls.csv`) se vuoi che PBI sovrascriva lo stesso file ad ogni refresh.
+- Viene scritto anche `last_refresh.json` nella stessa cartella (utile come sorgente di una card "Ultimo aggiornamento" in PBI).
 
-**NON fare:** Non pubblicare senza prima verificare l'autenticazione. Non mischiare `replace` e `append` nella stessa sessione su lo stesso dataset -- scegliere una strategia di update.
+**Setup Power BI Desktop (una tantum):**
+1. Get Data → Cartella (o SharePoint Folder se usi la versione cloud OneDrive)
+2. Punta a `OneDrive - GPA Ingegneria Srl\RevitCortex\<NomeProgetto>\`
+3. Combina i file CSV con Power Query → espandi le colonne
+4. Pubblica nel workspace Premium GPA → abilita scheduled refresh (fino a 48x/giorno con Premium)
 
-**Fonte:** Phase 2A Power BI Live (pbi_publish_elements, pbi_publish_schedules, pbi_publish_selection)
+**NON fare:**
+- Non usare un `fileName` con timestamp fisso e poi impostare scheduled refresh in PBI: PBI aggiungerebbe nuove righe ad ogni refresh invece di sostituirle. Usa un nome fisso oppure usa Power Query per filtrare sul file più recente tramite `last_refresh.json`.
+- Non esportare tutto il modello senza filtrare categorie su modelli grandi (>50k elementi): usa sempre `categories` e `maxElements`.
 
-### Phase 2B — pbi_query (PBI → Revit)
+**Fonte:** Implementazione sessione 2026-05-09 (architettura B2: plugin → OneDrive → PBI scheduled refresh)
 
-Seleziona elementi in Revit eseguendo una DAX query sul dataset Power BI.
+---
 
-**Sequenza:** `pbi_query` con categoria oppure DAX personalizzato
+## Wizard UI Power BI + Bidirezionalita Drillthrough (B2 + Protocol Handler)
 
-**Esempi:**
-
-Seleziona tutti i muri:
-```
-pbi_query(category: "OST_Walls")
-```
-
-Seleziona porte al livello "Level 1":
-```
-pbi_query(category: "OST_Doors", level: "Level 1")
-```
-
-Riselezione snapshot precedente (usando l'ID di un publish passato):
-```
-pbi_query(exportRunId: "<guid da risposta pbi_publish_elements>")
-```
-
-DAX avanzato (aree > 50 m²):
-```
-pbi_query(daxQuery: "EVALUATE SELECTCOLUMNS(FILTER(Elements, Elements[Area] > 50), \"ElementId\", Elements[ElementId])")
-```
+**Sequenza:**
+1. Ribbon RevitCortex -> bottone "Power BI Export"
+2. Wizard step 1: scegli categorie con count (filtro testuale, profili salvabili)
+3. Wizard step 2: scegli parametri con copertura % (Istanza/Tipo, hide-empty, search)
+4. Wizard step 3: imposta cartella output OneDrive, nome file, sovrascrittura, auto-export al salvataggio, registrazione protocol handler -> "Esporta"
+5. Power BI Desktop -> Get Data -> Cartella -> punta a OneDrive\RevitCortex\<Modello>\
+6. In PBI: drillthrough su una matrice elemento -> URL `revitcortex://select?ids=ID1,ID2,...` -> Revit attiva e seleziona
 
 **Parametri chiave:**
-- `category`: OST code (es. `OST_Walls`, `OST_Doors`) — NON nomi localizzati
-- `level`: nome livello Revit (es. "Ground Floor", "Livello 1")
-- `parameterName`: riferisce alle colonne dello schema dataset, NON ai parametri custom Revit
-- `exportRunId`: GUID restituito da `pbi_publish_elements` per riselezione
-- `daxQuery`: DAX puro per query avanzate (richiede `ExecuteQueries.Execute.All` tenant setting su Power BI)
+- I profili salvati sono in `~/.revitcortex/profiles/<Nome>.json` (uno per cliente/progetto)
+- "Sovrascrivi file" = ON e indispensabile per scheduled refresh PBI con un singolo dataset
+- "Auto-export al salvataggio" si applica solo durante la sessione Revit corrente (no persistence cross-restart)
+- Il protocol handler viene registrato in HKCU (no admin); `~/.revitcortex/protocol/protocol.log` contiene il log delle invocazioni
+- Performance: la discovery dei parametri sample 200 elementi per categoria, fa coverage % e raggruppa per gruppo Revit
 
-**Colonna Elements[Category]:** contiene OST code (`OST_Walls`, `OST_Doors`, ecc.), NON nomi display.
+**Setup PBI per drillthrough:**
+1. Crea una colonna "Drillthrough URL" nel modello PBI: `"revitcortex://select?ids=" & [ElementId]`
+2. Inserisci un visual "Action" o un bottone con campo URL = quella misura
+3. Per multi-selezione: `"revitcortex://select?ids=" & CONCATENATEX(SELECTEDVALUES(...), ",")`
 
-**NON fare:** Non usare nomi categoria localizzati -- usare OST code. Non eseguire query DAX complesse senza prima abilitare `ExecuteQueries.Execute.All` sul tenant PBI (controlla con admin PBI).
+**NON fare:**
+- Non usare `parameterNames` con nomi inventati: la wizard scopre i nomi reali via campionamento, fidati di quel risultato
+- Non disabilitare la coverage % filter su modelli grandi (>50 categorie + 1000 parametri possibili) — il rumore in lista diventa eccessivo
+- Non usare protocol handler con porte diverse da quelle della sessione attiva: il registrar usa `RevitCortexApp.Instance.Port` corrente al momento della registrazione
 
-**Fonte:** Phase 2B Power BI Live (pbi_query)
+**Fonte:** Implementazione sessione 2026-05-09 (B2 completo: WPF wizard + ProtocolHandlerRegistrar + SelectFromPowerBiTool)
+
+---
+
+## Wizard Power BI v2 - Tab categorie + Mapping editor + Round-trip
+
+**Sequenza completa:**
+1. Ribbon RevitCortex -> "Power BI Export"
+2. Step 1 (Sorgente): tab Model/Annotation/Analytical/Altre, scope Tutto/Vista/Selezione, oppure "Schedule esistenti del modello"
+3. Step 2 (Parametri): dual-pane Available/Selected con frecce, color legend, search globale
+4. Step 3 (Output): cartella + nome file + opzioni; **bottone "Mappa colonne..."** per definire alias/formula; **bottone "Applica da CSV..."** per round-trip Revit<-CSV
+5. Esporta = `push_to_powerbi` invocato in-process via `RevitCortexApp.Instance.Router.Route(...)` (no TCP, no Cortex Switch necessario)
+
+**Mapping editor (Commit 2):**
+- Riga = una colonna CSV
+- Tipo: `param` (nome parametro), `field` (ElementId|Category|Family|Type), `formula` (espressione con token)
+- Formula tokens: `{ParamName}`, `{[Type] ParamName}`, `{ElementId|Category|Family|Type}`. Esempio: `{Family} - {Type} ({Mark})`
+- Header CSV: alias custom per la colonna, vuoto = nome sorgente
+- Riordina con su/giu, rimuovi, aggiungi calcolata
+
+**Round-trip Excel<-CSV->Revit (Commit 3):**
+1. `push_to_powerbi` -> CSV
+2. Aprire in Excel, modificare valori (no formule, solo testi puri rispettando le unita di progetto)
+3. Salvare come CSV UTF-8
+4. Wizard -> "Applica da CSV..." oppure tool `import_from_powerbi`
+5. Anteprima dryRun con conteggi, conferma TaskDialog, scrittura in transazione singola
+6. Skipped automaticamente: `ElementId`, `Category`, `Family`, `Type` (built-in non scrivibili) + parametri read-only
+7. Header `[Type] Foo` -> parametro di tipo, altrimenti istanza
+
+**NON fare:**
+- Non modificare la colonna `ElementId` nel CSV: e la chiave per ritrovare l'elemento, modificarla = riga ignorata
+- Non aspettarsi che il round-trip ricostruisca formule Excel: vengono ignorate; calcoli devono essere generati nel CSV via "Mappa colonne" prima dell'export
+- Non usare comma decimale in CSV se la cultura del CSV e en-US: il tool prova prima `SetValueString` (unit-aware) poi `double.Parse` (Invariant + Current), ma colonne ambigue meglio normalizzarle
+
+**Fonte:** Commit 2 + 3 implementati 2026-05-09 ispirati a SheetLink (https://docs.dirootsone.diroots.com/docs/sheetlink-user-guide)
+
+---
+
+## push_table_to_powerbi - tabelle generate da Claude verso PBI
+
+**Sequenza:**
+1. Claude analizza dati Revit / clash / WBS / qualunque cosa
+2. Claude chiama `push_table_to_powerbi(headers: [...], rows: [...])`
+3. Il tool scrive un CSV nella stessa cartella OneDrive degli export `push_to_powerbi`
+4. PBI legge la cartella unica e vede tutti i file insieme
+
+**Esempio chiamata:**
+```json
+{
+  "headers": ["Level", "WallVolume_m3", "FloorArea_m2", "DoorCount"],
+  "rows": [
+    ["Level 1", 145.6, 320.4, 12],
+    ["Level 2", 132.1, 305.8, 14],
+    ["Roof", 0, 280.0, 0]
+  ],
+  "subfolder": "Analyses",
+  "fileName": "summary_by_level.csv"
+}
+```
+
+**Quando usarlo:**
+- L'analisi e' fatta da Claude (non e' un dump di elementi Revit)
+- Multi-documento (push_to_powerbi opera solo sul documento attivo)
+- Aggregati per livello/disciplina/fase
+- Computi ricavati da formule custom
+
+**Quando NON usarlo:**
+- Dati che escono direttamente da Revit -> usa `push_to_powerbi` (mantiene ElementId per drillthrough)
+- Schedule esistenti del modello -> `push_to_powerbi` con `scheduleIds`
+
+**Templates di test (non richiede Revit):**
+- `templates/powerbi/Generate-SampleData.ps1` genera 125 righe di test in OneDrive
+- `templates/powerbi/RevitCortex-PowerQuery.pq` script M gia' configurato
+- `templates/powerbi/RevitCortex-DAX-Measures.txt` misure DAX base
+- `templates/powerbi/Build-Report-Steps.md` procedura passo-passo
+
+**Fonte:** Implementato 2026-05-09 (commit 4: Claude-generated tables to PBI)
+
+---
+
+## PBI Live - Phase 0 (Auth + Discovery)
+
+**Sequenza:**
+1. Da Claude o tool: `pbi_check_auth` -> verifica se gia loggato (silent)
+2. Se non loggato: `pbi_check_auth(signIn=true)` -> avvia MSAL device-code in background e ritorna subito (`Starting` o `AwaitingUser`), senza bloccare il main thread Revit
+3. Richiamare `pbi_check_auth(signIn=false)` dopo pochi secondi per leggere `userCode` + `verificationUrl` se il primo risultato era `Starting`
+4. Utente apre browser su `https://login.microsoft.com/device`, incolla codice, completa login
+5. Token cache salvato cifrato in %LOCALAPPDATA%\.revitcortex\msal_cache.bin (DPAPI)
+6. `pbi_list_workspaces` -> elenco gruppi PBI accessibili
+
+**Settings:**
+- `~/.revitcortex/powerbi-live.json` contiene clientId/tenantId/defaultWorkspaceId
+- Per GPA usare app registration custom, non il ClientId well-known:
+  - `ClientId = 05d231e9-d720-4c54-8ecd-93a85dbef40b`
+  - `TenantId = 53372e72-8a4d-4a86-8745-257d91a1aafc`
+- ClientId default storico = "871c010f-5e61-4fb1-83ac-98610a7e9110" (PBI Embedded Sample, well-known), ma sul tenant GPA fallisce con AADSTS65002
+- AllowExternalWrites = false (push PBI bloccato in read-only mode by default)
+
+**App registration Entra GPA:**
+- Supported account types: Single tenant - GPA Ingegneria Srl
+- Platform: Mobile and desktop applications / InstalledClient
+- Redirect URI:
+  - `http://localhost`
+  - `https://login.microsoftonline.com/common/oauth2/nativeclient`
+- API permissions delegated Power BI Service:
+  - `Dataset.ReadWrite.All`
+  - `Report.Read.All`
+  - `Workspace.Read.All`
+- Admin consent deve risultare `Granted for GPA Ingegneria Srl`
+- Nel Manifest `allowPublicClient` deve essere esplicitamente `true`; se e' `null`, il device-code arriva alla conferma browser ma poi il token exchange fallisce con AADSTS7000218 (`client_assertion` o `client_secret` richiesto)
+
+**Token cache:**
+- Cifrato DPAPI per-user-per-machine
+- Refresh automatico via MSAL
+- SignOut: cancella accounts + file cache
+
+**Architettura:**
+- `PowerBiAuthService`: MSAL public-client, device-code, cache DPAPI
+- `PowerBiServiceClient`: REST wrapper minimale Phase 0 (solo ListWorkspaces)
+- `PowerBiSettings`: persistenza config
+- `PbiCheckAuthTool` / `PbiListWorkspacesTool`: tool ICortexTool registrati via assembly scan del Plugin (oltre a Tools)
+- `PbiCheckAuthTool` usa stato auth in memoria e thread background: non usare `Thread.Sleep`, `Join` o polling MSAL sul main thread Revit per aspettare il completamento login
+
+**NON fare:**
+- Non hardcodare segreti client (e' public client, niente secret necessario)
+- Non chiamare HTTP REST sul main thread Revit (gia' giro su Task.Run)
+- Non assumere che il device-code completi: utente puo' annullare, mostrare URL+codice in modo chiaro
+- Non lasciare `allowPublicClient` a `null` nel manifest Entra
+
+**Esito test validato 2026-05-11:**
+- `pbi_check_auth(signIn=true)` ritorna in ~20 ms, Revit non si congela
+- Login riuscito con account `luigi.dattilo-co@gpapartners.com`
+- Token cache MSAL/DPAPI letto correttamente
+- `pbi_list_workspaces` ritorna 4 workspace: `GPA BIM`, `24HBS`, `AutomatedML`, `Test`
+
+**Fonte:** Phase 0 del piano PBI Live, allineato con docs/powerbi-live-architecture-review.md (2026-05-09), validato end-to-end 2026-05-11
+
+---
+
+## PBI Live - Phase 1 (Publish Elements + Schedules)
+
+**Primo publish (workspaceId esplicito, dataset auto-creato):**
+1. `pbi_check_auth(signIn=false)` → verifica token valido
+2. `pbi_list_workspaces()` → trova workspaceId target (es. `Test`)
+3. `pbi_publish_elements(workspaceId="...", mode="replace", categoryFilter=["OST_Walls","OST_Doors"], maxElements=2000)` → snapshot filtrato, dataset auto-creato se non esiste, binding salvato in `~/.revitcortex/powerbi-live.json`
+4. Risposta: `{success:true, datasetId:"...", rowCount:N, batchCount:N}`
+
+**Publish successivi (binding auto-risolto, no parametri necessari):**
+1. `pbi_publish_elements()` → workspaceId/datasetId/datasetName risolti dal binding del documento aperto
+2. `pbi_publish_schedules()` → stesso binding, tabella Schedules long-form
+
+**Publish schedules:**
+1. `pbi_publish_schedules(mode="replace")` → esporta tutti gli schedule non-template (max 5000 righe/schedule), long-form: una riga per cella
+2. Con filtro: `pbi_publish_schedules(scheduleIds=[123456, 789012])` → solo gli schedule specificati
+
+**Ispezione binding:**
+- `pbi_get_binding()` → mostra il binding corrente per il documento aperto (workspaceId, datasetId, datasetName, docKey, updatedAt)
+
+**Sign-out / cambio account:**
+1. `pbi_sign_out()` → revoca cache MSAL, ritorna `previousAccount`
+2. `pbi_check_auth(signIn=true)` → nuovo login device-code
+
+**ProjectBindings — chiave documento:**
+- Priorità: cloud GUID > `ProjectInformation.UniqueId` > SHA256(path normalizzato)
+- Salvato in `~/.revitcortex/powerbi-live.json` sotto `ProjectBindings[docKey]`
+- Aggiornato automaticamente ad ogni publish riuscito (elements o schedules)
+- Schema binding: `{WorkspaceId, DatasetId, DatasetName, ProjectName, DocumentGuid, LastPathHash, SchemaVersion, UpdatedAtUtc}`
+
+**Schema dataset (v1.0):**
+- **Metadata**: ExportRunId, ExportedAt, SchemaVersion, ProjectName, ProjectNumber, RevitVersion, ElementCount, ScheduleCount
+- **Elements**: ElementId, UniqueId, Category, Family, Type, Level, Phase, Area, Volume, Length, IsStructural, ... + _ExportRunId, _ExportedAt
+- **Schedules**: ScheduleId, ScheduleName, RowIndex, ColumnName, ValueString, ValueNumber, _ExportRunId, _ExportedAt
+- **Selection**: ElementId, UniqueId, Category, SelectedAt (Phase 2)
+- Per i muri, `Elements[Level]` deve derivare dal parametro Revit `WALL_BASE_CONSTRAINT` (Base Constraint), non dai soli parametri generici di level-hosting.
+
+**Limiti e best practice:**
+- PBI push dataset ottimizzato per PBI Service (browser), non PBI Desktop → usare `categoryFilter` per limitare le righe su Desktop
+- Max 10.000 righe per batch POST (gestito automaticamente dal client)
+- `pbi_publish_elements` senza filtri su modelli grandi (>5000 elementi) → usare `maxElements` o `categoryFilter`
+- `mode="append"` non richiede dataset esistente solo per elements (lo crea); per schedules il dataset deve esistere già
+
+**Architettura:**
+- `PowerBiElementExporter`: snapshot Revit→DTO sul main thread, detached (no Revit API dopo)
+- `PowerBiScheduleExporter`: idem, long-form, salta template e titleblock revision schedules
+- `PowerBiServiceClient`: REST wrapper (ListWorkspaces, ListDatasets, GetDatasetByName, CreatePushDataset, DeleteRows, PostRows)
+- `ProjectDocumentKey.Compute(doc)`: chiave stabile per binding
+- `RunWithoutContext<T>`: thread dedicato senza SynchronizationContext per evitare deadlock MSAL/WPF
+
+**Esito test validato 2026-05-11:**
+- Dataset creato automaticamente in workspace `Test`
+- 1191 elementi (filtro OST_Walls + OST_Doors + OST_StructuralColumns) pubblicati, 29 colonne
+- Tabella Elements visibile in PBI Service e PBI Desktop
+- Conteggi per categoria verificati vs `analyze_model_statistics`
+
+**NON fare:**
+- Non chiamare API REST sul main thread Revit (usare sempre RunWithoutContext)
+- Non aprire dataset push pesanti (~10k righe) in PBI Desktop → usare PBI Service
+- Non usare `mode="append"` per un refresh completo → usare `replace`
+
+**Fonte:** Phase 1 del piano PBI Live, implementato 2026-05-11, validato end-to-end sullo stesso giorno
+
+---
+
+### PBI Live — Phase 2A: Publish Selection
+
+Publish the current Revit selection to the Power BI Selection table.
+
+**Prerequisite:** A ProjectBinding must exist (run `pbi_publish_elements` once first).
+
+**Flow:**
+1. Select elements in Revit
+2. Call `pbi_publish_selection` (no params needed if binding exists)
+3. In Power BI, filter/visualize the Selection table by `SelectionSetId` or `ElementId`
+
+**Tool:** `pbi_publish_selection(clearIfEmpty?)`
+
+**Key behaviors:**
+- Replace semantics: each call DELETEs previous rows and POSTs the new snapshot
+- Empty selection with `clearIfEmpty=false` (default): returns warning, table unchanged
+- Empty selection with `clearIfEmpty=true`: clears the table
+- Stale binding (dataset manually deleted): falls back to name-lookup (same as publish_elements)
+
+---
+
+### PBI Live — Phase 2B: Query Power BI -> Select in Revit
+
+Query the bound Power BI dataset and select matching Revit elements by returned `ElementId`.
+
+**Prerequisite:** A ProjectBinding must exist (run `pbi_publish_elements` once first).
+
+**Flow manuale validato:**
+1. `pbi_publish_elements()` -> pubblica/aggiorna la tabella `Elements`
+2. `pbi_query(exportRunId="...", maxElements=10)` -> riseleziona un publish run precedente
+3. `pbi_publish_selection()` -> pubblica la selezione corrente nella tabella `Selection`
+4. In Power BI creare visual o filtri su `Elements`/`Selection`
+
+**Filtri categoria:**
+- `category` filtra `Elements[Category]` con nome display, es. `pbi_query(category="Walls")`
+- `ostCode` filtra `Elements[OstCode]` con codice stabile, es. `pbi_query(ostCode="OST_Walls")`
+- Preferire `ostCode` nei test automatici e nei workflow multi-lingua; usare `category` solo quando si lavora consapevolmente sul nome display salvato nel dataset.
+
+**Comandi utili:**
+- `pbi_query(exportRunId="...", action="select", maxElements=10)`
+- `pbi_query(ostCode="OST_Walls", action="select", maxElements=20)`
+- `pbi_query(category="Walls", action="isolate", maxElements=50)`
+
+**Esito test validato 2026-05-11 su Snowdon Towers:**
+- `OST_Walls`, `OST_Floors`, `OST_StructuralColumns`, `OST_StructuralFraming`, `OST_StructuralFoundation`, `OST_GenericModel` -> elementi trovati e selezionabili via DAX su `Elements[OstCode]`
+- `OST_Doors`, `OST_Windows`, `OST_Rooms`, `OST_Columns`, `OST_Ceilings`, `OST_Roofs`, `OST_Stairs`, `OST_Railings`, `OST_CurtainWallPanels`, `OST_CurtainWallMullions` -> query valida, nessun elemento nel dataset corrente
+
+### PBI Live — Phase 2C: PBI Desktop visual → Revit selection
+
+**Quando usare:** Selezionare elementi Revit direttamente da un report Power BI Desktop senza passare da Claude.
+
+**Prerequisiti:**
+- Plugin RevitCortex installato e Cortex Switch attivo (porta 27016 si apre automaticamente)
+- Power BI Desktop (non Service) con il visual `revitcortexselectionvisual1A2B3C4D.1.0.0.0.pbiviz` importato
+
+**Installazione del visual:**
+1. Aprire Power BI Desktop
+2. Nel pannello Visualizzazioni → "…" → Importa un visual da un file
+3. Selezionare `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.0.pbiviz`
+4. Trascinare il visual sulla pagina del report
+5. Nel pannello Campi, trascinare `Elements[ElementId]` nel ruolo **Element ID**
+
+**Utilizzo:**
+- **Seleziona filtrati (N)** — seleziona tutti gli elementi visibili nel report (rispetta cross-filter e slicer)
+- **Seleziona highlighted (N)** — seleziona solo le righe evidenziate da un altro visual; pulsante disabilitato se count=0
+- Indicatore connessione: verde = RevitCortex attivo su porta 27016, grigio = plugin non avviato
+
+**Porta:** Il listener si apre sulla porta `27016` (una sopra il TCP bridge su `27015`). Se due istanze Revit sono aperte, la seconda salta il listener silenziosamente.

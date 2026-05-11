@@ -1,0 +1,22 @@
+<Window x:Class="RevitCortex.Plugin.PowerBi.ProfileNameDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Salva profilo" Height="170" Width="420"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="Nome profilo:" Margin="0,0,0,6"/>
+        <TextBox Grid.Row="1" x:Name="NameBox" Padding="6,4"/>
+        <TextBlock Grid.Row="2" Text="Il profilo verra salvato in ~/.revitcortex/profiles/. Puoi richiamarlo da 'Profili...' nello step 1."
+                   TextWrapping="Wrap" Foreground="#616161" Margin="0,8,0,0" FontSize="11"/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Annulla" Width="80" Margin="0,0,8,0" Click="Cancel_Click"/>
+            <Button Content="Salva" Width="80" IsDefault="True" Click="Save_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

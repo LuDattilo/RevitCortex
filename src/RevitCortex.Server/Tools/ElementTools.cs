@@ -378,4 +378,254 @@ public static class ElementTools
         var result = await revit.ExecuteAsync("modify_element", p, ct);
         return result.ToString();
     }
+
+    [McpServerTool(Name = "push_to_powerbi"), Description("Export element parameters or existing schedules to CSV files in a local/OneDrive folder for Power BI refresh. Two modes: (1) categories + parameterNames -> one elements.csv; (2) scheduleIds -> one schedule_<Name>.csv per schedule. Scope can be limited to active view or current selection. Defaults to OneDrive GPA Ingegneria Srl\\RevitCortex\\<DocumentName>\\.")]
+    public static async Task<string> PushToPowerBi(
+        RevitConnectionManager revit,
+        [Description("Categories to export (OST_* codes or display names). Omit for all. Used in category mode.")] string[]? categories = null,
+        [Description("Parameter names to include as columns. Omit to auto-discover from first 100 elements. Used in category mode.")] string[]? parameterNames = null,
+        [Description("Existing schedule (ViewSchedule) IDs to export. When set, switches to schedule mode (one CSV per schedule).")] long[]? scheduleIds = null,
+        [Description("Also include type-level parameters. Default: false. Category mode only.")] bool includeTypeParameters = false,
+        [Description("Max elements to export. Default: 10000. Category mode only.")] int maxElements = 10000,
+        [Description("Scope: WholeModel (default), ActiveView, Selection.")] string? scopeMode = null,
+        [Description("Element IDs for Selection scope.")] long[]? selectionIds = null,
+        [Description("View ID for ActiveView scope (defaults to the document's active view).")] long? activeViewId = null,
+        [Description("Output folder path. Defaults to OneDrive GPA Ingegneria Srl\\RevitCortex\\<DocumentName>.")] string? outputFolder = null,
+        [Description("CSV file name (without path). Defaults to elements_<timestamp>.csv. Category mode only.")] string? fileName = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["includeTypeParameters"] = includeTypeParameters,
+            ["maxElements"] = maxElements,
+        };
+        if (categories != null) p["categories"] = new JArray(categories);
+        if (parameterNames != null) p["parameterNames"] = new JArray(parameterNames);
+        if (scheduleIds != null) p["scheduleIds"] = new JArray(scheduleIds.Cast<object>().ToArray());
+        if (scopeMode != null) p["scopeMode"] = scopeMode;
+        if (selectionIds != null) p["selectionIds"] = new JArray(selectionIds.Cast<object>().ToArray());
+        if (activeViewId != null) p["activeViewId"] = activeViewId;
+        if (outputFolder != null) p["outputFolder"] = outputFolder;
+        if (fileName != null) p["fileName"] = fileName;
+        var result = await revit.ExecuteAsync("push_to_powerbi", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "select_from_powerbi"), Description("Selects/zooms/isolates elements in the active Revit view from a Power BI drillthrough. Action: select | highlight | isolate.")]
+    public static async Task<string> SelectFromPowerBi(
+        RevitConnectionManager revit,
+        [Description("Element IDs to focus")] long[] elementIds,
+        [Description("Action: select | highlight | isolate. Default: select")] string action = "select",
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["elementIds"] = new JArray(elementIds.Cast<object>().ToArray()),
+            ["action"] = action,
+        };
+        var result = await revit.ExecuteAsync("select_from_powerbi", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "push_table_to_powerbi"), Description("Writes an arbitrary table (headers + rows) to a CSV in the RevitCortex/OneDrive folder for Power BI. Use when the data was computed by you (LLM analysis, multi-doc aggregation, etc.) and is NOT a direct dump of Revit elements. Pass headers as a JSON array of strings; pass rows as a JSON array where each item is either an array (positional) or an object keyed by header. The file lives next to push_to_powerbi outputs and can be picked up by the same Power BI folder source.")]
+    public static async Task<string> PushTableToPowerBi(
+        RevitConnectionManager revit,
+        [Description("JSON array of column header strings, e.g. [\"Level\",\"Volume\",\"Count\"].")] string headers,
+        [Description("JSON array of rows. Each row is either an array of values matching headers' order, or an object keyed by header name.")] string rows,
+        [Description("Output folder. Defaults to OneDrive\\RevitCortex\\<DocumentName-or-ChatTables>.")] string? outputFolder = null,
+        [Description("Optional subfolder name appended to outputFolder for grouping (e.g. 'Analyses').")] string? subfolder = null,
+        [Description("CSV file name. Defaults to table_<timestamp>.csv. Use a stable name for repeated overwrites.")] string? fileName = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["headers"] = JArray.Parse(headers),
+            ["rows"] = JArray.Parse(rows),
+        };
+        if (outputFolder != null) p["outputFolder"] = outputFolder;
+        if (subfolder != null) p["subfolder"] = subfolder;
+        if (fileName != null) p["fileName"] = fileName;
+        var result = await revit.ExecuteAsync("push_table_to_powerbi", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_check_auth"), Description("Reports the user's Power BI sign-in state. With signIn=true, starts an MSAL device-code flow inside Revit (a TaskDialog will show the URL + code; the user finishes login in their browser). Token is cached DPAPI-encrypted in %LOCALAPPDATA%\\.revitcortex\\msal_cache.bin.")]
+    public static async Task<string> PbiCheckAuth(
+        RevitConnectionManager revit,
+        [Description("If true and not already signed in, kick off device-code flow and wait until the user signs in.")] bool signIn = false,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["signIn"] = signIn };
+        var result = await revit.ExecuteAsync("pbi_check_auth", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_list_workspaces"), Description("Lists Power BI workspaces (groups) accessible to the signed-in user. Read-only.")]
+    public static async Task<string> PbiListWorkspaces(
+        RevitConnectionManager revit,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("pbi_list_workspaces", new JObject(), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_list_datasets"), Description("Lists push datasets in a Power BI workspace. Useful for finding an existing RevitCortex dataset before publishing. Read-only.")]
+    public static async Task<string> PbiListDatasets(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID — obtained from pbi_list_workspaces.")] string workspaceId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["workspaceId"] = workspaceId };
+        var result = await revit.ExecuteAsync("pbi_list_datasets", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_create_dataset"), Description("Creates a RevitCortex push dataset in a Power BI workspace. Idempotent: if a dataset with the same name already exists, returns its id without creating a duplicate. Default tables: Metadata, Elements, Selection.")]
+    public static async Task<string> PbiCreateDataset(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID.")] string workspaceId,
+        [Description("Dataset name. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("Tables to include. Allowed: Metadata, Elements, Schedules, ElementParameters, Selection. Default: [Metadata, Elements, Selection].")] string[]? tables = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["workspaceId"] = workspaceId };
+        if (datasetName != null) p["datasetName"] = datasetName;
+        if (tables != null) p["tables"] = new JArray(tables);
+        var result = await revit.ExecuteAsync("pbi_create_dataset", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_publish_elements"), Description("Publishes Revit model elements to a Power BI push dataset (Elements table). workspaceId and datasetId can be omitted if a ProjectBinding was saved by a previous successful publish for this document. Supports replace (full snapshot, clears old rows), append (keeps old rows), and create (auto-create dataset if missing then replace). Snapshot runs on the Revit main thread; HTTP publish runs in the background.")]
+    public static async Task<string> PbiPublishElements(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID. Can be omitted if a ProjectBinding was saved by a previous publish for this document.")] string? workspaceId = null,
+        [Description("Existing dataset id. If omitted, resolved from ProjectBinding or looked up by datasetName (and created if mode allows).")] string? datasetId = null,
+        [Description("Dataset name used for lookup/create. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("Publish mode: 'replace' (default, delete rows then post snapshot), 'append' (add rows, keep existing), 'create' (auto-create if missing then replace).")] string mode = "replace",
+        [Description("OST category codes to filter elements, e.g. [\"OST_Walls\",\"OST_Doors\"]. Omit to export all model elements.")] string[]? categoryFilter = null,
+        [Description("Maximum number of elements to export. Default 10000.")] int maxElements = 10000,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["mode"] = mode,
+            ["maxElements"] = maxElements
+        };
+        if (workspaceId != null) p["workspaceId"] = workspaceId;
+        if (datasetId != null) p["datasetId"] = datasetId;
+        if (datasetName != null) p["datasetName"] = datasetName;
+        if (categoryFilter != null) p["categoryFilter"] = new JArray(categoryFilter);
+        var result = await revit.ExecuteAsync("pbi_publish_elements", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_publish_schedules"), Description("Publishes Revit schedules to the Power BI Schedules table in long-form (one row per cell). workspaceId and datasetId can be omitted if a ProjectBinding was saved by a previous successful publish for this document. Supports replace and append modes. Snapshot runs on the Revit main thread; HTTP publish runs in the background.")]
+    public static async Task<string> PbiPublishSchedules(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID. Can be omitted if a ProjectBinding was saved by a previous publish for this document.")] string? workspaceId = null,
+        [Description("Existing dataset id. If omitted, resolved from ProjectBinding or looked up by datasetName.")] string? datasetId = null,
+        [Description("Dataset name used for lookup. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("Specific schedule element ids to export. Omit to export all non-template schedules.")] long[]? scheduleIds = null,
+        [Description("Publish mode: 'replace' (default, clears existing rows) or 'append'.")] string mode = "replace",
+        [Description("Maximum rows per schedule to export. Default 5000.")] int maxRowsPerSchedule = 5000,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["mode"] = mode,
+            ["maxRowsPerSchedule"] = maxRowsPerSchedule
+        };
+        if (workspaceId != null) p["workspaceId"] = workspaceId;
+        if (datasetId != null) p["datasetId"] = datasetId;
+        if (datasetName != null) p["datasetName"] = datasetName;
+        if (scheduleIds != null) p["scheduleIds"] = new JArray(scheduleIds);
+        var result = await revit.ExecuteAsync("pbi_publish_schedules", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_sign_out"), Description("Signs out of Power BI by revoking all cached MSAL tokens. After this call pbi_check_auth(signIn=false) returns signedIn=false. The previously signed-in account is reported in the response. Use pbi_check_auth(signIn=true) to re-authenticate.")]
+    public static async Task<string> PbiSignOut(
+        RevitConnectionManager revit,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("pbi_sign_out", new JObject(), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_get_binding"), Description("Returns the Power BI ProjectBinding stored for the active Revit document (workspaceId, datasetId, datasetName, docKey, updatedAt). Returns bound=false with a tip if no binding exists yet. Read-only — call this to verify which workspace/dataset a document is linked to before publishing.")]
+    public static async Task<string> PbiGetBinding(
+        RevitConnectionManager revit,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("pbi_get_binding", new JObject(), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_publish_selection"), Description("Publishes the current Revit selection to the Power BI Selection table (one row per selected element). Each call replaces the previous snapshot (DELETE then POST). workspaceId and datasetId can be omitted when a ProjectBinding was saved by a previous publish for this document. Returns rowCount=0 with a warning if nothing is selected and clearIfEmpty is false.")]
+    public static async Task<string> PbiPublishSelection(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID. Can be omitted if a ProjectBinding exists for this document.")] string? workspaceId = null,
+        [Description("Existing dataset id. If omitted, resolved from ProjectBinding or looked up by datasetName.")] string? datasetId = null,
+        [Description("Dataset name used for lookup. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("If true, DELETE the Selection table rows even when nothing is selected in Revit. Default: false.")] bool clearIfEmpty = false,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["clearIfEmpty"] = clearIfEmpty };
+        if (workspaceId != null) p["workspaceId"] = workspaceId;
+        if (datasetId != null)   p["datasetId"]   = datasetId;
+        if (datasetName != null) p["datasetName"] = datasetName;
+        var result = await revit.ExecuteAsync("pbi_publish_selection", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_query"), Description("Executes a DAX query against the bound Power BI dataset and selects matching elements in Revit. Use template params (category, level, parameterName+parameterValue, exportRunId) for common filters, or supply a raw daxQuery for advanced queries. action='isolate' temporarily isolates the elements instead of selecting. workspaceId and datasetId can be omitted when a ProjectBinding exists. Returns elementCount=0 with a warning when no elements match.")]
+    public static async Task<string> PbiQuery(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID. Can be omitted if a ProjectBinding exists.")] string? workspaceId = null,
+        [Description("Existing dataset id. If omitted, resolved from ProjectBinding or looked up by datasetName.")] string? datasetId = null,
+        [Description("Dataset name for lookup. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("OST category code to filter by, e.g. 'OST_Walls'. Applied as Elements[Category] = value.")] string? category = null,
+        [Description("Level name to filter by, e.g. 'Level 1'. Applied as Elements[Level] = value.")] string? level = null,
+        [Description("Column name in the Elements table to filter by, e.g. 'Mark'. Requires parameterValue.")] string? parameterName = null,
+        [Description("Value to match for parameterName. String equality match. Requires parameterName.")] string? parameterValue = null,
+        [Description("ExportRunId GUID from a previous pbi_publish_elements run, to reselect that exact snapshot.")] string? exportRunId = null,
+        [Description("Raw DAX query starting with EVALUATE. Overrides all template params. Example: EVALUATE SELECTCOLUMNS(FILTER(Elements, Elements[Area] > 50), \"ElementId\", Elements[ElementId])")] string? daxQuery = null,
+        [Description("'select' (default) or 'isolate' — isolate temporarily hides all other elements in the active view.")] string? action = null,
+        [Description("Maximum number of ElementIds to select. Default: 5000.")] int maxElements = 5000,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["maxElements"] = maxElements };
+        if (workspaceId    != null) p["workspaceId"]    = workspaceId;
+        if (datasetId      != null) p["datasetId"]      = datasetId;
+        if (datasetName    != null) p["datasetName"]    = datasetName;
+        if (category       != null) p["category"]       = category;
+        if (level          != null) p["level"]          = level;
+        if (parameterName  != null) p["parameterName"]  = parameterName;
+        if (parameterValue != null) p["parameterValue"] = parameterValue;
+        if (exportRunId    != null) p["exportRunId"]    = exportRunId;
+        if (daxQuery       != null) p["daxQuery"]       = daxQuery;
+        if (action         != null) p["action"]         = action;
+        var result = await revit.ExecuteAsync("pbi_query", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "import_from_powerbi"), Description("Reads a previously-exported (or hand-edited) Power BI CSV and writes parameter values back to Revit elements. Identifies elements via the ElementId column. Built-in fields and read-only parameters are skipped. Defaults to dryRun=true so callers can preview first.")]
+    public static async Task<string> ImportFromPowerBi(
+        RevitConnectionManager revit,
+        [Description("Path to the CSV file (typically the one written by push_to_powerbi).")] string filePath,
+        [Description("Preview mode: report what would change without committing. Default: true.")] bool dryRun = true,
+        [Description("Name of the column holding the Revit ElementId. Default: 'ElementId'.")] string idColumn = "ElementId",
+        [Description("Optional whitelist of column headers to write (others ignored).")] string[]? columns = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["filePath"] = filePath,
+            ["dryRun"] = dryRun,
+            ["idColumn"] = idColumn,
+        };
+        if (columns != null) p["columns"] = new JArray(columns);
+        var result = await revit.ExecuteAsync("import_from_powerbi", p, ct);
+        return result.ToString();
+    }
 }

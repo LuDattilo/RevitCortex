@@ -1,0 +1,569 @@
+<Window x:Class="RevitCortex.Plugin.PowerBi.PowerBiExportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        Title="RevitCortex — Power BI Export" Height="680" Width="1100"
+        WindowStartupLocation="CenterScreen"
+        Background="#FAFAFA">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <Style x:Key="StepHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#00838F"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+        <Style x:Key="StepSubtitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#616161"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#00838F"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="20,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#006064"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#B0BEC5"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#00838F"/>
+            <Setter Property="BorderBrush" Value="#00838F"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Step indicator -->
+        <Border Grid.Row="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="20,14">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="Step1Label" Text="① Categorie" FontSize="14" FontWeight="SemiBold" Foreground="#00838F" Margin="0,0,32,0"/>
+                <TextBlock x:Name="Step2Label" Text="② Parametri" FontSize="14" Foreground="#9E9E9E" Margin="0,0,32,0"/>
+                <TextBlock x:Name="Step3Label" Text="③ Output" FontSize="14" Foreground="#9E9E9E"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Content -->
+        <Grid Grid.Row="1" Margin="20,16,20,12">
+            <!-- STEP 1: Source -->
+            <Grid x:Name="Step1Panel">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
+                    <TextBlock Style="{StaticResource StepHeader}" Text="Sorgente dati"/>
+                    <TextBlock Style="{StaticResource StepSubtitle}"
+                               Text="Scegli come selezionare gli elementi: per categoria + parametri (massima flessibilità) oppure riusa una schedule esistente del modello."/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
+                    <RadioButton x:Name="ModeCategoriesRadio" Content="Categorie + Parametri" IsChecked="True"
+                                 GroupName="SourceMode" Margin="0,0,24,0" Checked="SourceMode_Changed"/>
+                    <RadioButton x:Name="ModeSchedulesRadio" Content="Schedule esistenti del modello"
+                                 GroupName="SourceMode" Checked="SourceMode_Changed"/>
+                </StackPanel>
+
+                <!-- Scope toggle (SheetLink-style: Whole/Active View/Selection) -->
+                <StackPanel x:Name="ScopePanel" Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,8">
+                    <TextBlock Text="Ambito:" VerticalAlignment="Center" Foreground="#616161" Margin="0,0,8,0" FontSize="12"/>
+                    <RadioButton x:Name="ScopeWholeRadio" Content="Tutto il modello" IsChecked="True"
+                                 GroupName="Scope" Margin="0,0,16,0" Checked="Scope_Changed"/>
+                    <RadioButton x:Name="ScopeViewRadio" Content="Vista attiva"
+                                 GroupName="Scope" Margin="0,0,16,0" Checked="Scope_Changed"/>
+                    <RadioButton x:Name="ScopeSelectionRadio" Content="Selezione corrente"
+                                 GroupName="Scope" Checked="Scope_Changed"/>
+                </StackPanel>
+
+                <!-- Filter bar (shared) -->
+                <Grid Grid.Row="3" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="CategoryFilter" Grid.Column="0" Padding="6,4"
+                             ToolTip="Filtra per nome, codice OST o nome schedule"
+                             TextChanged="CategoryFilter_TextChanged"/>
+                    <Button Grid.Column="1" Content="Tutte" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"
+                            Click="SelectAllCategories_Click"/>
+                    <Button Grid.Column="2" Content="Nessuna" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"
+                            Click="SelectNoneCategories_Click"/>
+                    <Button Grid.Column="3" Content="Profili…" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"
+                            Click="LoadProfile_Click"/>
+                </Grid>
+
+                <!-- Categories tabs (mode A) — alla Revit Visibility/Graphics Overrides -->
+                <Grid x:Name="CategoryTableBorder" Grid.Row="4">
+                    <TabControl x:Name="CategoryTabControl" BorderBrush="#E0E0E0" BorderThickness="1" Background="White"
+                                SelectionChanged="CategoryTab_Changed">
+                        <TabItem x:Name="ModelCategoriesTab" Header="Model Categories">
+                            <DataGrid x:Name="CategoryDataGrid"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      CanUserSortColumns="True"
+                                      SelectionMode="Extended"
+                                      SelectionUnit="FullRow"
+                                      GridLinesVisibility="Horizontal"
+                                      HeadersVisibility="Column"
+                                      AlternatingRowBackground="#FAFAFA"
+                                      RowHeight="28"
+                                      BorderThickness="0"
+                                      VerticalGridLinesBrush="Transparent"
+                                      IsReadOnly="False"
+                                      MouseDoubleClick="CategoryDataGrid_DoubleClick">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <EventSetter Event="MouseLeftButtonUp" Handler="CategoryRow_Click"/>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridCheckBoxColumn Header="✓" Width="36"
+                                                            Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <DataGridTextColumn Header="Categoria" Width="300" Binding="{Binding DisplayName}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="OST Code" Width="260" Binding="{Binding OstCode}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="Elementi" Width="100" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem x:Name="AnnotationCategoriesTab" Header="Annotation Categories">
+                            <DataGrid x:Name="AnnotationDataGrid"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      CanUserSortColumns="True"
+                                      SelectionMode="Extended"
+                                      SelectionUnit="FullRow"
+                                      GridLinesVisibility="Horizontal"
+                                      HeadersVisibility="Column"
+                                      AlternatingRowBackground="#FAFAFA"
+                                      RowHeight="28"
+                                      BorderThickness="0"
+                                      VerticalGridLinesBrush="Transparent"
+                                      IsReadOnly="False"
+                                      MouseDoubleClick="CategoryDataGrid_DoubleClick">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <EventSetter Event="MouseLeftButtonUp" Handler="CategoryRow_Click"/>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridCheckBoxColumn Header="✓" Width="36"
+                                                            Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <DataGridTextColumn Header="Categoria" Width="300" Binding="{Binding DisplayName}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="OST Code" Width="260" Binding="{Binding OstCode}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="Elementi" Width="100" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem x:Name="AnalyticalCategoriesTab" Header="Analytical Model Categories">
+                            <DataGrid x:Name="AnalyticalDataGrid"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      CanUserSortColumns="True"
+                                      SelectionMode="Extended"
+                                      SelectionUnit="FullRow"
+                                      GridLinesVisibility="Horizontal"
+                                      HeadersVisibility="Column"
+                                      AlternatingRowBackground="#FAFAFA"
+                                      RowHeight="28"
+                                      BorderThickness="0"
+                                      VerticalGridLinesBrush="Transparent"
+                                      IsReadOnly="False"
+                                      MouseDoubleClick="CategoryDataGrid_DoubleClick">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <EventSetter Event="MouseLeftButtonUp" Handler="CategoryRow_Click"/>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridCheckBoxColumn Header="✓" Width="36"
+                                                            Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <DataGridTextColumn Header="Categoria" Width="300" Binding="{Binding DisplayName}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="OST Code" Width="260" Binding="{Binding OstCode}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="Elementi" Width="100" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem x:Name="OtherCategoriesTab" Header="Altre" Visibility="Collapsed">
+                            <DataGrid x:Name="OtherDataGrid"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      CanUserSortColumns="True"
+                                      SelectionMode="Extended"
+                                      SelectionUnit="FullRow"
+                                      GridLinesVisibility="Horizontal"
+                                      HeadersVisibility="Column"
+                                      AlternatingRowBackground="#FAFAFA"
+                                      RowHeight="28"
+                                      BorderThickness="0"
+                                      VerticalGridLinesBrush="Transparent"
+                                      IsReadOnly="False"
+                                      MouseDoubleClick="CategoryDataGrid_DoubleClick">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <EventSetter Event="MouseLeftButtonUp" Handler="CategoryRow_Click"/>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridCheckBoxColumn Header="✓" Width="36"
+                                                            Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <DataGridTextColumn Header="Categoria" Width="300" Binding="{Binding DisplayName}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="OST Code" Width="260" Binding="{Binding OstCode}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="Elementi" Width="100" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+
+                <!-- Schedules table (mode B) -->
+                <Border x:Name="ScheduleTableBorder" Grid.Row="4" BorderBrush="#E0E0E0" BorderThickness="1" Background="White" Visibility="Collapsed">
+                    <DataGrid x:Name="ScheduleDataGrid"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              CanUserSortColumns="True"
+                              SelectionMode="Extended"
+                              SelectionUnit="FullRow"
+                              GridLinesVisibility="Horizontal"
+                              HeadersVisibility="Column"
+                              AlternatingRowBackground="#FAFAFA"
+                              RowHeight="28"
+                              BorderThickness="0"
+                              VerticalGridLinesBrush="Transparent"
+                              IsReadOnly="False"
+                              MouseDoubleClick="ScheduleDataGrid_DoubleClick">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <EventSetter Event="MouseLeftButtonUp" Handler="ScheduleRow_Click"/>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="✓" Width="36"
+                                                    Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                            <DataGridTextColumn Header="Nome schedule" Width="280" Binding="{Binding Name}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Categoria" Width="200" Binding="{Binding CategoryName}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Colonne" Width="80" Binding="{Binding ColumnCount}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Righe" Width="80" Binding="{Binding RowCount}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="ID" Width="100" Binding="{Binding ScheduleId}" IsReadOnly="True"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </Grid>
+
+            <!-- STEP 2: Parameters (dual-pane Available / Selected, SheetLink-style) -->
+            <Grid x:Name="Step2Panel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
+                    <TextBlock Style="{StaticResource StepHeader}" Text="Seleziona i parametri da esportare"/>
+                    <TextBlock Style="{StaticResource StepSubtitle}"
+                               Text="Sposta i parametri da 'Disponibili' a 'Selezionati' (frecce o doppio-click). L'ordine in 'Selezionati' e l'ordine delle colonne nel CSV."/>
+                </StackPanel>
+
+                <!-- Color legend (SheetLink-style) -->
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                    <Border Width="14" Height="14" Background="#C8E6C9" BorderBrush="#2E7D32" BorderThickness="1" VerticalAlignment="Center"/>
+                    <TextBlock Text="Istanza" Margin="6,0,16,0" VerticalAlignment="Center" FontSize="11"/>
+                    <Border Width="14" Height="14" Background="#FFF9C4" BorderBrush="#F9A825" BorderThickness="1" VerticalAlignment="Center"/>
+                    <TextBlock Text="Tipo" Margin="6,0,16,0" VerticalAlignment="Center" FontSize="11"/>
+                    <Border Width="14" Height="14" Background="#FFCDD2" BorderBrush="#C62828" BorderThickness="1" VerticalAlignment="Center"/>
+                    <TextBlock Text="Read-only" Margin="6,0,16,0" VerticalAlignment="Center" FontSize="11"/>
+                    <Border Width="14" Height="14" Background="White" BorderBrush="#9E9E9E" BorderThickness="1" VerticalAlignment="Center">
+                        <TextBlock Text="◆" FontSize="9" HorizontalAlignment="Center" Foreground="#1565C0"/>
+                    </Border>
+                    <TextBlock Text="Shared" Margin="6,0,16,0" VerticalAlignment="Center" FontSize="11"/>
+                </StackPanel>
+
+                <!-- Filter + options bar -->
+                <Grid Grid.Row="2" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="ParameterFilter" Grid.Column="0" Padding="6,4"
+                             ToolTip="Filtra per nome o gruppo (in entrambi i pannelli)"
+                             TextChanged="ParameterFilter_TextChanged"/>
+                    <CheckBox x:Name="IncludeTypeParametersBox" Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"
+                              Content="Includi parametri di tipo" Checked="IncludeTypeParameters_Changed" Unchecked="IncludeTypeParameters_Changed"/>
+                    <CheckBox x:Name="HideEmptyBox" Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center"
+                              Content="Nascondi sempre vuoti" IsChecked="True" Checked="HideEmpty_Changed" Unchecked="HideEmpty_Changed"/>
+                </Grid>
+
+                <!-- Dual-pane Available | Buttons | Selected -->
+                <Grid Grid.Row="3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Available -->
+                    <Border Grid.Column="0" BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" Background="#F5F5F5" Padding="8,6" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+                                <TextBlock x:Name="AvailableHeader" Text="Disponibili" FontWeight="SemiBold" Foreground="#424242"/>
+                            </Border>
+                            <DataGrid x:Name="AvailableParamsGrid" Grid.Row="1"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      CanUserSortColumns="True"
+                                      SelectionMode="Extended"
+                                      SelectionUnit="FullRow"
+                                      GridLinesVisibility="None"
+                                      HeadersVisibility="Column"
+                                      RowHeight="26"
+                                      BorderThickness="0"
+                                      IsReadOnly="True"
+                                      MouseDoubleClick="AvailableParams_DoubleClick">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                                                <Setter Property="Background" Value="#FFCDD2"/>
+                                            </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsReadOnly}" Value="False"/>
+                                                    <Condition Binding="{Binding Scope}" Value="Instance"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#C8E6C9"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsReadOnly}" Value="False"/>
+                                                    <Condition Binding="{Binding Scope}" Value="Type"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#FFF9C4"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="" Width="22">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="◆" FontSize="9" Foreground="#1565C0" HorizontalAlignment="Center"
+                                                           Visibility="{Binding IsShared, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Collapsed}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Parametro" Width="*" Binding="{Binding Name}"/>
+                                    <DataGridTextColumn Header="Gruppo" Width="120" Binding="{Binding GroupName}"/>
+                                    <DataGridTextColumn Header="%" Width="50" Binding="{Binding CoveragePercent, StringFormat={}{0}%}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Transfer buttons -->
+                    <StackPanel Grid.Column="1" Orientation="Vertical" VerticalAlignment="Center" Margin="8,0">
+                        <Button Content="▶" Width="36" Height="32" Margin="0,2" ToolTip="Aggiungi i selezionati" Click="MoveToSelected_Click"/>
+                        <Button Content="▶▶" Width="36" Height="32" Margin="0,2" ToolTip="Aggiungi tutti i visibili" Click="MoveAllToSelected_Click"/>
+                        <Border Height="8"/>
+                        <Button Content="◀" Width="36" Height="32" Margin="0,2" ToolTip="Rimuovi i selezionati" Click="MoveToAvailable_Click"/>
+                        <Button Content="◀◀" Width="36" Height="32" Margin="0,2" ToolTip="Rimuovi tutti" Click="MoveAllToAvailable_Click"/>
+                        <Border Height="8"/>
+                        <Button Content="↑" Width="36" Height="32" Margin="0,2" ToolTip="Sposta su" Click="MoveSelectedUp_Click"/>
+                        <Button Content="↓" Width="36" Height="32" Margin="0,2" ToolTip="Sposta giu" Click="MoveSelectedDown_Click"/>
+                    </StackPanel>
+
+                    <!-- Selected -->
+                    <Border Grid.Column="2" BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" Background="#F5F5F5" Padding="8,6" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+                                <TextBlock x:Name="SelectedHeader" Text="Selezionati" FontWeight="SemiBold" Foreground="#424242"/>
+                            </Border>
+                            <DataGrid x:Name="SelectedParamsGrid" Grid.Row="1"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      CanUserSortColumns="False"
+                                      SelectionMode="Extended"
+                                      SelectionUnit="FullRow"
+                                      GridLinesVisibility="None"
+                                      HeadersVisibility="Column"
+                                      RowHeight="26"
+                                      BorderThickness="0"
+                                      IsReadOnly="True"
+                                      MouseDoubleClick="SelectedParams_DoubleClick">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                                                <Setter Property="Background" Value="#FFCDD2"/>
+                                            </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsReadOnly}" Value="False"/>
+                                                    <Condition Binding="{Binding Scope}" Value="Instance"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#C8E6C9"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsReadOnly}" Value="False"/>
+                                                    <Condition Binding="{Binding Scope}" Value="Type"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#FFF9C4"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="#" Width="32" Binding="{Binding OrderIndex}"/>
+                                    <DataGridTextColumn Header="Parametro" Width="*" Binding="{Binding Name}"/>
+                                    <DataGridTextColumn Header="Gruppo" Width="100" Binding="{Binding GroupName}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- STEP 3: Output -->
+            <Grid x:Name="Step3Panel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
+                    <TextBlock Style="{StaticResource StepHeader}" Text="Output e schedulazione"/>
+                    <TextBlock Style="{StaticResource StepSubtitle}"
+                               Text="Il file CSV verra salvato nella cartella selezionata. Per dashboard Power BI con scheduled refresh, imposta una cartella sincronizzata su OneDrive/SharePoint e mantieni un nome file fisso."/>
+                </StackPanel>
+
+                <Grid Grid.Row="1" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="160"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Cartella output:" VerticalAlignment="Center" Margin="0,4"/>
+                    <TextBox x:Name="OutputFolderBox" Grid.Row="0" Grid.Column="1" Padding="6,4" Margin="0,4"/>
+                    <Button Grid.Row="0" Grid.Column="2" Content="Sfoglia…" Margin="8,4,0,4"
+                            Style="{StaticResource SecondaryButton}" Click="BrowseFolder_Click"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Nome file:" VerticalAlignment="Center" Margin="0,4"/>
+                    <TextBox x:Name="FileNameBox" Grid.Row="1" Grid.Column="1" Padding="6,4" Margin="0,4"
+                             Text="elements.csv"/>
+
+                    <CheckBox x:Name="OverwriteBox" Grid.Row="2" Grid.Column="1" Margin="0,8" IsChecked="True"
+                              Content="Sovrascrivi file esistente (consigliato per scheduled refresh)"/>
+
+                    <CheckBox x:Name="AutoExportBox" Grid.Row="3" Grid.Column="1" Margin="0,4"
+                              Content="Aggiorna automaticamente al salvataggio del modello"/>
+
+                    <CheckBox x:Name="RegisterProtocolBox" Grid.Row="4" Grid.Column="1" Margin="0,4" IsChecked="True"
+                              Content="Registra il protocol handler revitcortex:// (richiede privilegi utente)"/>
+                </Grid>
+
+                <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Anteprima (prime 5 righe)" FontWeight="SemiBold" Foreground="#424242" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" x:Name="EditMappingsBtn" Content="Mappa colonne…" Style="{StaticResource SecondaryButton}"
+                                ToolTip="Personalizza header CSV (alias) e aggiungi colonne calcolate da formula"
+                                Click="EditMappings_Click"/>
+                    </Grid>
+                    <Border Grid.Row="1" BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <DataGrid x:Name="PreviewGrid" AutoGenerateColumns="True" IsReadOnly="True"
+                                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                      AlternatingRowBackground="#F5F5F5"/>
+                        </ScrollViewer>
+                    </Border>
+                    <TextBlock x:Name="SummaryText" Grid.Row="2" Margin="0,8,0,0" Foreground="#616161"/>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="20,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button x:Name="SaveProfileBtn" Content="Salva profilo…" Style="{StaticResource SecondaryButton}"
+                            Click="SaveProfile_Click"/>
+                    <Button x:Name="ImportProfileBtn" Content="Importa…" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0"
+                            ToolTip="Importa un profilo da un file .json (cartella di rete/condivisa)" Click="ImportProfile_Click"/>
+                    <Button x:Name="OpenProfilesFolderBtn" Content="Apri cartella" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0"
+                            ToolTip="Apri ~/.revitcortex/profiles per copiare/condividere i profili" Click="OpenProfilesFolder_Click"/>
+                    <Button x:Name="ApplyFromCsvBtn" Content="Applica da CSV…" Style="{StaticResource SecondaryButton}" Margin="12,0,0,0"
+                            ToolTip="Round-trip: legge un CSV (es. modificato in Excel) e scrive i parametri sugli elementi Revit"
+                            Click="ApplyFromCsv_Click"/>
+                </StackPanel>
+                <TextBlock Grid.Column="1" x:Name="StatusText" VerticalAlignment="Center" Margin="16,0" Foreground="#424242"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button x:Name="BackBtn" Content="◀ Indietro" Style="{StaticResource SecondaryButton}" Click="Back_Click" IsEnabled="False"/>
+                    <Button x:Name="NextBtn" Content="Avanti ▶" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Click="Next_Click"/>
+                    <Button x:Name="ExportBtn" Content="Esporta" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Click="Export_Click" Visibility="Collapsed"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

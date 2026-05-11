@@ -1,0 +1,24 @@
+{
+  "visual": {
+    "name": "RevitCortexSelection",
+    "displayName": "RevitCortex Selection",
+    "guid": "revitcortexselectionvisual1A2B3C4D",
+    "visualClassName": "RevitCortexSelectionVisual",
+    "version": "1.0.0.0",
+    "description": "Select Revit elements from a Power BI Desktop report",
+    "supportUrl": "https://github.com/LuDattilo/revitcortex-releases",
+    "gitHubUrl": ""
+  },
+  "author": {
+    "name": "GPA Ingegneria Srl",
+    "email": "luigi.dattilo@gpapartners.com"
+  },
+  "apiVersion": "5.3.0",
+  "assets": {
+    "icon": "assets/icon.png"
+  },
+  "externalJS": [],
+  "style": "style/visual.less",
+  "capabilities": "capabilities.json",
+  "dependencies": null
+}

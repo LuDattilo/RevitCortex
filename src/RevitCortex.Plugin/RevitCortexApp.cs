@@ -6,9 +6,11 @@ using RevitCortex.Core.Session;
 using RevitCortex.Plugin.Caching;
 using RevitCortex.Plugin.Communication;
 using RevitCortex.Plugin.Discovery;
+using RevitCortex.Plugin.PowerBiLive;
 using RevitCortex.Plugin.Threading;
 using RevitCortex.Plugin.UI;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace RevitCortex.Plugin;
@@ -23,6 +25,9 @@ public class RevitCortexApp : IExternalApplication
     private int _port = 8080;
     private Autodesk.Revit.UI.PushButton? _connectButton;
     private bool _updateNotificationShown;
+    private PbiSelectHttpListener? _pbiSelectListener;
+    private PbiSelectionEventHandler? _pbiSelectionHandler;
+    private ExternalEvent? _pbiSelectionEvent;
 
     public static RevitCortexApp? Instance { get; private set; }
 
@@ -84,6 +89,11 @@ public class RevitCortexApp : IExternalApplication
                 _router.RegisterToolsFromAssembly(toolsAssembly);
             }
 
+            // Also scan the Plugin assembly itself: a few tools (Power BI Live
+            // auth/REST) live here because they depend on MSAL.NET which is
+            // referenced by the Plugin, not the Tools project.
+            _router.RegisterToolsFromAssembly(Assembly.GetExecutingAssembly());
+
             // Create thread dispatcher for Revit main thread execution
             var executionHandler = new ToolExecutionHandler();
             var externalEvent = ExternalEvent.Create(executionHandler);
@@ -100,6 +110,11 @@ public class RevitCortexApp : IExternalApplication
             // notification window (or OnIdling shows it if Revit is already idle).
             RevitCortex.Plugin.Updates.UpdateChecker.UpdateAvailable += OnUpdateAvailable;
             RevitCortex.Plugin.Updates.UpdateChecker.CheckInBackground();
+
+            // Create the PBI selection ExternalEvent (registered once at startup,
+            // used whenever the Power BI Desktop visual sends a pbi-select request)
+            _pbiSelectionHandler = new PbiSelectionEventHandler();
+            _pbiSelectionEvent = ExternalEvent.Create(_pbiSelectionHandler);
 
             // Create socket service but do NOT start automatically
             _socketService = new SocketService(_router, _port);
@@ -133,6 +148,8 @@ public class RevitCortexApp : IExternalApplication
     {
         try
         {
+            _pbiSelectListener?.Dispose();
+            _pbiSelectListener = null;
             _socketService?.Stop();
             application.ControlledApplication.DocumentOpened -= OnDocumentOpened;
             application.ControlledApplication.DocumentClosing -= OnDocumentClosing;
@@ -170,6 +187,40 @@ public class RevitCortexApp : IExternalApplication
             }
 
             _socketService.Start();
+
+            // Start PBI Desktop → Revit HTTP listener on port 27016
+            if (_pbiSelectListener == null && _pbiSelectionHandler != null && _pbiSelectionEvent != null)
+            {
+                var handler = _pbiSelectionHandler;
+                var evt = _pbiSelectionEvent;
+                var app = _uiApplication;
+                _pbiSelectListener = new PbiSelectHttpListener(
+                    handleSelection: (rawIds, action) =>
+                    {
+                        var doc = app?.ActiveUIDocument?.Document;
+                        if (doc == null) return null;
+
+                        // Validate ElementIds and queue selection on main thread
+                        var validIds = new List<ElementId>(rawIds.Count);
+                        foreach (var idVal in rawIds)
+                        {
+#if REVIT2024_OR_GREATER
+                            var eid = new ElementId(idVal);
+#else
+                            var eid = new ElementId((int)idVal);
+#endif
+                            if (doc.GetElement(eid) != null)
+                                validIds.Add(eid);
+                        }
+
+                        handler.Prepare(validIds, action);
+                        evt.Raise();
+                        return validIds.Count.ToString();
+                    },
+                    port: 27016);
+                _pbiSelectListener.Start();
+            }
+
             UpdateConnectionButtonIcon();
             ServiceStateChanged?.Invoke();
         }
@@ -177,6 +228,8 @@ public class RevitCortexApp : IExternalApplication
 
     public void StopService()
     {
+        _pbiSelectListener?.Stop();
+        _pbiSelectListener = null;
         _socketService?.Stop();
         UpdateConnectionButtonIcon();
         ServiceStateChanged?.Invoke();
@@ -215,6 +268,19 @@ public class RevitCortexApp : IExternalApplication
         settingsBtn.Image = IconFactory.CreateSettingsIcon(16);
         settingsBtn.LargeImage = IconFactory.CreateSettingsIcon(32);
         panel.AddItem(settingsBtn);
+
+        // Power BI export button
+        var powerBiBtn = new PushButtonData(
+            "ID_CORTEX_POWERBI", "Power BI\r\nExport",
+            assemblyLocation, "RevitCortex.Plugin.Commands.OpenPowerBiExport");
+        powerBiBtn.ToolTip = "Esporta dati e parametri in CSV per Power BI";
+        powerBiBtn.LongDescription =
+            "Apre il wizard di export Power BI: scegli categorie e parametri, " +
+            "salva profili riutilizzabili, abilita auto-export al salvataggio e " +
+            "registra il protocol handler revitcortex:// per drillthrough da PBI a Revit.";
+        powerBiBtn.Image = IconFactory.CreatePowerBiIcon(16);
+        powerBiBtn.LargeImage = IconFactory.CreatePowerBiIcon(32);
+        panel.AddItem(powerBiBtn);
 
         // Send support report button
         var supportBtn = new PushButtonData(
