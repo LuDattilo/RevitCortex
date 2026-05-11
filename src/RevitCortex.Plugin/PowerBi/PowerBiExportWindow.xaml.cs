@@ -360,7 +360,18 @@ public partial class PowerBiExportWindow : Window
             ModelCategoriesTab.Header = $"Model Categories ({_filteredModelCategories.Count}{(totalModelSelected > 0 ? $" · {totalModelSelected}✓" : "")})";
             AnnotationCategoriesTab.Header = $"Annotation Categories ({_filteredAnnotationCategories.Count}{(totalAnnoSelected > 0 ? $" · {totalAnnoSelected}✓" : "")})";
             AnalyticalCategoriesTab.Header = $"Analytical Model Categories ({_filteredAnalyticalCategories.Count}{(totalAnalSelected > 0 ? $" · {totalAnalSelected}✓" : "")})";
-            OtherCategoriesTab.Header = $"Altre ({_filteredOtherCategories.Count}{(totalOtherSelected > 0 ? $" · {totalOtherSelected}✓" : "")})";
+
+            // "Altre" tab: show only when non-empty (should not happen after Internal filtering,
+            // but kept as a safety net for unknown category types).
+            if (_filteredOtherCategories.Count > 0)
+            {
+                OtherCategoriesTab.Visibility = System.Windows.Visibility.Visible;
+                OtherCategoriesTab.Header = $"Altre ({_filteredOtherCategories.Count}{(totalOtherSelected > 0 ? $" · {totalOtherSelected}✓" : "")})";
+            }
+            else
+            {
+                OtherCategoriesTab.Visibility = System.Windows.Visibility.Collapsed;
+            }
         }
         catch { /* tab elements may be null during initialize */ }
     }

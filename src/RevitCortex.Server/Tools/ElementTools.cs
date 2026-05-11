@@ -469,6 +469,56 @@ public static class ElementTools
         return result.ToString();
     }
 
+    [McpServerTool(Name = "pbi_list_datasets"), Description("Lists push datasets in a Power BI workspace. Useful for finding an existing RevitCortex dataset before publishing. Read-only.")]
+    public static async Task<string> PbiListDatasets(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID — obtained from pbi_list_workspaces.")] string workspaceId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["workspaceId"] = workspaceId };
+        var result = await revit.ExecuteAsync("pbi_list_datasets", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_create_dataset"), Description("Creates a RevitCortex push dataset in a Power BI workspace. Idempotent: if a dataset with the same name already exists, returns its id without creating a duplicate. Default tables: Metadata, Elements, Selection.")]
+    public static async Task<string> PbiCreateDataset(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID.")] string workspaceId,
+        [Description("Dataset name. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("Tables to include. Allowed: Metadata, Elements, Schedules, ElementParameters, Selection. Default: [Metadata, Elements, Selection].")] string[]? tables = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["workspaceId"] = workspaceId };
+        if (datasetName != null) p["datasetName"] = datasetName;
+        if (tables != null) p["tables"] = new JArray(tables);
+        var result = await revit.ExecuteAsync("pbi_create_dataset", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_publish_elements"), Description("Publishes Revit model elements to a Power BI push dataset (Elements table). Supports replace (full snapshot, clears old rows), append (keeps old rows), and create (auto-create dataset if missing then replace). Snapshot runs on the Revit main thread; HTTP publish runs in the background.")]
+    public static async Task<string> PbiPublishElements(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID.")] string workspaceId,
+        [Description("Existing dataset id. If omitted, the dataset is looked up by datasetName (and created if mode allows).")] string? datasetId = null,
+        [Description("Dataset name used for lookup/create. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("Publish mode: 'replace' (default, delete rows then post snapshot), 'append' (add rows, keep existing), 'create' (auto-create if missing then replace).")] string mode = "replace",
+        [Description("OST category codes to filter elements, e.g. [\"OST_Walls\",\"OST_Doors\"]. Omit to export all model elements.")] string[]? categoryFilter = null,
+        [Description("Maximum number of elements to export. Default 10000.")] int maxElements = 10000,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["workspaceId"] = workspaceId,
+            ["mode"] = mode,
+            ["maxElements"] = maxElements
+        };
+        if (datasetId != null) p["datasetId"] = datasetId;
+        if (datasetName != null) p["datasetName"] = datasetName;
+        if (categoryFilter != null) p["categoryFilter"] = new JArray(categoryFilter);
+        var result = await revit.ExecuteAsync("pbi_publish_elements", p, ct);
+        return result.ToString();
+    }
+
     [McpServerTool(Name = "import_from_powerbi"), Description("Reads a previously-exported (or hand-edited) Power BI CSV and writes parameter values back to Revit elements. Identifies elements via the ElementId column. Built-in fields and read-only parameters are skipped. Defaults to dryRun=true so callers can preview first.")]
     public static async Task<string> ImportFromPowerBi(
         RevitConnectionManager revit,

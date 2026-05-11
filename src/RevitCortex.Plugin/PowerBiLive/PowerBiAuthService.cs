@@ -52,13 +52,17 @@ public class PowerBiAuthService
     /// </summary>
     public async Task<AuthState> TryAcquireSilentAsync(CancellationToken ct = default)
     {
-        var accounts = (await _app.GetAccountsAsync()).ToList();
+        // ConfigureAwait(false) throughout so MSAL continuations never try to
+        // marshal back to the Revit/WPF SynchronizationContext — that would
+        // deadlock when the caller blocks with .GetAwaiter().GetResult().
+        var accounts = (await _app.GetAccountsAsync().ConfigureAwait(false)).ToList();
         if (accounts.Count == 0) return AuthState.NotSignedIn();
 
         var first = accounts[0];
         try
         {
-            var result = await _app.AcquireTokenSilent(DefaultScopes, first).ExecuteAsync(ct);
+            var result = await _app.AcquireTokenSilent(DefaultScopes, first)
+                .ExecuteAsync(ct).ConfigureAwait(false);
             return AuthState.SignedIn(result);
         }
         catch (MsalUiRequiredException)
@@ -86,7 +90,7 @@ public class PowerBiAuthService
                     onCodeReceived(dcr);
                     return Task.CompletedTask;
                 })
-                .ExecuteAsync(ct);
+                .ExecuteAsync(ct).ConfigureAwait(false);
             return AuthState.SignedIn(result);
         }
         catch (Exception ex)
@@ -97,9 +101,9 @@ public class PowerBiAuthService
 
     public async Task SignOutAsync()
     {
-        var accounts = await _app.GetAccountsAsync();
+        var accounts = await _app.GetAccountsAsync().ConfigureAwait(false);
         foreach (var a in accounts)
-            await _app.RemoveAsync(a);
+            await _app.RemoveAsync(a).ConfigureAwait(false);
         try { if (File.Exists(CacheFilePath)) File.Delete(CacheFilePath); } catch { }
     }
 

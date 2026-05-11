@@ -16,78 +16,120 @@ namespace RevitCortex.Plugin.PowerBi;
 public class ParameterDiscoveryService
 {
     /// <summary>
-    /// Returns every Model category that has at least one instance in the document,
-    /// with the instance count. Sorted alphabetically by display name.
+    /// Returns all non-Internal categories from the document, with instance counts
+    /// for categories that have elements. Uses doc.Settings.Categories as the
+    /// authoritative source (same as Visibility/Graphics) so the tab split is
+    /// identical to Revit's own V/G dialog: Model / Annotation / AnalyticalModel.
+    /// Only categories that appear in V/G (i.e. non-Internal) are returned.
+    /// Instance count is set to 0 for categories with no instances — callers can
+    /// filter these out or show them greyed.
     /// </summary>
     public List<CategoryInfo> DiscoverCategories(Document doc, CancellationToken ct = default)
     {
-        // Use long as the universal key — works for net48 (where IntegerValue is int)
-        // and net8 (where ElementId.Value is long). BuiltInCategory enum may have
-        // either int or long underlying type depending on the Revit version, so we
-        // reflect on it once and cast through Convert to dodge ArgumentException.
-        var counts = new Dictionary<long, int>();
-        var bicById = new Dictionary<long, BuiltInCategory>();
-        var displayById = new Dictionary<long, string>();
-        var typeById = new Dictionary<long, string>();
+        var bicUnderlying = Enum.GetUnderlyingType(typeof(BuiltInCategory));
 
-        var bicEnumType = typeof(BuiltInCategory);
-        var bicUnderlying = Enum.GetUnderlyingType(bicEnumType);
+        // ── Step 1: build the category registry from doc.Settings.Categories ──
+        // This is the same source Revit uses for Visibility/Graphics — it gives us
+        // the correct CategoryType for every category without having to iterate elements.
+        var registry = new Dictionary<long, CategoryInfo>();
 
-        var iter = new FilteredElementCollector(doc).WhereElementIsNotElementType().GetElementIterator();
-        while (iter.MoveNext())
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            var elem = iter.Current;
-            if (elem == null) continue;
-
-            Category? cat = null;
-            try { cat = elem.Category; } catch { continue; }
-            if (cat == null) continue;
-
-            long idValue;
-            try { idValue = GetCategoryIdValueLong(cat.Id); } catch { continue; }
-
-            if (!counts.ContainsKey(idValue))
+            foreach (Category cat in doc.Settings.Categories)
             {
-                counts[idValue] = 0;
+                ct.ThrowIfCancellationRequested();
+                if (cat == null) continue;
 
-                // Match BuiltInCategory by name based on Category.Id, avoiding
-                // Enum.IsDefined which throws when the value type doesn't match
-                // the enum's underlying type.
+                // Skip Internal — sketch lines, area boundaries, sun path, etc.
+                if (IsInternalCategory(cat)) continue;
+
+                long idValue;
+                try { idValue = GetCategoryIdValueLong(cat.Id); } catch { continue; }
+                if (registry.ContainsKey(idValue)) continue;
+
+                string display;
+                try { display = cat.Name ?? $"Category {idValue}"; }
+                catch { display = $"Category {idValue}"; }
+
+                string catType;
+                try { catType = ClassifyCategoryType(cat); }
+                catch { catType = "Model"; }
+
                 BuiltInCategory? bic = TryGetBuiltInCategory(idValue, bicUnderlying);
-                if (bic.HasValue) bicById[idValue] = bic.Value;
+                string ost = bic.HasValue ? bic.Value.ToString() : $"OST_{idValue}";
 
-                try { displayById[idValue] = cat.Name ?? $"Category {idValue}"; }
-                catch { displayById[idValue] = $"Category {idValue}"; }
-
-                // Capture Revit's CategoryType so the UI can split categories
-                // into Model/Annotation/Analytical tabs like V/G overrides.
-                try { typeById[idValue] = ClassifyCategoryType(cat); }
-                catch { typeById[idValue] = "Model"; }
+                registry[idValue] = new CategoryInfo
+                {
+                    OstCode = ost,
+                    DisplayName = display,
+                    InstanceCount = 0,
+                    CategoryType = catType
+                };
             }
-            counts[idValue]++;
         }
-
-        var result = new List<CategoryInfo>();
-        foreach (var kvp in counts)
+        catch (Exception)
         {
-            ct.ThrowIfCancellationRequested();
-            string display = displayById.TryGetValue(kvp.Key, out var d) ? d : $"Category {kvp.Key}";
-            string ost = bicById.ContainsKey(kvp.Key)
-                ? bicById[kvp.Key].ToString()
-                : "OST_" + kvp.Key;
-
-            string catType = typeById.TryGetValue(kvp.Key, out var t) ? t : "Model";
-            result.Add(new CategoryInfo
-            {
-                OstCode = ost,
-                DisplayName = display,
-                InstanceCount = kvp.Value,
-                CategoryType = catType
-            });
+            // If Settings.Categories fails entirely fall through to element-based fallback
         }
 
-        return result.OrderBy(c => c.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
+        // ── Step 2: count instances per category ──
+        // We iterate elements only to get the counts — category classification
+        // already comes from Step 1.
+        var skippedIds = new HashSet<long>();
+
+        try
+        {
+            var iter = new FilteredElementCollector(doc)
+                .WhereElementIsNotElementType()
+                .GetElementIterator();
+
+            while (iter.MoveNext())
+            {
+                ct.ThrowIfCancellationRequested();
+                var elem = iter.Current;
+                if (elem == null) continue;
+
+                Category? cat = null;
+                try { cat = elem.Category; } catch { continue; }
+                if (cat == null) continue;
+
+                long idValue;
+                try { idValue = GetCategoryIdValueLong(cat.Id); } catch { continue; }
+
+                if (skippedIds.Contains(idValue)) continue;
+
+                if (registry.TryGetValue(idValue, out var info))
+                {
+                    info.InstanceCount++;
+                }
+                else
+                {
+                    // Category not in Settings.Categories — likely Internal; skip it.
+                    skippedIds.Add(idValue);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Count step failure is non-fatal — we still return the category list
+        }
+
+        // Return only categories with at least one instance (or all if registry only)
+        return registry.Values
+            .Where(c => c.InstanceCount > 0)
+            .OrderBy(c => c.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Returns true if the category should be excluded from the PBI export wizard.
+    /// Revit's CategoryType.Internal includes sketch lines, area boundaries, sun path
+    /// and other internal primitives that are never useful in a BI context.
+    /// </summary>
+    public static bool IsInternalCategory(Category cat)
+    {
+        try { return cat.CategoryType == CategoryType.Internal; }
+        catch { return false; }
     }
 
     private static string ClassifyCategoryType(Category cat)
@@ -95,13 +137,12 @@ public class ParameterDiscoveryService
         try
         {
             // Revit's CategoryType: Model, Annotation, Internal, AnalyticalModel.
-            // We surface "Imported" as a 5th bucket (CAD/IFC links) — handled below.
+            // Internal is filtered out before we get here (see DiscoverCategories).
             switch (cat.CategoryType)
             {
                 case CategoryType.Model: return "Model";
                 case CategoryType.Annotation: return "Annotation";
                 case CategoryType.AnalyticalModel: return "Analytical";
-                case CategoryType.Internal: return "Internal";
                 default: return "Model";
             }
         }

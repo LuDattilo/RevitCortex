@@ -210,7 +210,7 @@
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
-                        <TabItem x:Name="OtherCategoriesTab" Header="Altre">
+                        <TabItem x:Name="OtherCategoriesTab" Header="Altre" Visibility="Collapsed">
                             <DataGrid x:Name="OtherDataGrid"
                                       AutoGenerateColumns="False"
                                       CanUserAddRows="False"
