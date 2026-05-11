@@ -640,3 +640,24 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 - Non usare `mode="append"` per un refresh completo → usare `replace`
 
 **Fonte:** Phase 1 del piano PBI Live, implementato 2026-05-11, validato end-to-end sullo stesso giorno
+
+---
+
+### PBI Live — Phase 2A: Publish Selection
+
+Publish the current Revit selection to the Power BI Selection table.
+
+**Prerequisite:** A ProjectBinding must exist (run `pbi_publish_elements` once first).
+
+**Flow:**
+1. Select elements in Revit
+2. Call `pbi_publish_selection` (no params needed if binding exists)
+3. In Power BI, filter/visualize the Selection table by `SelectionSetId` or `ElementId`
+
+**Tool:** `pbi_publish_selection(clearIfEmpty?)`
+
+**Key behaviors:**
+- Replace semantics: each call DELETEs previous rows and POSTs the new snapshot
+- Empty selection with `clearIfEmpty=false` (default): returns warning, table unchanged
+- Empty selection with `clearIfEmpty=true`: clears the table
+- Stale binding (dataset manually deleted): falls back to name-lookup (same as publish_elements)

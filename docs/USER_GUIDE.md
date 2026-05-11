@@ -265,6 +265,7 @@ Integrazione diretta con Power BI push datasets (senza file intermedi).
 | `pbi_publish_elements` | Pubblica snapshot elementi → tabella Elements (replace/append/create) |
 | `pbi_publish_schedules` | Pubblica schedule → tabella Schedules long-form (una riga per cella) |
 | `pbi_get_binding` | Mostra il binding workspace/dataset salvato per il documento attivo |
+| `pbi_publish_selection` | Pubblica la selezione Revit corrente nella tabella Selection del dataset PBI | workspaceId?, datasetId?, datasetName?, clearIfEmpty? |
 | `pbi_sign_out` | Revoca il token MSAL; necessario per cambiare account |
 
 **Flusso tipico (primo utilizzo):**
