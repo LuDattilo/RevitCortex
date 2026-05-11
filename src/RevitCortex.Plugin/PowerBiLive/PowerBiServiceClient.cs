@@ -164,6 +164,47 @@ public class PowerBiServiceClient : IDisposable
         await SendWithRetryAsync(new HttpRequestMessage(HttpMethod.Delete, url), ct);
     }
 
+    // ─── DAX Queries ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// POST groups/{workspaceId}/datasets/{datasetId}/executeQueries with a DAX query.
+    /// Returns the list of Int64 ElementId values from the first [ElementId] column in the result.
+    ///
+    /// Requires the Power BI tenant setting "ExecuteQueries.Execute.All" to be enabled.
+    /// Returns an empty list (not an exception) when the query returns zero rows.
+    /// </summary>
+    public async Task<List<long>> ExecuteQueryAsync(
+        string workspaceId,
+        string datasetId,
+        string daxQuery,
+        CancellationToken ct = default)
+    {
+        var url = $"groups/{workspaceId}/datasets/{datasetId}/executeQueries";
+        var body = new
+        {
+            queries = new[] { new { query = daxQuery } },
+            serializerSettings = new { includeNulls = true }
+        };
+        var resp = await PostAsync(url, body, ct).ConfigureAwait(false);
+        return ParseElementIds(resp);
+    }
+
+    private static List<long> ParseElementIds(JObject responseRoot)
+    {
+        var result = new List<long>();
+        var rows = responseRoot["results"]?[0]?["tables"]?[0]?["rows"] as JArray;
+        if (rows == null) return result;
+        foreach (var row in rows)
+        {
+            // Power BI may return "[ElementId]" (bracketed) or "ElementId" (plain)
+            var val = row["[ElementId]"] ?? row["ElementId"];
+            if (val == null) continue;
+            try { result.Add(val.Value<long>()); }
+            catch { /* skip unparseable values */ }
+        }
+        return result;
+    }
+
     // ─── HTTP helpers ─────────────────────────────────────────────────────────
 
     private async Task<JObject> GetAsync(string relUrl, CancellationToken ct)
