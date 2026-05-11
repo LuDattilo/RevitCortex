@@ -98,6 +98,7 @@ public class PbiPublishSelectionTool : ICortexTool
 
         // Read current selection
         List<Dictionary<string, object?>> selectionRows;
+        string exportRunId;
         try
         {
             var uiDoc = new UIDocument(doc);
@@ -117,7 +118,7 @@ public class PbiPublishSelectionTool : ICortexTool
                 });
             }
 
-            var exportRunId = Guid.NewGuid().ToString();
+            exportRunId = Guid.NewGuid().ToString();
             var exportedAt = DateTime.UtcNow;
             var docGuid = "";
             var projectId = docKey;
@@ -198,10 +199,9 @@ public class PbiPublishSelectionTool : ICortexTool
                 datasetId = result.DatasetId,
                 datasetName,
                 table = PowerBiDatasetSchema.TableSelection,
-                exportRunId = selectionRows.Count > 0
-                    ? selectionRows[0]["SelectionSetId"]?.ToString()
-                    : null,
+                exportRunId = selectionRows.Count > 0 ? exportRunId : null,
                 rowCount = result.RowCount,
+                batchCount = 0,
                 durationMs = sw.ElapsedMilliseconds
             });
         }
