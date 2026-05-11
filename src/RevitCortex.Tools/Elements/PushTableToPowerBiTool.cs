@@ -106,6 +106,42 @@ public class PushTableToPowerBiTool : ICortexTool
 
         try
         {
+            // ElementId integrity check: without it, PBI loses the relationship
+            // back to the Elements master table. We allow the table to be written
+            // anyway (some callers push aggregated data without per-row elements),
+            // but the caller must see a loud warning in the response.
+            var elementIdColumn = input["elementIdColumn"]?.Value<string>();
+            int elementIdIndex = -1;
+            if (!string.IsNullOrEmpty(elementIdColumn))
+            {
+                elementIdIndex = headers.FindIndex(h =>
+                    string.Equals(h, elementIdColumn, StringComparison.OrdinalIgnoreCase));
+            }
+            if (elementIdIndex < 0)
+            {
+                elementIdIndex = headers.FindIndex(h =>
+                    string.Equals(h, "ElementId", StringComparison.OrdinalIgnoreCase));
+            }
+            bool hasElementId = elementIdIndex >= 0;
+
+            // If found at a non-first position, normalize: move it to column 0 so
+            // PBI auto-detect picks it as join key. This is a cheap re-ordering.
+            if (hasElementId && elementIdIndex != 0)
+            {
+                var moved = headers[elementIdIndex];
+                headers.RemoveAt(elementIdIndex);
+                headers.Insert(0, moved);
+                foreach (var row in rows)
+                {
+                    if (elementIdIndex < row.Count)
+                    {
+                        var v = row[elementIdIndex];
+                        row.RemoveAt(elementIdIndex);
+                        row.Insert(0, v);
+                    }
+                }
+            }
+
             var sb = new StringBuilder();
             sb.AppendLine(string.Join(",", headers.Select(CsvEscape)));
             foreach (var row in rows)
@@ -123,7 +159,8 @@ public class PushTableToPowerBiTool : ICortexTool
                 ["mode"] = "table",
                 ["row_count"] = rows.Count,
                 ["column_count"] = headers.Count,
-                ["file"] = fileName
+                ["file"] = fileName,
+                ["has_element_id"] = hasElementId
             };
             File.WriteAllText(metaPath, meta.ToString(), Encoding.UTF8);
 
@@ -133,6 +170,9 @@ public class PushTableToPowerBiTool : ICortexTool
                 metaPath,
                 rowCount = rows.Count,
                 columnCount = headers.Count,
+                hasElementId,
+                warning = hasElementId ? null :
+                    "No ElementId column detected. PBI cannot join this table to the Elements master without an ElementId column. Pass elementIdColumn=\"<header>\" to map an existing column, or add an 'ElementId' header to the input.",
                 tip = "Power BI: 'Get Data → Folder' on the parent path picks up this file together with push_to_powerbi exports."
             });
         }
