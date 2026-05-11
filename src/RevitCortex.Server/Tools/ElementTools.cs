@@ -519,6 +519,30 @@ public static class ElementTools
         return result.ToString();
     }
 
+    [McpServerTool(Name = "pbi_publish_schedules"), Description("Publishes Revit schedules to the Power BI Schedules table in long-form (one row per cell). Supports replace and append modes. Snapshot runs on the Revit main thread; HTTP publish runs in the background.")]
+    public static async Task<string> PbiPublishSchedules(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID.")] string workspaceId,
+        [Description("Existing dataset id. If omitted, looked up by datasetName.")] string? datasetId = null,
+        [Description("Dataset name used for lookup. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("Specific schedule element ids to export. Omit to export all non-template schedules.")] long[]? scheduleIds = null,
+        [Description("Publish mode: 'replace' (default, clears existing rows) or 'append'.")] string mode = "replace",
+        [Description("Maximum rows per schedule to export. Default 5000.")] int maxRowsPerSchedule = 5000,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["workspaceId"] = workspaceId,
+            ["mode"] = mode,
+            ["maxRowsPerSchedule"] = maxRowsPerSchedule
+        };
+        if (datasetId != null) p["datasetId"] = datasetId;
+        if (datasetName != null) p["datasetName"] = datasetName;
+        if (scheduleIds != null) p["scheduleIds"] = new JArray(scheduleIds);
+        var result = await revit.ExecuteAsync("pbi_publish_schedules", p, ct);
+        return result.ToString();
+    }
+
     [McpServerTool(Name = "import_from_powerbi"), Description("Reads a previously-exported (or hand-edited) Power BI CSV and writes parameter values back to Revit elements. Identifies elements via the ElementId column. Built-in fields and read-only parameters are skipped. Defaults to dryRun=true so callers can preview first.")]
     public static async Task<string> ImportFromPowerBi(
         RevitConnectionManager revit,
