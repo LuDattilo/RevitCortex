@@ -578,6 +578,37 @@ public static class ElementTools
         return result.ToString();
     }
 
+    [McpServerTool(Name = "pbi_query"), Description("Executes a DAX query against the bound Power BI dataset and selects matching elements in Revit. Use template params (category, level, parameterName+parameterValue, exportRunId) for common filters, or supply a raw daxQuery for advanced queries. action='isolate' temporarily isolates the elements instead of selecting. workspaceId and datasetId can be omitted when a ProjectBinding exists. Returns elementCount=0 with a warning when no elements match.")]
+    public static async Task<string> PbiQuery(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID. Can be omitted if a ProjectBinding exists.")] string? workspaceId = null,
+        [Description("Existing dataset id. If omitted, resolved from ProjectBinding or looked up by datasetName.")] string? datasetId = null,
+        [Description("Dataset name for lookup. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("OST category code to filter by, e.g. 'OST_Walls'. Applied as Elements[Category] = value.")] string? category = null,
+        [Description("Level name to filter by, e.g. 'Level 1'. Applied as Elements[Level] = value.")] string? level = null,
+        [Description("Column name in the Elements table to filter by, e.g. 'Mark'. Requires parameterValue.")] string? parameterName = null,
+        [Description("Value to match for parameterName. String equality match. Requires parameterName.")] string? parameterValue = null,
+        [Description("ExportRunId GUID from a previous pbi_publish_elements run, to reselect that exact snapshot.")] string? exportRunId = null,
+        [Description("Raw DAX query starting with EVALUATE. Overrides all template params. Example: EVALUATE SELECTCOLUMNS(FILTER(Elements, Elements[Area] > 50), \"ElementId\", Elements[ElementId])")] string? daxQuery = null,
+        [Description("'select' (default) or 'isolate' — isolate temporarily hides all other elements in the active view.")] string? action = null,
+        [Description("Maximum number of ElementIds to select. Default: 5000.")] int maxElements = 5000,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["maxElements"] = maxElements };
+        if (workspaceId    != null) p["workspaceId"]    = workspaceId;
+        if (datasetId      != null) p["datasetId"]      = datasetId;
+        if (datasetName    != null) p["datasetName"]    = datasetName;
+        if (category       != null) p["category"]       = category;
+        if (level          != null) p["level"]          = level;
+        if (parameterName  != null) p["parameterName"]  = parameterName;
+        if (parameterValue != null) p["parameterValue"] = parameterValue;
+        if (exportRunId    != null) p["exportRunId"]    = exportRunId;
+        if (daxQuery       != null) p["daxQuery"]       = daxQuery;
+        if (action         != null) p["action"]         = action;
+        var result = await revit.ExecuteAsync("pbi_query", p, ct);
+        return result.ToString();
+    }
+
     [McpServerTool(Name = "import_from_powerbi"), Description("Reads a previously-exported (or hand-edited) Power BI CSV and writes parameter values back to Revit elements. Identifies elements via the ElementId column. Built-in fields and read-only parameters are skipped. Defaults to dryRun=true so callers can preview first.")]
     public static async Task<string> ImportFromPowerBi(
         RevitConnectionManager revit,
