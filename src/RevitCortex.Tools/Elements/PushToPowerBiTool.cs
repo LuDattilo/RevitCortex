@@ -195,10 +195,19 @@ public class PushToPowerBiTool : ICortexTool
             {
                 // ── Explicit mapping mode: user-defined columns ──
                 var mappings = ParseMappings(columnMappingsRaw);
-                columnCount = mappings.Count;
 
-                // Header line uses each mapping's Header (or fallback to source name)
-                sb.AppendLine(ToCsvRow(mappings.Select(m => CsvEscape(EffectiveHeader(m)))));
+                // ElementId is forced as first column even in explicit mapping mode,
+                // because losing the join key silently breaks PBI relationships.
+                // The CSV header always starts with "ElementId".
+                bool userHasElementId = mappings.Any(m =>
+                    string.Equals(EffectiveHeader(m), "ElementId", StringComparison.OrdinalIgnoreCase));
+
+                var headers = new List<string>();
+                if (!userHasElementId) headers.Add("ElementId");
+                headers.AddRange(mappings.Select(m => EffectiveHeader(m)));
+                columnCount = headers.Count;
+
+                sb.AppendLine(ToCsvRow(headers.Select(CsvEscape)));
 
                 foreach (var elem in elemList)
                 {
@@ -209,7 +218,9 @@ public class PushToPowerBiTool : ICortexTool
                         typeCache[typeId] = typeElem;
                     }
 
-                    var row = new List<string>(mappings.Count);
+                    var row = new List<string>(headers.Count);
+                    if (!userHasElementId)
+                        row.Add(ToolHelpers.GetElementIdValue(elem.Id).ToString(System.Globalization.CultureInfo.InvariantCulture));
                     foreach (var m in mappings)
                     {
                         var raw = ResolveMappingValue(elem, typeElem as ElementType, m);
@@ -334,30 +345,95 @@ public class PushToPowerBiTool : ICortexTool
 
             try
             {
+                // Schedule rows are sourced per-element (FilteredElementCollector
+                // on the schedule's id), not by reading body cells. This gives us
+                // a reliable ElementId per row and skips group/total rows that
+                // have no element backing.
                 var sb = new StringBuilder();
-                var data = view.GetTableData();
-                var body = data.GetSectionData(SectionType.Body);
-                int colCount = body.NumberOfColumns;
-                int rowCount = body.NumberOfRows;
 
-                // Header row from schedule header section
-                var headerCells = new List<string>();
-                for (int c = 0; c < colCount; c++)
+                // Resolve schedule fields (heading + parameter binding)
+                var def = view.Definition;
+                int fieldCount = def?.GetFieldCount() ?? 0;
+                var fieldHeadings = new List<string>(fieldCount);
+                var fieldBips = new List<BuiltInParameter?>(fieldCount);
+                for (int i = 0; i < fieldCount; i++)
                 {
-                    var h = view.GetCellText(SectionType.Header, 0, c);
-                    if (string.IsNullOrEmpty(h)) h = $"Col{c + 1}";
-                    headerCells.Add(CsvEscape(h));
+                    string heading = $"Col{i + 1}";
+                    BuiltInParameter? bip = null;
+                    try
+                    {
+                        var f = def!.GetField(i);
+                        if (f != null && !f.IsHidden)
+                        {
+                            heading = !string.IsNullOrEmpty(f.ColumnHeading) ? f.ColumnHeading :
+                                      (f.GetName() ?? heading);
+                            if (f.ParameterId != null && f.ParameterId != ElementId.InvalidElementId)
+                            {
+                                long pid = ToolHelpers.GetElementIdValue(f.ParameterId);
+                                if (pid < 0) bip = (BuiltInParameter)pid;
+                            }
+                        }
+                        else
+                        {
+                            continue; // skip hidden field
+                        }
+                    }
+                    catch { continue; }
+                    fieldHeadings.Add(heading);
+                    fieldBips.Add(bip);
                 }
+
+                // ElementId is always the first column — required for Elements ↔ Schedule join in PBI
+                var headerCells = new List<string> { "ElementId" };
+                headerCells.AddRange(fieldHeadings.Select(CsvEscape));
                 sb.AppendLine(string.Join(",", headerCells));
 
-                // Body rows: skip the header row at index 0 (Revit duplicates it in body)
+                // Enumerate elements visible in the schedule
+                var schedElements = new FilteredElementCollector(doc, view.Id)
+                    .WhereElementIsNotElementType()
+                    .ToElements();
+
                 int written_rows = 0;
-                for (int r = 1; r < rowCount; r++)
+                foreach (var elem in schedElements)
                 {
-                    var rowCells = new List<string>(colCount);
-                    for (int c = 0; c < colCount; c++)
-                        rowCells.Add(CsvEscape(view.GetCellText(SectionType.Body, r, c)));
-                    sb.AppendLine(string.Join(",", rowCells));
+                    if (elem == null) continue;
+
+                    Element? elemType = null;
+                    try
+                    {
+                        var typeId = elem.GetTypeId();
+                        if (typeId != null && typeId != ElementId.InvalidElementId)
+                            elemType = doc.GetElement(typeId);
+                    }
+                    catch { }
+
+                    var row = new List<string>(fieldHeadings.Count + 1)
+                    {
+                        ToolHelpers.GetElementIdValue(elem.Id).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    };
+                    for (int i = 0; i < fieldHeadings.Count; i++)
+                    {
+                        var bip = fieldBips[i];
+                        Parameter? p = null;
+                        if (bip.HasValue)
+                        {
+                            try { p = elem.get_Parameter(bip.Value); } catch { }
+                            if ((p == null || !p.HasValue) && elemType != null)
+                            {
+                                try { p = elemType.get_Parameter(bip.Value); } catch { }
+                            }
+                        }
+                        else
+                        {
+                            try { p = elem.LookupParameter(fieldHeadings[i]); } catch { }
+                            if ((p == null || !p.HasValue) && elemType != null)
+                            {
+                                try { p = elemType.LookupParameter(fieldHeadings[i]); } catch { }
+                            }
+                        }
+                        row.Add(CsvEscape(p != null ? GetParamDisplayValue(p) : ""));
+                    }
+                    sb.AppendLine(string.Join(",", row));
                     written_rows++;
                 }
 
@@ -368,7 +444,7 @@ public class PushToPowerBiTool : ICortexTool
                     schedule = view.Name,
                     scheduleId = schId,
                     file = csvPath,
-                    columns = colCount,
+                    columns = fieldHeadings.Count + 1,
                     rows = written_rows
                 });
             }
