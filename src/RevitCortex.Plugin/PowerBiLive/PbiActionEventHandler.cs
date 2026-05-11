@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -171,7 +172,10 @@ public class PbiActionEventHandler : IExternalEventHandler
         {
             try
             {
+                using var tx = new Transaction(doc, "PBI isolate");
+                tx.Start();
                 doc.ActiveView.IsolateElementsTemporary(validIds);
+                tx.Commit();
             }
             catch (Exception ex)
             {
@@ -210,8 +214,10 @@ public class PbiActionEventHandler : IExternalEventHandler
         var view = doc.ActiveView;
         foreach (var (eid, color) in resolved)
         {
+            // Pattern fill only — projection/cut line colors are left untouched so
+            // the model's own edges stay legible (otherwise the colored outlines
+            // overwhelm the geometry on busy views).
             var ogs = new OverrideGraphicSettings();
-            ogs.SetProjectionLineColor(color);
             if (solidFillId != ElementId.InvalidElementId)
             {
                 ogs.SetSurfaceForegroundPatternColor(color);
@@ -259,7 +265,6 @@ public class PbiActionEventHandler : IExternalEventHandler
         var validIds = ResolveIds(doc, rawIds);
         if (validIds.Count == 0) return "0";
 
-        // Find 3D view type
         var view3DType = new FilteredElementCollector(doc)
             .OfClass(typeof(ViewFamilyType))
             .Cast<ViewFamilyType>()
@@ -271,12 +276,12 @@ public class PbiActionEventHandler : IExternalEventHandler
             return null;
         }
 
-        // Compute bounding box for section box
         BoundingBoxXYZ? bbox = ComputeBoundingBox(doc, validIds);
 
         View3D? newView;
-        using (var tx = new Transaction(doc, "PBI create view"))
+        try
         {
+            using var tx = new Transaction(doc, "PBI create view");
             tx.Start();
             newView = View3D.CreateIsometric(doc, view3DType.Id);
             newView.Name = ProposeViewName(doc, _pendingViewName);
@@ -285,9 +290,29 @@ public class PbiActionEventHandler : IExternalEventHandler
                 newView.IsSectionBoxActive = true;
                 newView.SetSectionBox(bbox);
             }
-            // Isolate the elements so the new view shows only them
-            try { newView.IsolateElementsTemporary(validIds); } catch { /* non-fatal */ }
             tx.Commit();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[PbiActionEventHandler] CreateView failed: {ex.Message}");
+            return null;
+        }
+
+        // Isolate the elements in the new view. Must be a separate transaction
+        // because IsolateElementsTemporary uses a temporary-view-mode transaction
+        // group internally and can conflict with the just-committed creation tx.
+        try
+        {
+            using var txIso = new Transaction(doc, "PBI create view isolate");
+            txIso.Start();
+            newView.IsolateElementsTemporary(validIds);
+            txIso.Commit();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[PbiActionEventHandler] CreateView isolate failed (non-fatal): {ex.Message}");
         }
 
         // NOTE: intentionally do NOT switch to the new view. The user keeps
@@ -374,10 +399,13 @@ public class PbiActionEventHandler : IExternalEventHandler
 
     private static string ProposeViewName(Document doc, string? requested)
     {
+        // Revit rejects ':', '\\', '/', '{', '}', '[', ']', '|', ';', '<', '>', '?', '`', '~'
+        // in view names. Default format uses '-' separators to stay safe; user-provided
+        // names are sanitised to keep this contract.
         var baseName = string.IsNullOrWhiteSpace(requested)
-            ? $"PBI Selection {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
-            : requested!;
-        // Ensure uniqueness
+            ? $"PBI Selection {DateTime.Now:yyyy-MM-dd HH-mm-ss}"
+            : SanitizeViewName(requested!);
+
         var existing = new FilteredElementCollector(doc)
             .OfClass(typeof(View3D))
             .Cast<View3D>()
@@ -388,6 +416,18 @@ public class PbiActionEventHandler : IExternalEventHandler
         while (existing.Contains(name))
             name = $"{baseName} ({++n})";
         return name;
+    }
+
+    private static string SanitizeViewName(string raw)
+    {
+        var invalid = new[] { ':', '\\', '/', '{', '}', '[', ']', '|', ';', '<', '>', '?', '`', '~' };
+        var sb = new StringBuilder(raw.Length);
+        foreach (var ch in raw)
+            sb.Append(Array.IndexOf(invalid, ch) >= 0 ? '-' : ch);
+        var cleaned = sb.ToString().Trim();
+        return string.IsNullOrWhiteSpace(cleaned)
+            ? $"PBI Selection {DateTime.Now:yyyy-MM-dd HH-mm-ss}"
+            : cleaned;
     }
 
     public string GetName() => "RevitCortex PBI Actions";
