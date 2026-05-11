@@ -72,6 +72,7 @@ pbi_publish_elements(workspaceId:string,null, datasetId:string,null, datasetName
 pbi_publish_schedules(workspaceId:string,null, datasetId:string,null, datasetName:string,null, scheduleIds:long[],null, mode:string,replace, maxRowsPerSchedule:int,5000)
 pbi_sign_out()
 pbi_get_binding()
+pbi_publish_selection(workspaceId?,datasetId?,datasetName?,clearIfEmpty?:bool=false) → {success,workspaceId,datasetId,datasetName,table,exportRunId?,rowCount,batchCount,durationMs} | {success,rowCount:0,warning}
 filter_by_parameter_value(category:string!, parameterName:string!, value:string!, parameterType:string,null)
 find_undimensioned_elements(category:string,null, viewId:integer,null)
 find_untagged_elements(category:string,null, viewId:integer,null)
