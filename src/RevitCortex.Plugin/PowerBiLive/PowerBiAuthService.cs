@@ -61,8 +61,25 @@ public class PowerBiAuthService
         var first = accounts[0];
         try
         {
+            // First attempt: standard silent acquire (uses cache if token still valid)
             var result = await _app.AcquireTokenSilent(DefaultScopes, first)
                 .ExecuteAsync(ct).ConfigureAwait(false);
+
+            // If token expires within 5 minutes, proactively refresh via refresh token
+            if (result.ExpiresOn - DateTimeOffset.UtcNow < TimeSpan.FromMinutes(5))
+            {
+                try
+                {
+                    result = await _app.AcquireTokenSilent(DefaultScopes, first)
+                        .WithForceRefresh(true)
+                        .ExecuteAsync(ct).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Proactive refresh failed — use the still-valid cached token
+                }
+            }
+
             return AuthState.SignedIn(result);
         }
         catch (MsalUiRequiredException)

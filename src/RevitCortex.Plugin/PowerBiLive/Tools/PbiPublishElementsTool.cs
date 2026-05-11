@@ -51,12 +51,8 @@ public class PbiPublishElementsTool : ICortexTool
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         // ── Inputs ────────────────────────────────────────────────────────────
+        // workspaceId is required but can be resolved from ProjectBindings if omitted.
         var workspaceId = input["workspaceId"]?.Value<string>();
-        if (string.IsNullOrWhiteSpace(workspaceId))
-            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "workspaceId is required.",
-                suggestion: "Use pbi_list_workspaces to enumerate available workspaces.");
-
         var datasetId = input["datasetId"]?.Value<string>();
         var datasetName = input["datasetName"]?.Value<string>();
         var mode = (input["mode"]?.Value<string>() ?? "replace").ToLowerInvariant();
@@ -89,12 +85,15 @@ public class PbiPublishElementsTool : ICortexTool
 
         // ── Step 1: authenticate (still on main thread, but network-free via MSAL cache) ──
         var settings = PowerBiSettings.Load();
+        var writeCheck = PowerBiToolHelper.CheckExternalWritesAllowed(settings);
+        if (writeCheck != null) return writeCheck;
+
         var auth = new PowerBiAuthService(settings);
 
         AuthState authState;
         try
         {
-            authState = RunWithoutContext(() => auth.TryAcquireSilentAsync());
+            authState = PowerBiToolHelper.RunWithoutContext(() => auth.TryAcquireSilentAsync());
         }
         catch (Exception ex)
         {
@@ -114,16 +113,41 @@ public class PbiPublishElementsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "No active Revit document.");
 
-        // Resolve dataset name for default + metadata
+        // Compute stable document key for ProjectBindings
+        var docKey = ProjectDocumentKey.Compute(doc);
+        var existingBinding = settings.GetBinding(docKey);
+
+        // Resolve workspaceId from binding if not provided
+        if (string.IsNullOrWhiteSpace(workspaceId) && existingBinding != null)
+            workspaceId = existingBinding.WorkspaceId;
+
+        // Resolve datasetId from binding if not provided
+        if (string.IsNullOrWhiteSpace(datasetId) && existingBinding != null)
+            datasetId = existingBinding.DatasetId;
+
+        // Resolve dataset name
         if (string.IsNullOrWhiteSpace(datasetName))
         {
-            string projectName = "";
-            try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; }
-            catch { }
-            datasetName = string.IsNullOrWhiteSpace(projectName)
-                ? "RevitCortex Live - v1"
-                : $"RevitCortex Live - {projectName} - v1";
+            if (existingBinding != null && !string.IsNullOrWhiteSpace(existingBinding.DatasetName))
+            {
+                datasetName = existingBinding.DatasetName;
+            }
+            else
+            {
+                string projectName = "";
+                try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; }
+                catch { }
+                datasetName = string.IsNullOrWhiteSpace(projectName)
+                    ? "RevitCortex Live - v1"
+                    : $"RevitCortex Live - {projectName} - v1";
+            }
         }
+
+        // Re-validate workspaceId after binding resolution.
+        if (string.IsNullOrWhiteSpace(workspaceId))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "workspaceId is required.",
+                suggestion: "Use pbi_list_workspaces to enumerate available workspaces.");
 
         var exportRunId = Guid.NewGuid().ToString();
         var exportedAt = DateTime.UtcNow;
@@ -151,7 +175,7 @@ public class PbiPublishElementsTool : ICortexTool
 
         try
         {
-            var publishResult = RunWithoutContext(() => PublishAsync(
+            var publishResult = PowerBiToolHelper.RunWithoutContext(() => PublishAsync(
                 authState.AccessToken!,
                 workspaceId!,
                 datasetId,
@@ -163,6 +187,26 @@ public class PbiPublishElementsTool : ICortexTool
                 warnings));
 
             sw.Stop();
+
+            // Save/update ProjectBinding so future calls can omit workspaceId/datasetId
+            try
+            {
+                string projectName = "";
+                string documentGuid = "";
+                try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; } catch { }
+                try { documentGuid = doc.ProjectInformation?.UniqueId ?? ""; } catch { }
+                settings.SetBinding(docKey, new ProjectBinding
+                {
+                    WorkspaceId = workspaceId!,
+                    DatasetId = publishResult.DatasetId,
+                    DatasetName = datasetName,
+                    ProjectName = projectName,
+                    DocumentGuid = documentGuid,
+                    LastPathHash = ProjectDocumentKey.ComputePathHash(doc.PathName ?? ""),
+                    SchemaVersion = PowerBiDatasetSchema.CurrentVersion
+                });
+            }
+            catch { /* non-critical — binding save failure should not fail the publish */ }
 
             return CortexResult<object>.Ok(new
             {
@@ -221,35 +265,34 @@ public class PbiPublishElementsTool : ICortexTool
     {
         using var client = new PowerBiServiceClient(accessToken);
 
-        // Resolve dataset id
+        // Resolve dataset id — lookup by name when not supplied, or when the
+        // cached binding id no longer exists (stale binding after manual delete).
         if (string.IsNullOrEmpty(datasetId))
         {
-            var existing = await client.GetDatasetByNameAsync(workspaceId, datasetName)
-                .ConfigureAwait(false);
+            datasetId = await ResolveOrCreateDatasetAsync(
+                client, workspaceId, datasetName, mode, warnings).ConfigureAwait(false);
+        }
+        else
+        {
+            // Validate the cached id is still alive; fall back to name-lookup on 404
+            try
+            {
+                // A lightweight probe: list datasets and see if our id is present
+                var datasets = await client.ListDatasetsAsync(workspaceId).ConfigureAwait(false);
+                bool found = false;
+                foreach (var ds in datasets)
+                    if (ds.Id == datasetId) { found = true; break; }
 
-            if (existing != null)
-            {
-                datasetId = existing.Id;
+                if (!found)
+                {
+                    warnings.Add($"Cached dataset id '{datasetId}' no longer exists — resolving by name.");
+                    datasetId = await ResolveOrCreateDatasetAsync(
+                        client, workspaceId, datasetName, mode, warnings).ConfigureAwait(false);
+                }
             }
-            else if (mode == "create" || mode == "replace")
+            catch
             {
-                // Auto-create when dataset doesn't exist
-                var body = PowerBiDatasetSchema.BuildCreateDatasetBody(datasetName,
-                    new[]
-                    {
-                        PowerBiDatasetSchema.TableMetadata,
-                        PowerBiDatasetSchema.TableElements,
-                        PowerBiDatasetSchema.TableSelection
-                    });
-                datasetId = await client.CreatePushDatasetAsync(workspaceId, body)
-                    .ConfigureAwait(false);
-                warnings.Add($"Dataset '{datasetName}' did not exist — created automatically.");
-            }
-            else // append with no existing dataset
-            {
-                throw new InvalidOperationException(
-                    $"Dataset '{datasetName}' not found. Cannot append to a non-existent dataset. " +
-                    "Use mode='replace' or 'create' to create it first.");
+                // If we can't verify, proceed with the cached id and let the real call fail naturally
             }
         }
 
@@ -293,6 +336,40 @@ public class PbiPublishElementsTool : ICortexTool
         };
     }
 
+    private static async System.Threading.Tasks.Task<string> ResolveOrCreateDatasetAsync(
+        PowerBiServiceClient client,
+        string workspaceId,
+        string datasetName,
+        string mode,
+        List<string> warnings)
+    {
+        var existing = await client.GetDatasetByNameAsync(workspaceId, datasetName)
+            .ConfigureAwait(false);
+
+        if (existing != null)
+            return existing.Id;
+
+        if (mode == "create" || mode == "replace")
+        {
+            var body = PowerBiDatasetSchema.BuildCreateDatasetBody(datasetName,
+                new[]
+                {
+                    PowerBiDatasetSchema.TableMetadata,
+                    PowerBiDatasetSchema.TableElements,
+                    PowerBiDatasetSchema.TableSchedules,
+                    PowerBiDatasetSchema.TableSelection
+                });
+            var newId = await client.CreatePushDatasetAsync(workspaceId, body)
+                .ConfigureAwait(false);
+            warnings.Add($"Dataset '{datasetName}' did not exist — created automatically.");
+            return newId;
+        }
+
+        throw new InvalidOperationException(
+            $"Dataset '{datasetName}' not found. Cannot append to a non-existent dataset. " +
+            "Use mode='replace' or 'create' to create it first.");
+    }
+
     private class PublishSummary
     {
         public string DatasetId { get; set; } = "";
@@ -300,32 +377,4 @@ public class PbiPublishElementsTool : ICortexTool
         public int BatchCount { get; set; }
     }
 
-    // ─── Thread helper ────────────────────────────────────────────────────────
-
-    private static T RunWithoutContext<T>(Func<System.Threading.Tasks.Task<T>> factory)
-    {
-        T result = default!;
-        Exception? caught = null;
-
-        var thread = new System.Threading.Thread(() =>
-        {
-            System.Threading.SynchronizationContext.SetSynchronizationContext(null);
-            try
-            {
-                result = factory().ConfigureAwait(false).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                caught = ex;
-            }
-        });
-        thread.IsBackground = true;
-        thread.Start();
-        thread.Join();
-
-        if (caught != null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(caught).Throw();
-
-        return result;
-    }
 }

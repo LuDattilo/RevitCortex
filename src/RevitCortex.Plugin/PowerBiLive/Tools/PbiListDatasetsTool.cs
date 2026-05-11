@@ -33,7 +33,7 @@ public class PbiListDatasetsTool : ICortexTool
         var settings = PowerBiSettings.Load();
         var auth = new PowerBiAuthService(settings);
 
-        var state = RunWithoutContext(() => auth.TryAcquireSilentAsync());
+        var state = PowerBiToolHelper.RunWithoutContext(() => auth.TryAcquireSilentAsync());
         if (!state.IsSignedIn || string.IsNullOrEmpty(state.AccessToken))
             return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
                 "Not signed in to Power BI.",
@@ -42,7 +42,7 @@ public class PbiListDatasetsTool : ICortexTool
         try
         {
             using var client = new PowerBiServiceClient(state.AccessToken!);
-            var datasets = RunWithoutContext(() => client.ListDatasetsAsync(workspaceId));
+            var datasets = PowerBiToolHelper.RunWithoutContext(() => client.ListDatasetsAsync(workspaceId));
 
             return CortexResult<object>.Ok(new
             {
@@ -82,34 +82,5 @@ public class PbiListDatasetsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
                 $"Dataset listing failed: {ex.Message}");
         }
-    }
-
-    // ─── Thread helper ────────────────────────────────────────────────────────
-
-    private static T RunWithoutContext<T>(Func<System.Threading.Tasks.Task<T>> factory)
-    {
-        T result = default!;
-        Exception? caught = null;
-
-        var thread = new System.Threading.Thread(() =>
-        {
-            System.Threading.SynchronizationContext.SetSynchronizationContext(null);
-            try
-            {
-                result = factory().ConfigureAwait(false).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                caught = ex;
-            }
-        });
-        thread.IsBackground = true;
-        thread.Start();
-        thread.Join();
-
-        if (caught != null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(caught).Throw();
-
-        return result;
     }
 }

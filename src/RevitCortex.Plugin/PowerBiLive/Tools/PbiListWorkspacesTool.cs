@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
@@ -25,7 +24,7 @@ public class PbiListWorkspacesTool : ICortexTool
         var settings = PowerBiSettings.Load();
         var auth = new PowerBiAuthService(settings);
 
-        var state = RunWithoutContext(() => auth.TryAcquireSilentAsync());
+        var state = PowerBiToolHelper.RunWithoutContext(() => auth.TryAcquireSilentAsync());
         if (!state.IsSignedIn || string.IsNullOrEmpty(state.AccessToken))
         {
             return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
@@ -36,7 +35,7 @@ public class PbiListWorkspacesTool : ICortexTool
         try
         {
             using var client = new PowerBiServiceClient(state.AccessToken!);
-            var workspaces = RunWithoutContext(() => client.ListWorkspacesAsync());
+            var workspaces = PowerBiToolHelper.RunWithoutContext(() => client.ListWorkspacesAsync());
 
             return CortexResult<object>.Ok(new
             {
@@ -58,32 +57,5 @@ public class PbiListWorkspacesTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
                 $"Workspace listing failed: {ex.Message}");
         }
-    }
-
-    private static T RunWithoutContext<T>(Func<System.Threading.Tasks.Task<T>> factory)
-    {
-        T result = default!;
-        Exception? caught = null;
-
-        var thread = new System.Threading.Thread(() =>
-        {
-            System.Threading.SynchronizationContext.SetSynchronizationContext(null);
-            try
-            {
-                result = factory().ConfigureAwait(false).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                caught = ex;
-            }
-        });
-        thread.IsBackground = true;
-        thread.Start();
-        thread.Join();
-
-        if (caught != null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(caught).Throw();
-
-        return result;
     }
 }

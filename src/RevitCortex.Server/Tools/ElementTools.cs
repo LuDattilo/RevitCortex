@@ -495,11 +495,11 @@ public static class ElementTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "pbi_publish_elements"), Description("Publishes Revit model elements to a Power BI push dataset (Elements table). Supports replace (full snapshot, clears old rows), append (keeps old rows), and create (auto-create dataset if missing then replace). Snapshot runs on the Revit main thread; HTTP publish runs in the background.")]
+    [McpServerTool(Name = "pbi_publish_elements"), Description("Publishes Revit model elements to a Power BI push dataset (Elements table). workspaceId and datasetId can be omitted if a ProjectBinding was saved by a previous successful publish for this document. Supports replace (full snapshot, clears old rows), append (keeps old rows), and create (auto-create dataset if missing then replace). Snapshot runs on the Revit main thread; HTTP publish runs in the background.")]
     public static async Task<string> PbiPublishElements(
         RevitConnectionManager revit,
-        [Description("Power BI workspace (group) GUID.")] string workspaceId,
-        [Description("Existing dataset id. If omitted, the dataset is looked up by datasetName (and created if mode allows).")] string? datasetId = null,
+        [Description("Power BI workspace (group) GUID. Can be omitted if a ProjectBinding was saved by a previous publish for this document.")] string? workspaceId = null,
+        [Description("Existing dataset id. If omitted, resolved from ProjectBinding or looked up by datasetName (and created if mode allows).")] string? datasetId = null,
         [Description("Dataset name used for lookup/create. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
         [Description("Publish mode: 'replace' (default, delete rows then post snapshot), 'append' (add rows, keep existing), 'create' (auto-create if missing then replace).")] string mode = "replace",
         [Description("OST category codes to filter elements, e.g. [\"OST_Walls\",\"OST_Doors\"]. Omit to export all model elements.")] string[]? categoryFilter = null,
@@ -508,10 +508,10 @@ public static class ElementTools
     {
         var p = new JObject
         {
-            ["workspaceId"] = workspaceId,
             ["mode"] = mode,
             ["maxElements"] = maxElements
         };
+        if (workspaceId != null) p["workspaceId"] = workspaceId;
         if (datasetId != null) p["datasetId"] = datasetId;
         if (datasetName != null) p["datasetName"] = datasetName;
         if (categoryFilter != null) p["categoryFilter"] = new JArray(categoryFilter);
@@ -519,11 +519,11 @@ public static class ElementTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "pbi_publish_schedules"), Description("Publishes Revit schedules to the Power BI Schedules table in long-form (one row per cell). Supports replace and append modes. Snapshot runs on the Revit main thread; HTTP publish runs in the background.")]
+    [McpServerTool(Name = "pbi_publish_schedules"), Description("Publishes Revit schedules to the Power BI Schedules table in long-form (one row per cell). workspaceId and datasetId can be omitted if a ProjectBinding was saved by a previous successful publish for this document. Supports replace and append modes. Snapshot runs on the Revit main thread; HTTP publish runs in the background.")]
     public static async Task<string> PbiPublishSchedules(
         RevitConnectionManager revit,
-        [Description("Power BI workspace (group) GUID.")] string workspaceId,
-        [Description("Existing dataset id. If omitted, looked up by datasetName.")] string? datasetId = null,
+        [Description("Power BI workspace (group) GUID. Can be omitted if a ProjectBinding was saved by a previous publish for this document.")] string? workspaceId = null,
+        [Description("Existing dataset id. If omitted, resolved from ProjectBinding or looked up by datasetName.")] string? datasetId = null,
         [Description("Dataset name used for lookup. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
         [Description("Specific schedule element ids to export. Omit to export all non-template schedules.")] long[]? scheduleIds = null,
         [Description("Publish mode: 'replace' (default, clears existing rows) or 'append'.")] string mode = "replace",
@@ -532,14 +532,32 @@ public static class ElementTools
     {
         var p = new JObject
         {
-            ["workspaceId"] = workspaceId,
             ["mode"] = mode,
             ["maxRowsPerSchedule"] = maxRowsPerSchedule
         };
+        if (workspaceId != null) p["workspaceId"] = workspaceId;
         if (datasetId != null) p["datasetId"] = datasetId;
         if (datasetName != null) p["datasetName"] = datasetName;
         if (scheduleIds != null) p["scheduleIds"] = new JArray(scheduleIds);
         var result = await revit.ExecuteAsync("pbi_publish_schedules", p, ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_sign_out"), Description("Signs out of Power BI by revoking all cached MSAL tokens. After this call pbi_check_auth(signIn=false) returns signedIn=false. The previously signed-in account is reported in the response. Use pbi_check_auth(signIn=true) to re-authenticate.")]
+    public static async Task<string> PbiSignOut(
+        RevitConnectionManager revit,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("pbi_sign_out", new JObject(), ct);
+        return result.ToString();
+    }
+
+    [McpServerTool(Name = "pbi_get_binding"), Description("Returns the Power BI ProjectBinding stored for the active Revit document (workspaceId, datasetId, datasetName, docKey, updatedAt). Returns bound=false with a tip if no binding exists yet. Read-only — call this to verify which workspace/dataset a document is linked to before publishing.")]
+    public static async Task<string> PbiGetBinding(
+        RevitConnectionManager revit,
+        CancellationToken ct = default)
+    {
+        var result = await revit.ExecuteAsync("pbi_get_binding", new JObject(), ct);
         return result.ToString();
     }
 

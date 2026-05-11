@@ -113,6 +113,19 @@ Decisione richiesta:
 - Per rilascio piu ampio: valutare consenso progressivo o app registration custom.
 - Documentare chiaramente il failure mode `AADSTS65001` come richiesta admin consent.
 
+Esito validato 2026-05-11:
+
+- Il ClientId well-known `871c010f-5e61-4fb1-83ac-98610a7e9110` non e utilizzabile sul tenant GPA: fallisce con AADSTS65002.
+- La strada corretta per GPA e app registration custom single-tenant:
+  - `ClientId = 05d231e9-d720-4c54-8ecd-93a85dbef40b`
+  - `TenantId = 53372e72-8a4d-4a86-8745-257d91a1aafc`
+- Permessi delegati Power BI concessi con admin consent:
+  - `Dataset.ReadWrite.All`
+  - `Report.Read.All`
+  - `Workspace.Read.All`
+- Nel Manifest Entra `allowPublicClient` deve essere esplicitamente `true`. Se resta `null`, il device-code flow arriva alla pagina "You have signed in", ma il token exchange MSAL fallisce con AADSTS7000218 (`client_assertion` o `client_secret` richiesto).
+- `pbi_check_auth(signIn=true)` deve restare fire-and-forget: nel test validato ritorna in ~20 ms e non congela Revit.
+
 ---
 
 ## 4. Architettura target

@@ -108,6 +108,20 @@ public class PowerBiAuthFlowState
         }
     }
 
+    public void Reset()
+    {
+        lock (_sync)
+        {
+            _status = PowerBiAuthFlowStatus.NotStarted;
+            _userCode = null;
+            _verificationUrl = null;
+            _expiresOn = null;
+            _username = null;
+            _errorMessage = null;
+            _updatedAtUtc = DateTimeOffset.UtcNow;
+        }
+    }
+
     public PowerBiAuthFlowSnapshot Snapshot()
     {
         lock (_sync)

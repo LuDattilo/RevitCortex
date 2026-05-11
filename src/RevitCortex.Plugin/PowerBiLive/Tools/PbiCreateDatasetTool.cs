@@ -29,6 +29,7 @@ public class PbiCreateDatasetTool : ICortexTool
     {
         PowerBiDatasetSchema.TableMetadata,
         PowerBiDatasetSchema.TableElements,
+        PowerBiDatasetSchema.TableSchedules,
         PowerBiDatasetSchema.TableSelection
     };
 
@@ -82,9 +83,11 @@ public class PbiCreateDatasetTool : ICortexTool
         }
 
         var settings = PowerBiSettings.Load();
-        var auth = new PowerBiAuthService(settings);
+        var writeCheck = PowerBiToolHelper.CheckExternalWritesAllowed(settings);
+        if (writeCheck != null) return writeCheck;
 
-        var state = RunWithoutContext(() => auth.TryAcquireSilentAsync());
+        var auth = new PowerBiAuthService(settings);
+        var state = PowerBiToolHelper.RunWithoutContext(() => auth.TryAcquireSilentAsync());
         if (!state.IsSignedIn || string.IsNullOrEmpty(state.AccessToken))
             return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
                 "Not signed in to Power BI.",
@@ -95,7 +98,7 @@ public class PbiCreateDatasetTool : ICortexTool
             using var client = new PowerBiServiceClient(state.AccessToken!);
 
             // Idempotency: check if the dataset already exists
-            var existing = RunWithoutContext(() => client.GetDatasetByNameAsync(workspaceId, datasetName));
+            var existing = PowerBiToolHelper.RunWithoutContext(() => client.GetDatasetByNameAsync(workspaceId, datasetName));
             if (existing != null)
             {
                 return CortexResult<object>.Ok(new
@@ -112,7 +115,7 @@ public class PbiCreateDatasetTool : ICortexTool
 
             // Create new dataset
             var body = PowerBiDatasetSchema.BuildCreateDatasetBody(datasetName, tableNames);
-            var newId = RunWithoutContext(() => client.CreatePushDatasetAsync(workspaceId, body));
+            var newId = PowerBiToolHelper.RunWithoutContext(() => client.CreatePushDatasetAsync(workspaceId, body));
 
             return CortexResult<object>.Ok(new
             {
@@ -162,32 +165,4 @@ public class PbiCreateDatasetTool : ICortexTool
         }
     }
 
-    // ─── Thread helper ────────────────────────────────────────────────────────
-
-    private static T RunWithoutContext<T>(Func<System.Threading.Tasks.Task<T>> factory)
-    {
-        T result = default!;
-        Exception? caught = null;
-
-        var thread = new System.Threading.Thread(() =>
-        {
-            System.Threading.SynchronizationContext.SetSynchronizationContext(null);
-            try
-            {
-                result = factory().ConfigureAwait(false).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                caught = ex;
-            }
-        });
-        thread.IsBackground = true;
-        thread.Start();
-        thread.Join();
-
-        if (caught != null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(caught).Throw();
-
-        return result;
-    }
 }

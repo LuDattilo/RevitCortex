@@ -252,6 +252,33 @@ Default: `compact: false` (payload pieno). Chiedere a Claude esplicitamente "in 
 |-----------|-------|
 | `send_code_to_revit` | Esegue codice C# direttamente in Revit *(Revit 2025+)* |
 
+### Power BI Live
+
+Integrazione diretta con Power BI push datasets (senza file intermedi).
+
+| Strumento | Scopo |
+|-----------|-------|
+| `pbi_check_auth` | Verifica stato login; con `signIn=true` avvia il flusso device-code MSAL |
+| `pbi_list_workspaces` | Elenca i workspace Power BI accessibili |
+| `pbi_list_datasets` | Elenca i dataset push in un workspace |
+| `pbi_create_dataset` | Crea un dataset push RevitCortex (idempotente per nome) |
+| `pbi_publish_elements` | Pubblica snapshot elementi → tabella Elements (replace/append/create) |
+| `pbi_publish_schedules` | Pubblica schedule → tabella Schedules long-form (una riga per cella) |
+| `pbi_get_binding` | Mostra il binding workspace/dataset salvato per il documento attivo |
+| `pbi_sign_out` | Revoca il token MSAL; necessario per cambiare account |
+
+**Flusso tipico (primo utilizzo):**
+1. `pbi_check_auth(signIn=true)` → copia il codice mostrato e aprilo su `https://microsoft.com/devicelogin`
+2. `pbi_list_workspaces()` → copia il `workspaceId` target
+3. `pbi_publish_elements(workspaceId="...", categoryFilter=["OST_Walls","OST_Floors"], mode="replace")` → il dataset viene creato automaticamente e il binding salvato
+4. Publish successivi: `pbi_publish_elements()` senza parametri — workspace e dataset vengono risolti dal binding
+
+**Note:**
+- Token MSAL cifrato DPAPI in `%LOCALAPPDATA%\.revitcortex\msal_cache.bin`, valido tra le sessioni Revit
+- Il binding documento→dataset è salvato in `~/.revitcortex/powerbi-live.json` (chiave stabile: UniqueId o SHA256 del path)
+- I dataset push sono ottimizzati per Power BI Service (browser); su Power BI Desktop limitare a qualche centinaia di righe con `categoryFilter` o `maxElements`
+- `AllowExternalWrites` deve essere `true` in `powerbi-live.json` (o `false` ma `readOnlyMode=false` nelle impostazioni generali)
+
 ---
 
 ## Workflow consigliati

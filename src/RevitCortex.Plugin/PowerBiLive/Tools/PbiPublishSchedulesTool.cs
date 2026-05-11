@@ -38,12 +38,8 @@ public class PbiPublishSchedulesTool : ICortexTool
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         // ── Inputs ────────────────────────────────────────────────────────────
+        // workspaceId is required but can be resolved from ProjectBindings if omitted
         var workspaceId = input["workspaceId"]?.Value<string>();
-        if (string.IsNullOrWhiteSpace(workspaceId))
-            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "workspaceId is required.",
-                suggestion: "Use pbi_list_workspaces to enumerate available workspaces.");
-
         var datasetId = input["datasetId"]?.Value<string>();
         var datasetName = input["datasetName"]?.Value<string>();
         var mode = (input["mode"]?.Value<string>() ?? "replace").ToLowerInvariant();
@@ -68,10 +64,13 @@ public class PbiPublishSchedulesTool : ICortexTool
 
         // ── Authenticate ──────────────────────────────────────────────────────
         var settings = PowerBiSettings.Load();
+        var writeCheck = PowerBiToolHelper.CheckExternalWritesAllowed(settings);
+        if (writeCheck != null) return writeCheck;
+
         var auth = new PowerBiAuthService(settings);
 
         AuthState authState;
-        try { authState = RunWithoutContext(() => auth.TryAcquireSilentAsync()); }
+        try { authState = PowerBiToolHelper.RunWithoutContext(() => auth.TryAcquireSilentAsync()); }
         catch (Exception ex)
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
@@ -90,15 +89,38 @@ public class PbiPublishSchedulesTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "No active Revit document.");
 
+        // Resolve from ProjectBindings when not supplied by caller
+        var docKey = ProjectDocumentKey.Compute(doc);
+        var existingBinding = settings.GetBinding(docKey);
+
+        if (string.IsNullOrWhiteSpace(workspaceId) && existingBinding != null)
+            workspaceId = existingBinding.WorkspaceId;
+
+        if (string.IsNullOrWhiteSpace(datasetId) && existingBinding != null)
+            datasetId = existingBinding.DatasetId;
+
         if (string.IsNullOrWhiteSpace(datasetName))
         {
-            string projectName = "";
-            try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; }
-            catch { }
-            datasetName = string.IsNullOrWhiteSpace(projectName)
-                ? "RevitCortex Live - v1"
-                : $"RevitCortex Live - {projectName} - v1";
+            if (existingBinding != null && !string.IsNullOrWhiteSpace(existingBinding.DatasetName))
+            {
+                datasetName = existingBinding.DatasetName;
+            }
+            else
+            {
+                string projectName = "";
+                try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; }
+                catch { }
+                datasetName = string.IsNullOrWhiteSpace(projectName)
+                    ? "RevitCortex Live - v1"
+                    : $"RevitCortex Live - {projectName} - v1";
+            }
         }
+
+        // Re-validate workspaceId after binding resolution
+        if (string.IsNullOrWhiteSpace(workspaceId))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "workspaceId is required.",
+                suggestion: "Use pbi_list_workspaces to enumerate available workspaces.");
 
         var exportRunId = Guid.NewGuid().ToString();
         var exportedAt = DateTime.UtcNow;
@@ -150,7 +172,7 @@ public class PbiPublishSchedulesTool : ICortexTool
 
         try
         {
-            var result = RunWithoutContext(() => PublishAsync(
+            var result = PowerBiToolHelper.RunWithoutContext(() => PublishAsync(
                 authState.AccessToken!,
                 workspaceId!,
                 datasetId,
@@ -160,6 +182,26 @@ public class PbiPublishSchedulesTool : ICortexTool
                 warnings));
 
             sw.Stop();
+
+            // Save/update ProjectBinding
+            try
+            {
+                string projectName = "";
+                string documentGuid = "";
+                try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; } catch { }
+                try { documentGuid = doc.ProjectInformation?.UniqueId ?? ""; } catch { }
+                settings.SetBinding(docKey, new ProjectBinding
+                {
+                    WorkspaceId = workspaceId!,
+                    DatasetId = result.DatasetId,
+                    DatasetName = datasetName,
+                    ProjectName = projectName,
+                    DocumentGuid = documentGuid,
+                    LastPathHash = ProjectDocumentKey.ComputePathHash(doc.PathName ?? ""),
+                    SchemaVersion = PowerBiDatasetSchema.CurrentVersion
+                });
+            }
+            catch { /* non-critical */ }
 
             return CortexResult<object>.Ok(new
             {
@@ -183,11 +225,17 @@ public class PbiPublishSchedulesTool : ICortexTool
                 "Power BI token expired during publish.",
                 suggestion: "Run pbi_check_auth(signIn=true) to refresh.");
         }
+        catch (PowerBiApiException ex) when (ex.StatusCode == 403)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
+                $"Insufficient permissions in workspace. Power BI API returned 403.",
+                suggestion: "Ensure your account has at least Contributor role on the workspace.");
+        }
         catch (PowerBiApiException ex) when (ex.StatusCode == 404)
         {
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
-                $"Dataset not found: {ex.Message}",
-                suggestion: "Run pbi_create_dataset first, or check datasetId/datasetName.");
+                $"Dataset or table not found: {ex.Message}",
+                suggestion: "Run pbi_publish_elements first (creates dataset with all tables including Schedules), or pbi_create_dataset.");
         }
         catch (Exception ex)
         {
@@ -209,15 +257,41 @@ public class PbiPublishSchedulesTool : ICortexTool
     {
         using var client = new PowerBiServiceClient(accessToken);
 
-        // Resolve dataset id
+        // Resolve dataset id — lookup by name when not supplied, or validate
+        // the cached binding id is still alive (stale binding after manual delete).
         if (string.IsNullOrEmpty(datasetId))
         {
             var existing = await client.GetDatasetByNameAsync(workspaceId, datasetName)
                 .ConfigureAwait(false);
             if (existing == null)
                 throw new InvalidOperationException(
-                    $"Dataset '{datasetName}' not found. Create it first with pbi_create_dataset.");
+                    $"Dataset '{datasetName}' not found. Run pbi_publish_elements first " +
+                    "to auto-create the dataset with all tables including Schedules.");
             datasetId = existing.Id;
+        }
+        else
+        {
+            // Validate the cached id is still alive; fall back to name-lookup on stale binding
+            try
+            {
+                var datasets = await client.ListDatasetsAsync(workspaceId).ConfigureAwait(false);
+                bool found = false;
+                foreach (var ds in datasets)
+                    if (ds.Id == datasetId) { found = true; break; }
+
+                if (!found)
+                {
+                    var existing = await client.GetDatasetByNameAsync(workspaceId, datasetName)
+                        .ConfigureAwait(false);
+                    if (existing == null)
+                        throw new InvalidOperationException(
+                            $"Dataset '{datasetName}' not found. Run pbi_publish_elements first " +
+                            "to auto-create the dataset with all tables including Schedules.");
+                    datasetId = existing.Id;
+                }
+            }
+            catch (InvalidOperationException) { throw; }
+            catch { /* proceed with cached id, real call will surface errors */ }
         }
 
         if (mode == "replace")
@@ -248,32 +322,4 @@ public class PbiPublishSchedulesTool : ICortexTool
         public int BatchCount { get; set; }
     }
 
-    // ─── Thread helper ────────────────────────────────────────────────────────
-
-    private static T RunWithoutContext<T>(Func<System.Threading.Tasks.Task<T>> factory)
-    {
-        T result = default!;
-        Exception? caught = null;
-
-        var thread = new System.Threading.Thread(() =>
-        {
-            System.Threading.SynchronizationContext.SetSynchronizationContext(null);
-            try
-            {
-                result = factory().ConfigureAwait(false).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                caught = ex;
-            }
-        });
-        thread.IsBackground = true;
-        thread.Start();
-        thread.Join();
-
-        if (caught != null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(caught).Throw();
-
-        return result;
-    }
 }

@@ -22,7 +22,9 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 /// </summary>
 public class PbiCheckAuthTool : ICortexTool
 {
-    private static readonly PowerBiAuthFlowState FlowState = new PowerBiAuthFlowState();
+    internal static readonly PowerBiAuthFlowState FlowState = new PowerBiAuthFlowState();
+    private static readonly object FlowControlSync = new object();
+    private static CancellationTokenSource? FlowCancellation;
 
     public string Name => "pbi_check_auth";
     public string Category => "PowerBI";
@@ -79,13 +81,37 @@ public class PbiCheckAuthTool : ICortexTool
         // code as soon as Microsoft Identity provides it.
         if (FlowState.TryBegin())
         {
-            StartDeviceCodeFlow(auth);
+            StartDeviceCodeFlow(auth, CreateFlowCancellationSource());
         }
 
         return CortexResult<object>.Ok(BuildFlowPayload(FlowState.Snapshot(), settings));
     }
 
-    private static void StartDeviceCodeFlow(PowerBiAuthService auth)
+    internal static void ResetAuthFlow()
+    {
+        CancellationTokenSource? cts;
+        lock (FlowControlSync)
+        {
+            cts = FlowCancellation;
+            FlowCancellation = null;
+            FlowState.Reset();
+        }
+
+        try { cts?.Cancel(); }
+        catch (ObjectDisposedException) { }
+    }
+
+    private static CancellationTokenSource CreateFlowCancellationSource()
+    {
+        lock (FlowControlSync)
+        {
+            FlowCancellation?.Dispose();
+            FlowCancellation = new CancellationTokenSource();
+            return FlowCancellation;
+        }
+    }
+
+    private static void StartDeviceCodeFlow(PowerBiAuthService auth, CancellationTokenSource cts)
     {
         var thread = new Thread(() =>
         {
@@ -94,10 +120,16 @@ public class PbiCheckAuthTool : ICortexTool
             {
                 var state = auth.SignInWithDeviceCodeAsync(dcr =>
                 {
+                    if (cts.IsCancellationRequested)
+                        return;
+
                     FlowState.SetDeviceCode(dcr.UserCode, dcr.VerificationUrl, dcr.ExpiresOn);
                     WriteDeviceCodeDiagnostic(dcr.UserCode, dcr.VerificationUrl);
                     OpenBrowser(dcr.VerificationUrl);
-                }).ConfigureAwait(false).GetAwaiter().GetResult();
+                }, cts.Token).ConfigureAwait(false).GetAwaiter().GetResult();
+
+                if (cts.IsCancellationRequested)
+                    return;
 
                 if (state.IsSignedIn)
                 {
@@ -110,7 +142,18 @@ public class PbiCheckAuthTool : ICortexTool
             }
             catch (Exception ex)
             {
-                FlowState.SetFailed($"{ex.GetType().Name}: {ex.Message}");
+                if (!cts.IsCancellationRequested)
+                    FlowState.SetFailed($"{ex.GetType().Name}: {ex.Message}");
+            }
+            finally
+            {
+                lock (FlowControlSync)
+                {
+                    if (ReferenceEquals(FlowCancellation, cts))
+                        FlowCancellation = null;
+                }
+
+                cts.Dispose();
             }
         });
         thread.IsBackground = true;

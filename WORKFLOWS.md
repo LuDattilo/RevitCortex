@@ -525,16 +525,32 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 **Sequenza:**
 1. Da Claude o tool: `pbi_check_auth` -> verifica se gia loggato (silent)
-2. Se non loggato: `pbi_check_auth(signIn=true)` -> apre TaskDialog Revit con codice device
-3. Utente apre browser su microsoft.com/devicelogin, incolla codice, completa login
-4. Token cache salvato cifrato in %LOCALAPPDATA%\.revitcortex\msal_cache.bin (DPAPI)
-5. `pbi_list_workspaces` -> elenco gruppi PBI accessibili
+2. Se non loggato: `pbi_check_auth(signIn=true)` -> avvia MSAL device-code in background e ritorna subito (`Starting` o `AwaitingUser`), senza bloccare il main thread Revit
+3. Richiamare `pbi_check_auth(signIn=false)` dopo pochi secondi per leggere `userCode` + `verificationUrl` se il primo risultato era `Starting`
+4. Utente apre browser su `https://login.microsoft.com/device`, incolla codice, completa login
+5. Token cache salvato cifrato in %LOCALAPPDATA%\.revitcortex\msal_cache.bin (DPAPI)
+6. `pbi_list_workspaces` -> elenco gruppi PBI accessibili
 
 **Settings:**
 - `~/.revitcortex/powerbi-live.json` contiene clientId/tenantId/defaultWorkspaceId
-- ClientId default = "871c010f-5e61-4fb1-83ac-98610a7e9110" (PBI Embedded Sample, well-known)
-- TenantId default = "organizations" (qualunque tenant work, no personal MSA)
+- Per GPA usare app registration custom, non il ClientId well-known:
+  - `ClientId = 05d231e9-d720-4c54-8ecd-93a85dbef40b`
+  - `TenantId = 53372e72-8a4d-4a86-8745-257d91a1aafc`
+- ClientId default storico = "871c010f-5e61-4fb1-83ac-98610a7e9110" (PBI Embedded Sample, well-known), ma sul tenant GPA fallisce con AADSTS65002
 - AllowExternalWrites = false (push PBI bloccato in read-only mode by default)
+
+**App registration Entra GPA:**
+- Supported account types: Single tenant - GPA Ingegneria Srl
+- Platform: Mobile and desktop applications / InstalledClient
+- Redirect URI:
+  - `http://localhost`
+  - `https://login.microsoftonline.com/common/oauth2/nativeclient`
+- API permissions delegated Power BI Service:
+  - `Dataset.ReadWrite.All`
+  - `Report.Read.All`
+  - `Workspace.Read.All`
+- Admin consent deve risultare `Granted for GPA Ingegneria Srl`
+- Nel Manifest `allowPublicClient` deve essere esplicitamente `true`; se e' `null`, il device-code arriva alla conferma browser ma poi il token exchange fallisce con AADSTS7000218 (`client_assertion` o `client_secret` richiesto)
 
 **Token cache:**
 - Cifrato DPAPI per-user-per-machine
@@ -546,10 +562,81 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 - `PowerBiServiceClient`: REST wrapper minimale Phase 0 (solo ListWorkspaces)
 - `PowerBiSettings`: persistenza config
 - `PbiCheckAuthTool` / `PbiListWorkspacesTool`: tool ICortexTool registrati via assembly scan del Plugin (oltre a Tools)
+- `PbiCheckAuthTool` usa stato auth in memoria e thread background: non usare `Thread.Sleep`, `Join` o polling MSAL sul main thread Revit per aspettare il completamento login
 
 **NON fare:**
 - Non hardcodare segreti client (e' public client, niente secret necessario)
 - Non chiamare HTTP REST sul main thread Revit (gia' giro su Task.Run)
 - Non assumere che il device-code completi: utente puo' annullare, mostrare URL+codice in modo chiaro
+- Non lasciare `allowPublicClient` a `null` nel manifest Entra
 
-**Fonte:** Phase 0 del piano PBI Live, allineato con docs/powerbi-live-architecture-review.md (2026-05-09)
+**Esito test validato 2026-05-11:**
+- `pbi_check_auth(signIn=true)` ritorna in ~20 ms, Revit non si congela
+- Login riuscito con account `luigi.dattilo-co@gpapartners.com`
+- Token cache MSAL/DPAPI letto correttamente
+- `pbi_list_workspaces` ritorna 4 workspace: `GPA BIM`, `24HBS`, `AutomatedML`, `Test`
+
+**Fonte:** Phase 0 del piano PBI Live, allineato con docs/powerbi-live-architecture-review.md (2026-05-09), validato end-to-end 2026-05-11
+
+---
+
+## PBI Live - Phase 1 (Publish Elements + Schedules)
+
+**Primo publish (workspaceId esplicito, dataset auto-creato):**
+1. `pbi_check_auth(signIn=false)` → verifica token valido
+2. `pbi_list_workspaces()` → trova workspaceId target (es. `Test`)
+3. `pbi_publish_elements(workspaceId="...", mode="replace", categoryFilter=["OST_Walls","OST_Doors"], maxElements=2000)` → snapshot filtrato, dataset auto-creato se non esiste, binding salvato in `~/.revitcortex/powerbi-live.json`
+4. Risposta: `{success:true, datasetId:"...", rowCount:N, batchCount:N}`
+
+**Publish successivi (binding auto-risolto, no parametri necessari):**
+1. `pbi_publish_elements()` → workspaceId/datasetId/datasetName risolti dal binding del documento aperto
+2. `pbi_publish_schedules()` → stesso binding, tabella Schedules long-form
+
+**Publish schedules:**
+1. `pbi_publish_schedules(mode="replace")` → esporta tutti gli schedule non-template (max 5000 righe/schedule), long-form: una riga per cella
+2. Con filtro: `pbi_publish_schedules(scheduleIds=[123456, 789012])` → solo gli schedule specificati
+
+**Ispezione binding:**
+- `pbi_get_binding()` → mostra il binding corrente per il documento aperto (workspaceId, datasetId, datasetName, docKey, updatedAt)
+
+**Sign-out / cambio account:**
+1. `pbi_sign_out()` → revoca cache MSAL, ritorna `previousAccount`
+2. `pbi_check_auth(signIn=true)` → nuovo login device-code
+
+**ProjectBindings — chiave documento:**
+- Priorità: cloud GUID > `ProjectInformation.UniqueId` > SHA256(path normalizzato)
+- Salvato in `~/.revitcortex/powerbi-live.json` sotto `ProjectBindings[docKey]`
+- Aggiornato automaticamente ad ogni publish riuscito (elements o schedules)
+- Schema binding: `{WorkspaceId, DatasetId, DatasetName, ProjectName, DocumentGuid, LastPathHash, SchemaVersion, UpdatedAtUtc}`
+
+**Schema dataset (v1.0):**
+- **Metadata**: ExportRunId, ExportedAt, SchemaVersion, ProjectName, ProjectNumber, RevitVersion, ElementCount, ScheduleCount
+- **Elements**: ElementId, UniqueId, Category, Family, Type, Level, Phase, Area, Volume, Length, IsStructural, ... + _ExportRunId, _ExportedAt
+- **Schedules**: ScheduleId, ScheduleName, RowIndex, ColumnName, ValueString, ValueNumber, _ExportRunId, _ExportedAt
+- **Selection**: ElementId, UniqueId, Category, SelectedAt (Phase 2)
+
+**Limiti e best practice:**
+- PBI push dataset ottimizzato per PBI Service (browser), non PBI Desktop → usare `categoryFilter` per limitare le righe su Desktop
+- Max 10.000 righe per batch POST (gestito automaticamente dal client)
+- `pbi_publish_elements` senza filtri su modelli grandi (>5000 elementi) → usare `maxElements` o `categoryFilter`
+- `mode="append"` non richiede dataset esistente solo per elements (lo crea); per schedules il dataset deve esistere già
+
+**Architettura:**
+- `PowerBiElementExporter`: snapshot Revit→DTO sul main thread, detached (no Revit API dopo)
+- `PowerBiScheduleExporter`: idem, long-form, salta template e titleblock revision schedules
+- `PowerBiServiceClient`: REST wrapper (ListWorkspaces, ListDatasets, GetDatasetByName, CreatePushDataset, DeleteRows, PostRows)
+- `ProjectDocumentKey.Compute(doc)`: chiave stabile per binding
+- `RunWithoutContext<T>`: thread dedicato senza SynchronizationContext per evitare deadlock MSAL/WPF
+
+**Esito test validato 2026-05-11:**
+- Dataset creato automaticamente in workspace `Test`
+- 1191 elementi (filtro OST_Walls + OST_Doors + OST_StructuralColumns) pubblicati, 29 colonne
+- Tabella Elements visibile in PBI Service e PBI Desktop
+- Conteggi per categoria verificati vs `analyze_model_statistics`
+
+**NON fare:**
+- Non chiamare API REST sul main thread Revit (usare sempre RunWithoutContext)
+- Non aprire dataset push pesanti (~10k righe) in PBI Desktop → usare PBI Service
+- Non usare `mode="append"` per un refresh completo → usare `replace`
+
+**Fonte:** Phase 1 del piano PBI Live, implementato 2026-05-11, validato end-to-end sullo stesso giorno

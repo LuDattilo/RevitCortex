@@ -21,18 +21,50 @@ Tre commit atomici sopra `main`:
 - Tutto il wizard CSV-based dal ribbon Revit ("Power BI Export")
 - Drillthrough PBI → Revit via `revitcortex://`
 - Round-trip CSV → Revit (con dryRun + commit)
-- Phase 0 PBI Live: device-code + list workspaces (da testare con account GPA)
+- Phase 0 PBI Live: device-code + list workspaces validati con account GPA
 
 ## Cosa manca da testare prima di Phase 1
 
-- [ ] **Test Phase 0 end-to-end**: l'utente non ha ancora fatto il device-code
-      flow. Riavviare Revit dopo deploy del branch, lanciare `pbi_check_auth`
-      con `signIn=true`, completare login con account GPA, verificare che il
-      token cache sopravvive a riavvio Revit, eseguire `pbi_list_workspaces`.
-- [ ] **Verificare consent**: il client ID well-known potrebbe non essere
-      consentito sul tenant GPA. Se fallisce con AADSTS, override
-      `tenantId` in `~/.revitcortex/powerbi-live.json` con il tenant GPA
-      specifico (Microsoft Entra → Properties → Tenant ID).
+- [x] **Test Phase 0 end-to-end**: validato 2026-05-11 in Revit 2025.
+      `pbi_check_auth(signIn=true)` ritorna in ~20 ms senza freeze Revit,
+      device-code completato con account `luigi.dattilo-co@gpapartners.com`,
+      token letto da cache MSAL/DPAPI, `pbi_list_workspaces` OK.
+- [x] **Verificare consent**: il client ID well-known fallisce sul tenant GPA
+      con AADSTS65002. Risolto creando app registration custom GPA e
+      configurando `ClientId`/`TenantId` in `~/.revitcortex/powerbi-live.json`.
+
+## Configurazione GPA validata
+
+`~/.revitcortex/powerbi-live.json`:
+
+```json
+{
+  "ClientId": "05d231e9-d720-4c54-8ecd-93a85dbef40b",
+  "TenantId": "53372e72-8a4d-4a86-8745-257d91a1aafc",
+  "DefaultWorkspaceId": null,
+  "DefaultDatasetId": null,
+  "DefaultReportId": null,
+  "AllowExternalWrites": false,
+  "SelectionDebounceMs": 1000
+}
+```
+
+App registration Entra `RevitCortex Power BI`:
+
+- Single tenant GPA
+- Platform `Mobile and desktop applications`
+- Redirect URI `http://localhost`
+- Redirect URI `https://login.microsoftonline.com/common/oauth2/nativeclient`
+- Delegated Power BI permissions: `Dataset.ReadWrite.All`, `Report.Read.All`, `Workspace.Read.All`
+- Admin consent granted for GPA
+- Manifest: `"allowPublicClient": true` esplicito. Se resta `null`, il browser conferma il device login ma MSAL fallisce il token exchange con AADSTS7000218.
+
+Workspace restituiti nel test:
+
+- `GPA BIM`
+- `24HBS`
+- `AutomatedML`
+- `Test`
 
 ## Roadmap residua (allineata a `docs/powerbi-live-architecture-review.md`)
 

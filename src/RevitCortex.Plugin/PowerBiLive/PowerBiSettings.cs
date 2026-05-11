@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using Autodesk.Revit.DB;
 using Newtonsoft.Json;
 
 namespace RevitCortex.Plugin.PowerBiLive;
@@ -53,6 +57,13 @@ public class PowerBiSettings
     /// </summary>
     public int SelectionDebounceMs { get; set; } = 1000;
 
+    /// <summary>
+    /// Per-document workspace/dataset bindings. Key is a stable document key
+    /// computed by <see cref="ProjectDocumentKey.Compute"/>.
+    /// </summary>
+    public Dictionary<string, ProjectBinding> ProjectBindings { get; set; }
+        = new Dictionary<string, ProjectBinding>();
+
     public static string SettingsPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".revitcortex", "powerbi-live.json");
@@ -77,5 +88,116 @@ public class PowerBiSettings
         Directory.CreateDirectory(dir);
         File.WriteAllText(SettingsPath,
             JsonConvert.SerializeObject(this, Formatting.Indented));
+    }
+
+    /// <summary>
+    /// Returns the binding for the given document key, or null if not found.
+    /// </summary>
+    public ProjectBinding? GetBinding(string documentKey)
+    {
+        if (ProjectBindings.TryGetValue(documentKey, out var b)) return b;
+        return null;
+    }
+
+    /// <summary>
+    /// Saves or updates a binding for the given document key.
+    /// </summary>
+    public void SetBinding(string documentKey, ProjectBinding binding)
+    {
+        binding.UpdatedAtUtc = DateTime.UtcNow.ToString("o");
+        ProjectBindings[documentKey] = binding;
+        Save();
+    }
+}
+
+/// <summary>
+/// Workspace + dataset binding for a specific Revit document.
+/// Stored in powerbi-live.json under ProjectBindings[documentKey].
+/// </summary>
+public class ProjectBinding
+{
+    public string WorkspaceId { get; set; } = "";
+    public string DatasetId { get; set; } = "";
+    public string DatasetName { get; set; } = "";
+    /// <summary>Display label only — not used as key.</summary>
+    public string ProjectName { get; set; } = "";
+    /// <summary>Revit ProjectInformation.UniqueId if available.</summary>
+    public string DocumentGuid { get; set; } = "";
+    /// <summary>SHA256 of the full local/central path (fallback key).</summary>
+    public string LastPathHash { get; set; } = "";
+    public string SchemaVersion { get; set; } = "1.0";
+    public string UpdatedAtUtc { get; set; } = "";
+}
+
+/// <summary>
+/// Computes a stable, collision-resistant key for a Revit document
+/// used as the ProjectBindings dictionary key.
+///
+/// Priority:
+///   1. Cloud model GUID (BIM360/ACC) — most stable.
+///   2. ProjectInformation.UniqueId — stable across Save As on local files.
+///   3. SHA256(normalized full path) — fallback for files without project info.
+///
+/// ProjectName is intentionally excluded from the key: it can be renamed
+/// without creating a new dataset.
+/// </summary>
+public static class ProjectDocumentKey
+{
+    public static string Compute(Document doc)
+    {
+        // Priority 1: cloud model GUID
+        try
+        {
+            var cloud = doc.GetCloudModelPath();
+            if (cloud != null)
+            {
+                var str = cloud.ToString();
+                if (!string.IsNullOrWhiteSpace(str))
+                    return "cloud:" + str;
+            }
+        }
+        catch { }
+
+        // Priority 2: ProjectInformation.UniqueId
+        try
+        {
+            var uid = doc.ProjectInformation?.UniqueId;
+            if (!string.IsNullOrWhiteSpace(uid))
+                return "projuid:" + uid;
+        }
+        catch { }
+
+        // Priority 3: SHA256 of normalized path
+        try
+        {
+            var path = doc.PathName;
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                var normalized = path.ToUpperInvariant().Replace('\\', '/').Trim();
+                var hash = ComputeSha256(normalized);
+                return "pathhash:" + hash;
+            }
+        }
+        catch { }
+
+        // Last resort: random (won't persist across sessions, but won't crash)
+        return "tmp:" + Guid.NewGuid().ToString("N");
+    }
+
+    public static string ComputePathHash(string path)
+    {
+        var normalized = path.ToUpperInvariant().Replace('\\', '/').Trim();
+        return ComputeSha256(normalized);
+    }
+
+    private static string ComputeSha256(string input)
+    {
+        var bytes = Encoding.UTF8.GetBytes(input);
+        using var sha = SHA256.Create();
+        var hash = sha.ComputeHash(bytes);
+        var sb = new StringBuilder(hash.Length * 2);
+        foreach (var b in hash)
+            sb.AppendFormat("{0:x2}", b);
+        return sb.ToString().Substring(0, 16); // 16 hex chars — enough for collision resistance
     }
 }
