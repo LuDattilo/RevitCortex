@@ -252,6 +252,18 @@ Default: `compact: false` (payload pieno). Chiedere a Claude esplicitamente "in 
 |-----------|-------|
 | `send_code_to_revit` | Esegue codice C# direttamente in Revit *(Revit 2025+)* |
 
+### Power BI Live
+
+| Strumento | Scopo | Fase |
+|-----------|-------|------|
+| `pbi_check_auth` | Verifica/avvia autenticazione Power BI | Setup |
+| `pbi_list_workspaces` | Elenca workspace Power BI accessibili | Setup |
+| `pbi_create_dataset` | Crea un dataset push nel workspace | Setup |
+| `pbi_publish_elements` | Pubblica elementi Revit nel dataset | Phase 2A |
+| `pbi_publish_schedules` | Pubblica schedule Revit nel dataset | Phase 2A |
+| `pbi_publish_selection` | Pubblica selezione attuale nel dataset | Phase 2A |
+| `pbi_query` | Esegue DAX query e seleziona elementi | Phase 2B |
+
 ---
 
 ## Workflow consigliati

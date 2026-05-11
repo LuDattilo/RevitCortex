@@ -383,3 +383,67 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 **NON fare:** Non cambiare i riferimenti NuGet verso DLL locali della SDK senza una ragione precisa. Non aggiungere feature R27-only senza guardie `REVIT2027_OR_GREATER` e build cross-target R24/R25.
 
 **Fonte:** Sessione audit SDK locali 2026-05-02
+
+---
+
+## Power BI Live — Flusso Bi-Direzionale Revit ↔ PBI
+
+Integrazione live tra Revit e Power BI per pubblicazione dati e selezione elementi da DAX query.
+
+### Phase 2A — pbi_publish_*
+
+Pubblica snapshot degli elementi Revit verso il Power BI dataset.
+
+**Sequenza:** `pbi_check_auth` -> `pbi_list_workspaces` -> `pbi_create_dataset` (opzionale) -> `pbi_publish_elements` / `pbi_publish_schedules` / `pbi_publish_selection`
+
+**Parametri chiave:**
+- `pbi_check_auth`: verificare lo stato di autenticazione; `signIn: true` avvia il device-code flow
+- `pbi_publish_elements`: esportare tutto il modello o filtrare per categoria (es. `OST_Walls`)
+- `pbi_publish_schedules`: specifiche `scheduleIds` per export singoli schedule
+- `pbi_publish_selection`: pubblica gli elementi attualmente selezionati in Revit
+- Tutti i publish supportano `mode: replace` (snapshot completo) o `append` (aggiunge righe mantenendo quelle vecchie)
+
+**NON fare:** Non pubblicare senza prima verificare l'autenticazione. Non mischiare `replace` e `append` nella stessa sessione su lo stesso dataset -- scegliere una strategia di update.
+
+**Fonte:** Phase 2A Power BI Live (pbi_publish_elements, pbi_publish_schedules, pbi_publish_selection)
+
+### Phase 2B — pbi_query (PBI → Revit)
+
+Seleziona elementi in Revit eseguendo una DAX query sul dataset Power BI.
+
+**Sequenza:** `pbi_query` con categoria oppure DAX personalizzato
+
+**Esempi:**
+
+Seleziona tutti i muri:
+```
+pbi_query(category: "OST_Walls")
+```
+
+Seleziona porte al livello "Level 1":
+```
+pbi_query(category: "OST_Doors", level: "Level 1")
+```
+
+Riselezione snapshot precedente (usando l'ID di un publish passato):
+```
+pbi_query(exportRunId: "<guid da risposta pbi_publish_elements>")
+```
+
+DAX avanzato (aree > 50 m²):
+```
+pbi_query(daxQuery: "EVALUATE SELECTCOLUMNS(FILTER(Elements, Elements[Area] > 50), \"ElementId\", Elements[ElementId])")
+```
+
+**Parametri chiave:**
+- `category`: OST code (es. `OST_Walls`, `OST_Doors`) — NON nomi localizzati
+- `level`: nome livello Revit (es. "Ground Floor", "Livello 1")
+- `parameterName`: riferisce alle colonne dello schema dataset, NON ai parametri custom Revit
+- `exportRunId`: GUID restituito da `pbi_publish_elements` per riselezione
+- `daxQuery`: DAX puro per query avanzate (richiede `ExecuteQueries.Execute.All` tenant setting su Power BI)
+
+**Colonna Elements[Category]:** contiene OST code (`OST_Walls`, `OST_Doors`, ecc.), NON nomi display.
+
+**NON fare:** Non usare nomi categoria localizzati -- usare OST code. Non eseguire query DAX complesse senza prima abilitare `ExecuteQueries.Execute.All` sul tenant PBI (controlla con admin PBI).
+
+**Fonte:** Phase 2B Power BI Live (pbi_query)
