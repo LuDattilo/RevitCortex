@@ -697,18 +697,21 @@ Query the bound Power BI dataset and select matching Revit elements by returned 
 
 **Prerequisiti:**
 - Plugin RevitCortex installato e Cortex Switch attivo (porta 27016 si apre automaticamente)
-- Power BI Desktop (non Service) con il visual `revitcortexselectionvisual1A2B3C4D.1.0.0.0.pbiviz` importato
+- Power BI Desktop (non Service) con il visual `revitcortexselectionvisual1A2B3C4D.1.0.0.1.pbiviz` importato
 
 **Installazione del visual:**
 1. Aprire Power BI Desktop
 2. Nel pannello Visualizzazioni → "…" → Importa un visual da un file
-3. Selezionare `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.0.pbiviz`
+3. Selezionare `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.1.pbiviz`
 4. Trascinare il visual sulla pagina del report
 5. Nel pannello Campi, trascinare `Elements[ElementId]` nel ruolo **Element ID**
 
-**Utilizzo:**
-- **Seleziona filtrati (N)** — seleziona tutti gli elementi visibili nel report (rispetta cross-filter e slicer)
-- **Seleziona highlighted (N)** — seleziona solo le righe evidenziate da un altro visual; pulsante disabilitato se count=0
+**Utilizzo (v1.0.0.1):**
+- **Seleziona in Revit (N filtrati/evidenziati)** — pulsante principale. Quando un altro visual evidenzia righe (cross-filter), invia solo quelle; altrimenti invia tutti gli elementi visibili. Mostra anche il totale tra parentesi quando i due valori differiscono.
+- **Isola in Revit** — esegue isolamento temporaneo (Isolate Temporary) oltre alla selezione.
+- Feedback "✓ Inviati N elementi" per 3 secondi dopo il click.
 - Indicatore connessione: verde = RevitCortex attivo su porta 27016, grigio = plugin non avviato
+
+**Default field summarization:** il `data role` ha `kind: "Grouping"` (non `GroupingOrMeasure`) → la colonna viene trattata come dimensione, non aggregata. Niente più "Count of ElementId" né "Don't summarize" manuale.
 
 **Porta:** Il listener si apre sulla porta `27016` (una sopra il TCP bridge su `27015`). Se due istanze Revit sono aperte, la seconda salta il listener silenziosamente.
