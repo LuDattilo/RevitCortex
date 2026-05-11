@@ -1,0 +1,19 @@
+{
+  "name": "revitcortex-selection-visual",
+  "version": "1.0.0",
+  "description": "Power BI custom visual for selecting Revit elements from PBI Desktop",
+  "scripts": {
+    "build": "pbiviz package",
+    "start": "pbiviz start"
+  },
+  "devDependencies": {
+    "powerbi-visuals-tools": "^5.2.2",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

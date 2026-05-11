@@ -1,0 +1,24 @@
+{
+  "dataRoles": [
+    {
+      "name": "elementIds",
+      "kind": "GroupingOrMeasure",
+      "displayName": "Element ID",
+      "description": "Map the ElementId column from the Elements table"
+    }
+  ],
+  "dataViewMappings": [
+    {
+      "table": {
+        "rows": {
+          "for": { "in": "elementIds" },
+          "dataReductionAlgorithm": {
+            "top": { "count": 30000 }
+          }
+        }
+      }
+    }
+  ],
+  "supportsHighlight": true,
+  "objects": {}
+}
