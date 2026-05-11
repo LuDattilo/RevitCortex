@@ -266,7 +266,10 @@ Integrazione diretta con Power BI push datasets (senza file intermedi).
 | `pbi_publish_schedules` | Pubblica schedule → tabella Schedules long-form (una riga per cella) |
 | `pbi_get_binding` | Mostra il binding workspace/dataset salvato per il documento attivo |
 | `pbi_publish_selection` | Pubblica la selezione Revit corrente nella tabella Selection del dataset PBI | workspaceId?, datasetId?, datasetName?, clearIfEmpty? |
+| `pbi_query` | Esegue una query DAX sul dataset PBI e seleziona/isola in Revit gli elementi corrispondenti | datasetId?, workspaceId?, exportRunId?, category?, ostCode?, action?, maxElements? |
 | `pbi_sign_out` | Revoca il token MSAL; necessario per cambiare account |
+
+**Visual Power BI Desktop (Phase 2C):** Il file `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.0.pbiviz` è un custom visual importabile in Power BI Desktop che aggiunge due pulsanti ("Seleziona filtrati" / "Seleziona highlighted") e un indicatore di connessione al listener HTTP su porta 27016. Non richiede autenticazione MSAL — comunica direttamente con Revit tramite richiesta POST locale.
 
 **Flusso tipico (primo utilizzo):**
 1. `pbi_check_auth(signIn=true)` → copia il codice mostrato e aprilo su `https://microsoft.com/devicelogin`

@@ -614,6 +614,7 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 - **Elements**: ElementId, UniqueId, Category, Family, Type, Level, Phase, Area, Volume, Length, IsStructural, ... + _ExportRunId, _ExportedAt
 - **Schedules**: ScheduleId, ScheduleName, RowIndex, ColumnName, ValueString, ValueNumber, _ExportRunId, _ExportedAt
 - **Selection**: ElementId, UniqueId, Category, SelectedAt (Phase 2)
+- Per i muri, `Elements[Level]` deve derivare dal parametro Revit `WALL_BASE_CONSTRAINT` (Base Constraint), non dai soli parametri generici di level-hosting.
 
 **Limiti e best practice:**
 - PBI push dataset ottimizzato per PBI Service (browser), non PBI Desktop → usare `categoryFilter` per limitare le righe su Desktop
@@ -661,3 +662,53 @@ Publish the current Revit selection to the Power BI Selection table.
 - Empty selection with `clearIfEmpty=false` (default): returns warning, table unchanged
 - Empty selection with `clearIfEmpty=true`: clears the table
 - Stale binding (dataset manually deleted): falls back to name-lookup (same as publish_elements)
+
+---
+
+### PBI Live — Phase 2B: Query Power BI -> Select in Revit
+
+Query the bound Power BI dataset and select matching Revit elements by returned `ElementId`.
+
+**Prerequisite:** A ProjectBinding must exist (run `pbi_publish_elements` once first).
+
+**Flow manuale validato:**
+1. `pbi_publish_elements()` -> pubblica/aggiorna la tabella `Elements`
+2. `pbi_query(exportRunId="...", maxElements=10)` -> riseleziona un publish run precedente
+3. `pbi_publish_selection()` -> pubblica la selezione corrente nella tabella `Selection`
+4. In Power BI creare visual o filtri su `Elements`/`Selection`
+
+**Filtri categoria:**
+- `category` filtra `Elements[Category]` con nome display, es. `pbi_query(category="Walls")`
+- `ostCode` filtra `Elements[OstCode]` con codice stabile, es. `pbi_query(ostCode="OST_Walls")`
+- Preferire `ostCode` nei test automatici e nei workflow multi-lingua; usare `category` solo quando si lavora consapevolmente sul nome display salvato nel dataset.
+
+**Comandi utili:**
+- `pbi_query(exportRunId="...", action="select", maxElements=10)`
+- `pbi_query(ostCode="OST_Walls", action="select", maxElements=20)`
+- `pbi_query(category="Walls", action="isolate", maxElements=50)`
+
+**Esito test validato 2026-05-11 su Snowdon Towers:**
+- `OST_Walls`, `OST_Floors`, `OST_StructuralColumns`, `OST_StructuralFraming`, `OST_StructuralFoundation`, `OST_GenericModel` -> elementi trovati e selezionabili via DAX su `Elements[OstCode]`
+- `OST_Doors`, `OST_Windows`, `OST_Rooms`, `OST_Columns`, `OST_Ceilings`, `OST_Roofs`, `OST_Stairs`, `OST_Railings`, `OST_CurtainWallPanels`, `OST_CurtainWallMullions` -> query valida, nessun elemento nel dataset corrente
+
+### PBI Live — Phase 2C: PBI Desktop visual → Revit selection
+
+**Quando usare:** Selezionare elementi Revit direttamente da un report Power BI Desktop senza passare da Claude.
+
+**Prerequisiti:**
+- Plugin RevitCortex installato e Cortex Switch attivo (porta 27016 si apre automaticamente)
+- Power BI Desktop (non Service) con il visual `revitcortexselectionvisual1A2B3C4D.1.0.0.0.pbiviz` importato
+
+**Installazione del visual:**
+1. Aprire Power BI Desktop
+2. Nel pannello Visualizzazioni → "…" → Importa un visual da un file
+3. Selezionare `powerbi-visual/dist/revitcortexselectionvisual1A2B3C4D.1.0.0.0.pbiviz`
+4. Trascinare il visual sulla pagina del report
+5. Nel pannello Campi, trascinare `Elements[ElementId]` nel ruolo **Element ID**
+
+**Utilizzo:**
+- **Seleziona filtrati (N)** — seleziona tutti gli elementi visibili nel report (rispetta cross-filter e slicer)
+- **Seleziona highlighted (N)** — seleziona solo le righe evidenziate da un altro visual; pulsante disabilitato se count=0
+- Indicatore connessione: verde = RevitCortex attivo su porta 27016, grigio = plugin non avviato
+
+**Porta:** Il listener si apre sulla porta `27016` (una sopra il TCP bridge su `27015`). Se due istanze Revit sono aperte, la seconda salta il listener silenziosamente.
