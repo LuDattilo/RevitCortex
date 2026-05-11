@@ -158,7 +158,11 @@ public class PowerBiScheduleExporter
                     ["RowIndex"]       = (long)rowCount,
                     ["ColumnName"]     = field.ColumnName,
                     ["ValueString"]    = value.ValueString,
-                    ["ValueNumber"]    = value.ValueNumber ?? 0.0
+                    // ValueNumber is null for non-numeric fields (text, levels,
+                    // family/type names). 0.0 would corrupt SUM/AVG measures in
+                    // Power BI; null is treated as BLANK and ignored by aggregates.
+                    ["ValueNumber"]    = value.ValueNumber
+
                 });
             }
 

@@ -54,6 +54,13 @@ public class PbiActionEventHandler : IExternalEventHandler
     public TimeSpan ExecuteTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// Per-view registry of elements that PBI has painted. Used to scope
+    /// Reset overrides to PBI-touched elements only, preserving manual or
+    /// third-party overrides on the same view across sessions.
+    /// </summary>
+    private readonly PbiOverrideRegistry _registry = new();
+
+    /// <summary>
     /// Acquires the lock so the listener can prepare + raise + wait atomically.
     /// Returns a disposable to release the lock when done.
     /// </summary>
@@ -212,6 +219,7 @@ public class PbiActionEventHandler : IExternalEventHandler
         using var tx = new Transaction(doc, "PBI color override");
         tx.Start();
         var view = doc.ActiveView;
+        var painted = new List<ElementId>(resolved.Count);
         foreach (var (eid, color) in resolved)
         {
             // Pattern fill only — projection/cut line colors are left untouched so
@@ -227,8 +235,17 @@ public class PbiActionEventHandler : IExternalEventHandler
                 ogs.SetCutForegroundPatternId(solidFillId);
                 ogs.SetCutForegroundPatternVisible(true);
             }
-            try { view.SetElementOverrides(eid, ogs); } catch { /* skip per-element failures */ }
+            try
+            {
+                view.SetElementOverrides(eid, ogs);
+                painted.Add(eid);
+            }
+            catch { /* skip per-element failures */ }
         }
+        // Record in the registry so Reset overrides can target only PBI-painted ids
+        // later. Tracking happens inside the same tx as the override itself.
+        if (painted.Count > 0)
+            _registry.Track(doc, view.Id, painted);
         tx.Commit();
         return resolved.Count.ToString();
     }
@@ -237,24 +254,24 @@ public class PbiActionEventHandler : IExternalEventHandler
     {
         var view = doc.ActiveView;
 
-        // Collect all elements that currently have any override applied in this view.
-        // (Iterating "all visible elements" is the correct surface — Revit doesn't
-        // give us a "list of overridden elements" API, but resetting an element
-        // with no override is a no-op.)
-        var visible = new FilteredElementCollector(doc, view.Id)
-            .WhereElementIsNotElementType()
-            .ToElementIds();
-        if (visible == null || visible.Count == 0) return "0";
+        // Scope: only elements that PBI itself painted on this view, persisted
+        // via ExtensibleStorage across Revit sessions. Manual overrides created
+        // by the user or other add-ins on the same view are intentionally left
+        // untouched — a previous version that iterated all visible elements
+        // could destroy coordination/authoring work and was a footgun.
+        var trackedIds = _registry.GetTracked(doc, view.Id);
+        if (trackedIds.Count == 0) return "0";
 
         using var tx = new Transaction(doc, "PBI reset overrides");
         tx.Start();
         var empty = new OverrideGraphicSettings();
-        foreach (var id in visible)
+        foreach (var id in trackedIds)
         {
             try { view.SetElementOverrides(id, empty); } catch { /* skip */ }
         }
+        _registry.Clear(doc, view.Id);
         tx.Commit();
-        return visible.Count.ToString();
+        return trackedIds.Count.ToString();
     }
 
     private string? ExecuteCreateView(Document doc, UIApplication app)

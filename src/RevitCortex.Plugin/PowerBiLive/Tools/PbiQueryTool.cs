@@ -23,7 +23,10 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///   workspaceId     (string, optional): Falls back to ProjectBinding.
 ///   datasetId       (string, optional): Falls back to binding, then name-lookup.
 ///   datasetName     (string, optional): Used for lookup when datasetId absent.
-///   category        (string, optional): OST code, e.g. "OST_Walls".
+///   category        (string, optional): "OST_*" code (language-independent,
+///                   preferred) or localized display name ("Walls", "Muri").
+///                   OST_-prefixed values filter Elements[OstCode]; others
+///                   filter Elements[Category].
 ///   level           (string, optional): Level name, e.g. "Level 1".
 ///   parameterName   (string, optional): Column name in Elements table.
 ///   parameterValue  (string, optional): Value to match (string equality).
@@ -301,7 +304,16 @@ public class PbiQueryTool : ICortexTool
         var conditions = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(category))
-            conditions.Add($"Elements[Category] = \"{EscapeDax(category!)}\"");
+        {
+            // Heuristic: OST_-prefixed values target the language-independent OstCode
+            // column; anything else is treated as a localized display name (e.g.
+            // "Walls"/"Muri"/"Murs"). Without this, category="OST_Walls" used to
+            // filter Elements[Category] and silently returned zero rows.
+            var col = category!.StartsWith("OST_", StringComparison.OrdinalIgnoreCase)
+                ? "OstCode"
+                : "Category";
+            conditions.Add($"Elements[{col}] = \"{EscapeDax(category!)}\"");
+        }
 
         if (!string.IsNullOrWhiteSpace(level))
             conditions.Add($"Elements[Level] = \"{EscapeDax(level!)}\"");
