@@ -187,7 +187,23 @@ reflects `validIds.Count`.
 | Value | Behavior |
 |-------|----------|
 | `"select"` | `uiDoc.Selection.SetElementIds(validIds)` |
-| `"isolate"` | `SetElementIds` + `doc.ActiveView.IsolateElementsTemporary(validIds)` inside a Transaction |
+| `"isolate"` | `SetElementIds` + `doc.ActiveView.IsolateElementsTemporary(validIds)` inside a Transaction (see note below) |
+
+> **Note:** `IsolateElementsTemporary` is a document-modifying call and **must** run inside a `Transaction`:
+> ```csharp
+> uiDoc.Selection.SetElementIds(validIds);
+> if (action == "isolate")
+> {
+>     try
+>     {
+>         using var tx = new Transaction(doc, "PBI isolate");
+>         tx.Start();
+>         doc.ActiveView.IsolateElementsTemporary(validIds);
+>         tx.Commit();
+>     }
+>     catch { /* isolation failure is non-fatal — selection already applied */ }
+> }
+> ```
 
 ### 4.6 Integration in `RevitCortexApp`
 
@@ -195,11 +211,15 @@ In `StartService()`, after `_socketService.Start()`:
 
 ```csharp
 _pbiSelectListener = new PbiSelectHttpListener(
-    getActiveDocument: () => _session?.Store.Get<object>("activeDocument") as Document,
+    getActiveDocument: () => _uiApplication?.ActiveUIDocument?.Document,
     applySelection: ApplySelectionOnMainThread,
     port: 27016);
 _pbiSelectListener.Start();
 ```
+
+> **Note on `getActiveDocument`:** Use `_uiApplication.ActiveUIDocument?.Document` (already available in `RevitCortexApp`) rather than a session store lookup. The session store holds serialized data, not live Revit objects. This lambda returns `null` cleanly when no document is open, which is the correct sentinel for the "no active document" error response.
+
+> **Note on threading for `applySelection`:** The callback **must** be dispatched to the Revit main thread. Use the `ExternalEventHandler` pattern already in use by `CortexRouter` — do **not** use `Dispatcher.CurrentDispatcher.BeginInvoke` (the background thread does not have a Dispatcher). Capture the `ExternalEventHandler` at startup and raise it from the background listener thread.
 
 In `StopService()`, before or after `_socketService.Stop()`:
 
@@ -262,7 +282,9 @@ A minimal card-style panel with:
 
 - **Connection indicator** — on mount, does a lightweight
   `OPTIONS http://localhost:27016/pbi-select` preflight. Green dot = reachable,
-  grey dot = RevitCortex not running.
+  grey dot = RevitCortex not running. The check is repeated every 30 seconds
+  so the indicator updates automatically when Revit starts after Power BI Desktop.
+  Clicking either "Seleziona" button also triggers a re-check on failure.
 
 ### 5.4 Core logic
 
@@ -272,18 +294,24 @@ function getFilteredIds(dataView: DataView): number[] {
   return dataView.table!.rows.map(row => row[0] as number);
 }
 
-// Highlighted rows = rows where the highlight value is not null
+// Highlighted rows = rows where the highlight value is non-null/non-undefined.
+// Use loose inequality (!= null) to catch both null and undefined:
+//   - undefined: highlights array not populated (no cross-filter active) → skip all rows
+//   - null:      row not highlighted → skip
+//   - number:    row is highlighted → include
 function getHighlightedIds(dataView: DataView): number[] {
   return dataView.table!.rows
-    .filter((_, i) => dataView.table!.highlights?.[i] !== null)
+    .filter((_, i) => dataView.table!.highlights?.[i] != null)  // != (loose), NOT !==
     .map(row => row[0] as number);
 }
 
 async function sendToRevit(elementIds: number[], action: "select" | "isolate") {
+  // AbortSignal.timeout prevents hanging fetch if Revit is frozen (5 s timeout)
   await fetch("http://localhost:27016/pbi-select", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ elementIds, action }),
+    signal: AbortSignal.timeout(5000),
   });
 }
 ```
@@ -361,8 +389,11 @@ powerbi-visual/                     (new top-level folder)
 
 3. **`highlights` API reliability.** Power BI's `dataView.table.highlights`
    is not always populated depending on the visual type and PBI Desktop version.
-   If `highlights` is null/undefined, the "highlighted" button falls back to
-   showing count=0 and remaining disabled.
+   If `highlights` is `null` or `undefined`, the "highlighted" button falls back to
+   showing count=0 and remaining disabled. The implementation uses loose inequality
+   (`!= null`) rather than strict (`!== null`) to handle both cases correctly:
+   `undefined` (array not populated) and `null` (row not highlighted) both map to "not highlighted",
+   while any numeric highlight value maps to "highlighted".
 
 4. **pbiviz toolchain.** The custom visual requires `powerbi-visuals-tools`
    (`pbiviz` CLI) version 5.x. Node.js 18+ required for build. The PBIVIZ
