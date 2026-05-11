@@ -193,11 +193,13 @@ public class RevitCortexApp : IExternalApplication
             {
                 var handler = _pbiSelectionHandler;
                 var evt = _pbiSelectionEvent;
-                var app = _uiApplication;
                 _pbiSelectListener = new PbiSelectHttpListener(
                     handleSelection: (rawIds, action) =>
                     {
-                        var doc = app?.ActiveUIDocument?.Document;
+                        // Read _uiApplication dynamically — it may be null when StartService
+                        // is called (assigned lazily on first Idling event) but non-null by
+                        // the time the first PBI request arrives.
+                        var doc = _uiApplication?.ActiveUIDocument?.Document;
                         if (doc == null) return null;
 
                         // Validate ElementIds and queue selection on main thread
