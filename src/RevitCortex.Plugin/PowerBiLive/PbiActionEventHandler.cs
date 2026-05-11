@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,21 +13,25 @@ namespace RevitCortex.Plugin.PowerBiLive;
 /// Revit ExternalEventHandler that handles all PBI Desktop visual actions on the
 /// main thread: select, isolate, color override, reset overrides, create 3D view.
 ///
-/// Synchronous-from-listener pattern:
-///   1. Background thread acquires the handler lock (AcquireLock)
-///   2. Calls Prepare* + ExternalEvent.Raise()
-///   3. Calls WaitForCompletion() — blocks on a ManualResetEventSlim
-///   4. Revit invokes Execute(UIApp) on main thread → does the work → Set()
-///   5. Background thread unblocks and reports the result
+/// Queue-based dispatch (replaces the previous shared-mutable-state pattern that
+/// had a documented race: a timed-out request could be overwritten by the next
+/// one, causing the wrong action on the wrong elements once Revit unblocked).
 ///
-/// This lets the HTTP listener wait for the UI-thread action to complete
-/// before writing the HTTP response. Timeout (10 s) protects against a hung
-/// Execute. No user-visible confirmation dialogs — PBI users would find them
-/// disruptive in a per-click workflow.
+/// Contract:
+///   - Each Dispatch* call enqueues an immutable PbiActionRequest with its own
+///     ManualResetEventSlim and Raises ExternalEvent.
+///   - Execute(UIApplication) drains one request at a time. Every Execute call
+///     dequeues exactly one request (or none, if all were already processed in
+///     a previous Execute pass), runs it, fills the result, and signals it.
+///   - Caller blocks on its own request's done event with a timeout.
+///   - If a request times out on the caller side, its `Cancelled` flag is set;
+///     Execute checks the flag at start and silently skips it. The next valid
+///     request keeps queue order intact and does NOT carry the previous payload.
+///   - A "starvation watchdog" Raise() is fired after enqueue so subsequent
+///     requests don't sit waiting in case ExternalEvent coalesces.
 /// </summary>
 public class PbiActionEventHandler : IExternalEventHandler
 {
-    /// <summary>The action kind currently queued for Execute.</summary>
     public enum Kind
     {
         Select,
@@ -35,138 +40,146 @@ public class PbiActionEventHandler : IExternalEventHandler
         CreateView,
     }
 
-    // ─── Pending state (only one action in flight at a time) ───────────────
+    /// <summary>
+    /// Immutable request carrying its own result slot + completion event so that
+    /// concurrent dispatches never share mutable pending state.
+    /// </summary>
+    public sealed class Request
+    {
+        public Kind Kind { get; }
+        public IReadOnlyList<long> RawIds { get; }
+        public string Action { get; }
+        public IReadOnlyList<PbiSelectHttpListener.ColorOverride> Colors { get; }
+        public string? ViewName { get; }
 
-    private volatile Kind _pendingKind = Kind.Select;
-    private volatile IList<long>? _pendingIds;
-    private volatile string _pendingAction = "select";
-    private volatile IList<PbiSelectHttpListener.ColorOverride>? _pendingColors;
-    private volatile string? _pendingViewName;
+        public ManualResetEventSlim Done { get; } = new(initialState: false);
+        // Non-volatile fields are safe to read after Done is set (release fence).
+        public string? Result;
+        public volatile bool Cancelled;
 
-    // Result signalling — the background thread sets _done after Execute completes.
-    private readonly ManualResetEventSlim _done = new(initialState: false);
-    private volatile string? _result;     // null = cancelled / failed
-    private readonly object _gate = new(); // serialises Prepare/Wait calls
+        public Request(Kind kind,
+            IReadOnlyList<long>? rawIds,
+            string action,
+            IReadOnlyList<PbiSelectHttpListener.ColorOverride>? colors,
+            string? viewName)
+        {
+            Kind = kind;
+            RawIds = rawIds ?? Array.Empty<long>();
+            Action = action ?? "";
+            Colors = colors ?? Array.Empty<PbiSelectHttpListener.ColorOverride>();
+            ViewName = viewName;
+        }
+    }
 
-    public string? LastResult => _result;
+    private readonly ConcurrentQueue<Request> _queue = new();
+    // Reference to the external event for self-Raise after enqueue. Set once at
+    // wiring time by RevitCortexApp. The handler tolerates a null event (no
+    // self-raise) for tests that drive Execute() manually.
+    private ExternalEvent? _event;
 
     /// <summary>How long the listener waits for Execute to complete before timing out.</summary>
     public TimeSpan ExecuteTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Per-view registry of elements that PBI has painted. Used to scope
-    /// Reset overrides to PBI-touched elements only, preserving manual or
-    /// third-party overrides on the same view across sessions.
+    /// Reset overrides to PBI-touched elements only.
     /// </summary>
     private readonly PbiOverrideRegistry _registry = new();
 
     /// <summary>
-    /// Acquires the lock so the listener can prepare + raise + wait atomically.
-    /// Returns a disposable to release the lock when done.
+    /// Binds the ExternalEvent that owns this handler so the queue can self-raise
+    /// when enqueuing while a previous Execute is still draining. Call once after
+    /// `ExternalEvent.Create(handler)`. Tests can leave it null and call Execute
+    /// directly.
     /// </summary>
-    public IDisposable AcquireLock() => new LockHandle(_gate);
+    public void BindExternalEvent(ExternalEvent evt) => _event = evt;
 
-    private sealed class LockHandle : IDisposable
+    /// <summary>
+    /// Enqueues a request, raises the ExternalEvent, and waits on the request's
+    /// own completion event. Each caller has its own Done — no cross-request
+    /// state corruption is possible. Returns the result string or null on
+    /// timeout/cancellation/Execute failure.
+    /// </summary>
+    public string? Dispatch(Request request)
     {
-        private readonly object _gate;
-        private bool _taken;
-        public LockHandle(object gate) { _gate = gate; Monitor.Enter(_gate); _taken = true; }
-        public void Dispose() { if (_taken) { Monitor.Exit(_gate); _taken = false; } }
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        _queue.Enqueue(request);
+        try { _event?.Raise(); } catch { /* event disposed */ }
+
+        if (!request.Done.Wait(ExecuteTimeout))
+        {
+            request.Cancelled = true; // Tell future Execute pass to skip this one.
+            return null;
+        }
+        return request.Result;
     }
 
-    /// <summary>Called by the listener BEFORE Raise(), inside AcquireLock().</summary>
-    public void PrepareSelection(IList<long> rawIds, string action)
-    {
-        _pendingKind = Kind.Select;
-        _pendingIds = rawIds;
-        _pendingAction = action ?? "select";
-        _pendingColors = null;
-        _pendingViewName = null;
-        _done.Reset();
-        _result = null;
-    }
+    // ─── Convenience wrappers preserving the previous Dispatcher API ───────
 
-    public void PrepareColor(IList<PbiSelectHttpListener.ColorOverride> items)
-    {
-        _pendingKind = Kind.Color;
-        _pendingColors = items;
-        _pendingIds = null;
-        _pendingAction = "color";
-        _pendingViewName = null;
-        _done.Reset();
-        _result = null;
-    }
+    public string? DispatchSelection(IList<long> rawIds, string action) =>
+        Dispatch(new Request(Kind.Select, rawIds?.ToArray(), action ?? "select", null, null));
 
-    public void PrepareReset()
-    {
-        _pendingKind = Kind.ResetOverrides;
-        _pendingIds = null;
-        _pendingColors = null;
-        _pendingAction = "reset";
-        _pendingViewName = null;
-        _done.Reset();
-        _result = null;
-    }
+    public string? DispatchColor(IList<PbiSelectHttpListener.ColorOverride> items) =>
+        Dispatch(new Request(Kind.Color, null, "color", items?.ToArray(), null));
 
-    public void PrepareCreateView(IList<long> rawIds, string? viewName)
-    {
-        _pendingKind = Kind.CreateView;
-        _pendingIds = rawIds;
-        _pendingViewName = viewName;
-        _pendingColors = null;
-        _pendingAction = "createView";
-        _done.Reset();
-        _result = null;
-    }
+    public string? DispatchReset() =>
+        Dispatch(new Request(Kind.ResetOverrides, null, "reset", null, null));
 
-    /// <summary>Waits for Execute to finish. Returns true if completed within timeout.</summary>
-    public bool WaitForCompletion() => _done.Wait(ExecuteTimeout);
+    public string? DispatchCreateView(IList<long> rawIds, string? viewName) =>
+        Dispatch(new Request(Kind.CreateView, rawIds?.ToArray(), "createView", null, viewName));
 
     public void Execute(UIApplication app)
     {
-        try
+        // Drain in a loop — a single Raise() can correspond to multiple enqueued
+        // requests if Revit coalesced them. Each iteration handles exactly one.
+        while (_queue.TryDequeue(out var req))
         {
-            var doc = app?.ActiveUIDocument?.Document;
-            if (doc == null)
+            if (req.Cancelled)
             {
-                System.Diagnostics.Trace.WriteLine("[PbiActionEventHandler] doc null on UI thread.");
-                _result = null;
-                return;
+                // Caller already gave up; don't run the action but DO complete
+                // the event so any straggler observers unblock.
+                try { req.Done.Set(); } catch { }
+                continue;
             }
 
-            switch (_pendingKind)
+            try
             {
-                case Kind.Select:
-                    _result = ExecuteSelect(doc);
-                    break;
-                case Kind.Color:
-                    _result = ExecuteColor(doc);
-                    break;
-                case Kind.ResetOverrides:
-                    _result = ExecuteResetOverrides(doc);
-                    break;
-                case Kind.CreateView:
-                    _result = ExecuteCreateView(doc, app!);
-                    break;
+                var doc = app?.ActiveUIDocument?.Document;
+                if (doc == null)
+                {
+                    System.Diagnostics.Trace.WriteLine("[PbiActionEventHandler] doc null on UI thread.");
+                    req.Result = null;
+                }
+                else
+                {
+                    req.Result = req.Kind switch
+                    {
+                        Kind.Select         => ExecuteSelect(doc, req),
+                        Kind.Color          => ExecuteColor(doc, req),
+                        Kind.ResetOverrides => ExecuteResetOverrides(doc),
+                        Kind.CreateView     => ExecuteCreateView(doc, app!, req),
+                        _                   => null
+                    };
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Trace.WriteLine($"[PbiActionEventHandler] Execute error: {ex.Message}");
-            _result = null;
-        }
-        finally
-        {
-            _done.Set();
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"[PbiActionEventHandler] Execute error: {ex.Message}");
+                req.Result = null;
+            }
+            finally
+            {
+                req.Done.Set();
+            }
         }
     }
 
     // ─── Action implementations (UI thread) ────────────────────────────────
 
-    private string? ExecuteSelect(Document doc)
+    private string? ExecuteSelect(Document doc, Request req)
     {
-        var rawIds = _pendingIds;
-        var action = _pendingAction;
+        var rawIds = req.RawIds;
+        var action = req.Action;
         if (rawIds == null || rawIds.Count == 0) return "0";
 
         var validIds = ResolveIds(doc, rawIds);
@@ -193,9 +206,9 @@ public class PbiActionEventHandler : IExternalEventHandler
         return validIds.Count.ToString();
     }
 
-    private string? ExecuteColor(Document doc)
+    private string? ExecuteColor(Document doc, Request req)
     {
-        var items = _pendingColors;
+        var items = req.Colors;
         if (items == null || items.Count == 0) return "0";
 
         // Map id → ElementId pairs + parsed colors
@@ -274,9 +287,9 @@ public class PbiActionEventHandler : IExternalEventHandler
         return trackedIds.Count.ToString();
     }
 
-    private string? ExecuteCreateView(Document doc, UIApplication app)
+    private string? ExecuteCreateView(Document doc, UIApplication app, Request req)
     {
-        var rawIds = _pendingIds;
+        var rawIds = req.RawIds;
         if (rawIds == null || rawIds.Count == 0) return null;
 
         var validIds = ResolveIds(doc, rawIds);
@@ -301,7 +314,7 @@ public class PbiActionEventHandler : IExternalEventHandler
             using var tx = new Transaction(doc, "PBI create view");
             tx.Start();
             newView = View3D.CreateIsometric(doc, view3DType.Id);
-            newView.Name = ProposeViewName(doc, _pendingViewName);
+            newView.Name = ProposeViewName(doc, req.ViewName);
             if (bbox != null)
             {
                 newView.IsSectionBoxActive = true;
@@ -340,7 +353,7 @@ public class PbiActionEventHandler : IExternalEventHandler
 
     // ─── Helpers ───────────────────────────────────────────────────────────
 
-    private static IList<ElementId> ResolveIds(Document doc, IList<long> rawIds)
+    private static IList<ElementId> ResolveIds(Document doc, IReadOnlyList<long> rawIds)
     {
         var valid = new List<ElementId>(rawIds.Count);
         foreach (var v in rawIds)

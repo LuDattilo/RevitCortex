@@ -191,68 +191,18 @@ public class RevitCortexApp : IExternalApplication
             if (_pbiSelectListener == null && _pbiActionHandler != null && _pbiActionEvent != null)
             {
                 var handler = _pbiActionHandler;
-                var evt = _pbiActionEvent;
-
-                // All four callbacks share the same pattern: acquire the handler
-                // lock, prepare the request, raise the event, wait for the main
-                // thread Execute to complete. Returning null = "no doc / failed";
-                // a non-null string is whatever the action wants to report
-                // (count, view name, etc.).
-
-                string? DispatchSelect(System.Collections.Generic.IList<long> ids, string action)
-                {
-                    if (_uiApplication == null) return null;
-                    using (handler.AcquireLock())
-                    {
-                        handler.PrepareSelection(ids, action);
-                        evt.Raise();
-                        if (!handler.WaitForCompletion()) return null;
-                        return handler.LastResult;
-                    }
-                }
-
-                string? DispatchColor(System.Collections.Generic.IList<PbiSelectHttpListener.ColorOverride> items)
-                {
-                    if (_uiApplication == null) return null;
-                    using (handler.AcquireLock())
-                    {
-                        handler.PrepareColor(items);
-                        evt.Raise();
-                        if (!handler.WaitForCompletion()) return null;
-                        return handler.LastResult;
-                    }
-                }
-
-                string? DispatchReset()
-                {
-                    if (_uiApplication == null) return null;
-                    using (handler.AcquireLock())
-                    {
-                        handler.PrepareReset();
-                        evt.Raise();
-                        if (!handler.WaitForCompletion()) return null;
-                        return handler.LastResult;
-                    }
-                }
-
-                string? DispatchCreateView(System.Collections.Generic.IList<long> ids, string? viewName)
-                {
-                    if (_uiApplication == null) return null;
-                    using (handler.AcquireLock())
-                    {
-                        handler.PrepareCreateView(ids, viewName);
-                        evt.Raise();
-                        if (!handler.WaitForCompletion()) return null;
-                        return handler.LastResult;
-                    }
-                }
+                // Bind the event so the handler can self-raise after every enqueue.
+                // This eliminates the previous shared-pending-state race: each
+                // listener callback now hits the handler's queue, gets its own
+                // completion event, and times out without polluting later requests.
+                handler.BindExternalEvent(_pbiActionEvent);
 
                 _pbiSelectListener = new PbiSelectHttpListener(
                     new PbiSelectHttpListener.Callbacks(
-                        selection:       DispatchSelect,
-                        color:           DispatchColor,
-                        resetOverrides:  DispatchReset,
-                        createView:      DispatchCreateView),
+                        selection:       (ids, action) => _uiApplication == null ? null : handler.DispatchSelection(ids, action),
+                        color:           items         => _uiApplication == null ? null : handler.DispatchColor(items),
+                        resetOverrides:  ()            => _uiApplication == null ? null : handler.DispatchReset(),
+                        createView:      (ids, name)   => _uiApplication == null ? null : handler.DispatchCreateView(ids, name)),
                     port: 27016);
                 _pbiSelectListener.Start();
             }
