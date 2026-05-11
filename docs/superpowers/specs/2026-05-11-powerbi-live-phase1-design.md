@@ -1,7 +1,7 @@
 # Power BI Live — Phase 0 + Phase 1 — Implementation Spec
 
 **Date:** 2026-05-11  
-**Status:** Implemented and partially validated  
+**Status:** Implemented and fully validated ✅  
 **Author:** RevitCortex AI session (Luigi Dattilo, GPA Ingegneria Srl)  
 **Review target:** Independent code review against this spec
 
@@ -303,12 +303,13 @@ No `record` types, no `init` accessors, no `Dictionary.GetValueOrDefault()` in P
 
 | # | Issue | Severity | Status |
 |---|-------|----------|--------|
-| 1 | `allowExternalWrites` defaults to `false` — easy to miss, publish silently fails | Medium | Known, user sets manually |
-| 2 | `pbi_publish_schedules` not yet tested end-to-end | Medium | Pending test |
-| 3 | `pbi_sign_out` not yet tested end-to-end | Low | Pending test |
-| 4 | Binding auto-resolve not yet tested (requires prior successful publish) | Medium | Pending test |
-| 5 | Selection table (Phase 2) is created in dataset but never populated | Low | By design |
+| 1 | `allowExternalWrites` defaults to `false` — easy to miss, publish silently fails | Medium | ✅ Fixed: clear error + suggestion returned |
+| 2 | `pbi_publish_schedules` not tested end-to-end | Medium | ✅ Tested: 12 schedules, 2,921 rows, 777ms |
+| 3 | `pbi_sign_out` not tested end-to-end | Low | ✅ Tested: token cache cleared, re-auth works |
+| 4 | Binding auto-resolve not tested | Medium | ✅ Tested: 9,536 elements with zero params |
+| 5 | Selection table (Phase 2) is created in dataset but never populated | Low | By design — Phase 2 |
 | 6 | PBI Desktop crashes with large push datasets (~10k rows) | Medium | Known PBI limitation — use Service |
+| 7 | Stale binding (cached datasetId deleted from PBI) caused 404 loop | High | ✅ Fixed: stale-binding detection in publish tools; fallback to name-lookup + auto-create |
 
 ---
 
@@ -349,7 +350,10 @@ src/RevitCortex.Server/Tools/ElementTools.cs
 | `pbi_publish_elements` — real model, filtered | ✅ Dataset created, data visible in PBI Desktop |
 | `pbi_get_binding` — no binding (cold start) | ✅ Returns `bound:false` with tip |
 | `pbi_get_binding` — after deploy (new tool) | ✅ Tool responds correctly |
-| `pbi_publish_elements` — binding save after publish | 🔲 Pending (deploy done, test pending) |
-| `pbi_publish_schedules` | 🔲 Pending first test |
-| `pbi_sign_out` | 🔲 Pending first test |
-| Binding auto-resolve (no params) | 🔲 Pending first test |
+| `pbi_publish_elements` — binding save after publish | ✅ Binding persisted, verified with pbi_get_binding |
+| `pbi_publish_schedules` | ✅ 12 schedules, 2,921 rows, 777ms, 0 warnings |
+| `pbi_sign_out` | ✅ Token cache cleared, pbi_check_auth returns signedIn=false |
+| Binding auto-resolve (no params) | ✅ 9,536 elements, workspaceId/datasetId from binding |
+| Stale-binding recovery | ✅ Auto-detected stale id, recreated dataset with all 4 tables |
+| Re-auth after sign-out (device code) | ✅ New token acquired, publish operational |
+| Deploy R23→R27 | ✅ All 5 targets deployed and verified |
