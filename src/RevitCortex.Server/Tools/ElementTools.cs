@@ -561,6 +561,23 @@ public static class ElementTools
         return result.ToString();
     }
 
+    [McpServerTool(Name = "pbi_publish_selection"), Description("Publishes the current Revit selection to the Power BI Selection table (one row per selected element). Each call replaces the previous snapshot (DELETE then POST). workspaceId and datasetId can be omitted when a ProjectBinding was saved by a previous publish for this document. Returns rowCount=0 with a warning if nothing is selected and clearIfEmpty is false.")]
+    public static async Task<string> PbiPublishSelection(
+        RevitConnectionManager revit,
+        [Description("Power BI workspace (group) GUID. Can be omitted if a ProjectBinding exists for this document.")] string? workspaceId = null,
+        [Description("Existing dataset id. If omitted, resolved from ProjectBinding or looked up by datasetName.")] string? datasetId = null,
+        [Description("Dataset name used for lookup. Default: 'RevitCortex Live - {ProjectName} - v1'.")] string? datasetName = null,
+        [Description("If true, DELETE the Selection table rows even when nothing is selected in Revit. Default: false.")] bool clearIfEmpty = false,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["clearIfEmpty"] = clearIfEmpty };
+        if (workspaceId != null) p["workspaceId"] = workspaceId;
+        if (datasetId != null)   p["datasetId"]   = datasetId;
+        if (datasetName != null) p["datasetName"] = datasetName;
+        var result = await revit.ExecuteAsync("pbi_publish_selection", p, ct);
+        return result.ToString();
+    }
+
     [McpServerTool(Name = "import_from_powerbi"), Description("Reads a previously-exported (or hand-edited) Power BI CSV and writes parameter values back to Revit elements. Identifies elements via the ElementId column. Built-in fields and read-only parameters are skipped. Defaults to dryRun=true so callers can preview first.")]
     public static async Task<string> ImportFromPowerBi(
         RevitConnectionManager revit,
