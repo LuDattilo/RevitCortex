@@ -1,22 +1,37 @@
-# Power BI Live — Phase 2 — Bidirectional Selection
+# Power BI Live — Phase 2 — Selection Publishing
 
 **Date:** 2026-05-11  
-**Status:** Design — pending independent review  
+**Status:** Design — revised after independent review ✅  
 **Author:** RevitCortex AI session (Luigi Dattilo, GPA Ingegneria Srl)  
 **Depends on:** Phase 1 spec (`2026-05-11-powerbi-live-phase1-design.md`) — fully validated
 
 ---
 
+## Review Findings (2026-05-11)
+
+Independent review identified three blockers in the original design:
+
+1. **`GET /tables/{table}/rows` does not exist for push datasets.** The Power BI Push Dataset REST API exposes only `POST rows`, `DELETE rows`, `GET tables` — not a row-read endpoint. `select_from_powerbi` as designed would call a non-existent endpoint.
+2. **`select_from_powerbi` name conflict.** A tool with `Name => "select_from_powerbi"` already exists (`SelectFromPowerBiTool.cs`, MCP wrapper in `ElementTools.cs` line 415). The new tool would collide.
+3. **PBI → Revit "click visual" is not obtainable via REST alone.** Power BI REST does not expose visual selection state. A real PBI→Revit channel requires Power BI Embedded JS, a custom visual, or Power Automate writeback — out of scope.
+
+**Resolution:** Phase 2 is split into 2A and 2B:
+- **Phase 2A (this spec):** `pbi_publish_selection` only — Revit → PBI, fully implementable.
+- **Phase 2B (future spec):** PBI → Revit via DAX `executeQueries` or explicit ElementId passing — requires separate design.
+
+---
+
 ## 1. Scope
 
-Phase 2 adds **bidirectional selection** between Revit and Power BI:
+Phase 2A adds **one tool**: `pbi_publish_selection` (Revit → PBI).
 
 | Direction | Tool | Trigger |
 |-----------|------|---------|
 | Revit → PBI | `pbi_publish_selection` | On-demand (user asks Claude) |
-| PBI → Revit | `select_from_powerbi` | On-demand (user asks Claude) |
+| PBI → Revit | *(Phase 2B — future)* | — |
 
 **Explicitly out of scope:**
+- `select_from_powerbi` new variant (blocked — see review findings)
 - Automatic `SelectionChanged` watcher (polling/event loop)
 - Named selection sets / selection history
 - `pbi_bind_document` (explicit binding override)
@@ -117,168 +132,77 @@ Snapshots the currently selected elements in Revit and pushes them to the `Selec
 
 ---
 
-## 5. Tool: `select_from_powerbi`
+## 5. Phase 2B — PBI → Revit (Future, Not Implemented)
 
-### 5.1 Purpose
+Blocked by two constraints identified in review:
 
-Reads ElementIds from a Power BI table and applies them as the active Revit selection. Enables "click a visual in PBI → elements selected in Revit" via Claude as the bridge.
+1. **No `GET rows` endpoint on push datasets.** The Push Dataset REST API does not expose a row-read endpoint. Reading data back requires either: (a) DAX `executeQueries` (requires Build permission + tenant setting), or (b) a separate writeback channel (Power Automate, custom visual, Embedded JS).
+2. **Visual selection state is not in the REST API.** "What the user clicked in a PBI visual" is not queryable via REST. It requires Power BI Embedded JS SDK running in a browser context.
 
-### 5.2 Inputs
-
-| Parameter | Type | Required | Default | Notes |
-|-----------|------|----------|---------|-------|
-| `workspaceId` | string | No | from binding | |
-| `datasetId` | string | No | from binding | |
-| `datasetName` | string | No | from binding | |
-| `sourceTable` | string | No | `"Selection"` | Which table to read from. Can be `"Elements"` for filtered selection |
-| `elementIdColumn` | string | No | `"ElementId"` | Column containing the Int64 Revit ElementId |
-| `maxElements` | int | No | `500` | Safety cap — prevents accidentally selecting 10k elements |
-
-### 5.3 Behavior
-
-1. **Background thread — read from PBI:**
-   - `GET /v1.0/myorg/groups/{workspaceId}/datasets/{datasetId}/tables/{sourceTable}/rows`
-   - Extract `elementIdColumn` values → `List<long>`
-   - Apply `maxElements` cap (warn if truncated)
-
-2. **Main thread — apply selection:**
-   - Convert each `long` to `ElementId` (`new ElementId((int)id)` on R23/R24, `new ElementId(id)` on R25+)
-   - Filter: only include ids that exist in the active document (`doc.GetElement(id) != null`)
-   - `uiDoc.Selection.SetElementIds(validIds)`
-   - If `validIds.Count == 0`: return warning, do not clear existing selection
-
-3. **Return:**
-```json
-{
-  "success": true,
-  "selectedCount": 38,
-  "skippedCount": 4,
-  "skippedReason": "ElementIds not found in active document",
-  "sourceTable": "Selection",
-  "durationMs": 420,
-  "tip": "Use operate_element with action='isolate' to isolate selected elements in the current view."
-}
-```
-
-### 5.4 Error cases
-
-| Condition | Error code | Message |
-|-----------|-----------|---------|
-| Not signed in | PermissionDenied | "Not signed in to Power BI." |
-| No active document | InvalidInput | "No active Revit document." |
-| workspaceId not resolvable | InvalidInput | "workspaceId is required." |
-| Dataset not found (404) | ElementNotFound | "Dataset not found." |
-| Table empty (0 rows) | ok (warning) | Returns selectedCount=0 with tip |
-| All ids skipped (not in doc) | ok (warning) | Returns selectedCount=0, skippedCount=N |
+**Pragmatic Phase 2B design (future spec):**
+- Option A: User or Claude provides ElementId list explicitly → use existing `select_from_powerbi(elementIds, action)` tool (already implemented)
+- Option B: DAX `executeQueries` to read a filtered subset from the dataset → design separately, requires additional API permissions
 
 ---
 
-## 6. Power BI REST API — Row Read
-
-The `GET .../tables/{table}/rows` endpoint returns:
-
-```json
-{
-  "value": [
-    { "ElementId": 123456, "UniqueId": "...", ... },
-    ...
-  ]
-}
-```
-
-This is already handled by `PowerBiServiceClient`. A new method `GetTableRowsAsync(workspaceId, datasetId, tableName)` returns `List<Dictionary<string, object?>>`. The caller extracts the column by key.
-
-**Pagination:** The push dataset API returns all rows in a single response (no `$top`/`$skip` for push datasets). The `maxElements` cap is applied client-side after the read.
-
----
-
-## 7. ElementId Compatibility (R23 vs R25+)
+## 6. ElementId Compatibility (R23 vs R25+)
 
 ```csharp
 // ElementIdHelper.cs (already exists in codebase)
-// Reading: always use .Value (R24+) or .IntegerValue (R23)
-// Writing: new ElementId((int)longValue) on R23/R24 (net48)
-//          new ElementId(longValue)       on R25+ (net8)
+// Reading from doc: .Value (R24+) or .IntegerValue (R23)
+// Writing to Int64 column: (long)id.Value or (long)id.IntegerValue
 ```
 
-The `select_from_powerbi` tool must handle both. Since the stored value is `Int64`, the cast to `int` is safe for Revit's actual id range (< 2^31).
+Stored as `Int64` in the Selection table. Values fit in int32 for Revit's actual id range.
 
 ---
 
-## 8. New Files
+## 7. New Files (Phase 2A only)
 
 ```
 src/RevitCortex.Plugin/PowerBiLive/Tools/
-├── PbiPublishSelectionTool.cs    (new)
-└── PbiSelectFromPbiTool.cs       (new — "select_from_powerbi")
-
-src/RevitCortex.Plugin/PowerBiLive/
-└── PowerBiServiceClient.cs       (add GetTableRowsAsync method)
+└── PbiPublishSelectionTool.cs    (new)
 
 src/RevitCortex.Server/Tools/
-└── ElementTools.cs               (add 2 MCP wrappers)
+└── ElementTools.cs               (add 1 MCP wrapper: pbi_publish_selection)
 
-tool-schemas.txt                  (add 2 entries)
-WORKFLOWS.md                      (add Phase 2 section)
+tool-schemas.txt                  (add 1 entry)
+WORKFLOWS.md                      (add Phase 2A section)
 docs/USER_GUIDE.md                (update PBI Live table)
 ```
 
-No changes to `PowerBiDatasetSchema.cs`, `PowerBiSettings.cs`, or `PowerBiToolHelper.cs`.
+No changes to `PowerBiDatasetSchema.cs`, `PowerBiSettings.cs`, `PowerBiToolHelper.cs`, or `PowerBiServiceClient.cs`.
 
 ---
 
-## 9. MCP Server Wrappers (ElementTools.cs)
-
-```csharp
-// pbi_publish_selection
-[McpServerTool("pbi_publish_selection")]
-// inputs: workspaceId?, datasetId?, datasetName?, clearIfEmpty?
-
-// select_from_powerbi  
-[McpServerTool("select_from_powerbi")]
-// inputs: workspaceId?, datasetId?, datasetName?, sourceTable?, elementIdColumn?, maxElements?
-```
-
-Both follow the existing pattern: build `JObject input`, call `bridge.InvokeToolAsync(name, input)`.
-
----
-
-## 10. Threading Contract
+## 8. Threading Contract
 
 | Step | Thread | Revit API? |
 |------|--------|-----------|
 | Parse input, validate | Main | No |
 | Auth (MSAL cache) | Main | No |
-| Snapshot selection (pbi_publish_selection) | Main | ✅ Yes |
-| HTTP DELETE + POST (pbi_publish_selection) | Background | No |
-| HTTP GET rows (select_from_powerbi) | Background | No |
-| Apply selection (select_from_powerbi) | Main | ✅ Yes |
+| Snapshot selection | Main | ✅ Yes — `UIDocument.Selection.GetElementIds()` |
+| HTTP DELETE + POST | Background | No |
 
-`select_from_powerbi` needs **two main-thread phases**: apply selection after the background HTTP read. This is handled by the existing `RunWithoutContext` pattern — the background read completes and returns `List<long>`, then the main thread applies the selection synchronously before returning.
+Single main-thread phase (snapshot), then background HTTP. Same pattern as `pbi_publish_elements`.
 
 ---
 
-## 11. Test Matrix
+## 9. Test Matrix
 
 | Test | Expected |
 |------|----------|
-| `pbi_publish_selection` — elements selected | ✅ rowCount = selection size, table updated in PBI |
-| `pbi_publish_selection` — nothing selected, clearIfEmpty=false | ✅ rowCount=0, warning, table NOT cleared |
-| `pbi_publish_selection` — nothing selected, clearIfEmpty=true | ✅ rowCount=0, table cleared |
-| `pbi_publish_selection` — no binding, no params | ✅ Fail: workspaceId required |
-| `pbi_publish_selection` — binding auto-resolve | ✅ Uses binding workspaceId/datasetId |
-| `select_from_powerbi` — Selection table has rows | ✅ selectedCount = valid ids |
-| `select_from_powerbi` — some ids not in doc | ✅ skippedCount > 0, rest selected |
-| `select_from_powerbi` — empty table | ✅ selectedCount=0, warning |
-| `select_from_powerbi` — sourceTable="Elements", elementIdColumn="ElementId" | ✅ Selects filtered elements |
-| `select_from_powerbi` — maxElements cap hit | ✅ Warning: "truncated to N" |
-| Round-trip: publish_selection → select_from_powerbi | ✅ Same ids in, same ids out |
+| `pbi_publish_selection` — elements selected | rowCount = selection size, Selection table updated in PBI |
+| `pbi_publish_selection` — nothing selected, clearIfEmpty=false | rowCount=0, warning, table NOT cleared |
+| `pbi_publish_selection` — nothing selected, clearIfEmpty=true | rowCount=0, table cleared |
+| `pbi_publish_selection` — no binding, no params | Fail: workspaceId required |
+| `pbi_publish_selection` — binding auto-resolve | Uses binding workspaceId/datasetId |
+| `pbi_publish_selection` — stale binding (dataset deleted) | Fallback to name-lookup, recreates dataset |
 
 ---
 
-## 12. Known Constraints
+## 10. Known Constraints
 
-1. **Push dataset row read is all-or-nothing** — no server-side filter. Large `Elements` tables (10k rows) are fully downloaded before `maxElements` is applied. For `Selection` table this is fine (typically <500 rows).
-2. **UIDocument requires main thread** — `select_from_powerbi` must marshal back to main thread for `SetElementIds`. This is the existing pattern.
-3. **ElementId int32 ceiling** — Revit ElementId values fit in int32 even on newer versions; the Int64→int cast is safe.
-4. **Revit selection is per-view in some contexts** — `SetElementIds` works on the active view. No special handling needed.
+1. **UIDocument constructor requires an open document.** `new UIDocument(document)` throws if document is not open in the UI. Handled by `RequiresDocument = true` guard in the router.
+2. **Selection is scoped to active view in some Revit contexts.** `GetElementIds()` returns elements selectable in the current view. No special handling needed — this is the expected behavior.
+3. **ElementId int32 ceiling.** Revit ElementId values fit in int32 even on newer versions; storing as Int64 is safe and forward-compatible.
