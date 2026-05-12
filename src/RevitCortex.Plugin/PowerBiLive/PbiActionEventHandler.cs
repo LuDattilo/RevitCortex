@@ -227,9 +227,9 @@ public class PbiActionEventHandler : IExternalEventHandler
                 {
                     req.Result = req.Kind switch
                     {
-                        Kind.Select         => ExecuteSelect(doc, req),
-                        Kind.Color          => ExecuteColor(doc, req),
-                        Kind.ResetOverrides => ExecuteResetOverrides(doc),
+                        Kind.Select         => ExecuteSelect(app!, doc, req),
+                        Kind.Color          => ExecuteColor(app!, doc, req),
+                        Kind.ResetOverrides => ExecuteResetOverrides(app!, doc),
                         Kind.CreateView     => ExecuteCreateView(doc, app!, req),
                         _                   => null
                     };
@@ -249,7 +249,26 @@ public class PbiActionEventHandler : IExternalEventHandler
 
     // ─── Action implementations (UI thread) ────────────────────────────────
 
-    private string? ExecuteSelect(Document doc, Request req)
+    /// <summary>
+    /// Returns the view currently shown in the UI. Prefers
+    /// <see cref="UIDocument.ActiveView"/> (reflects the focused window) and falls
+    /// back to <see cref="Document.ActiveView"/> if the UIDocument is unavailable.
+    /// Critical for actions that depend on "where the user is looking right now":
+    /// if we read <c>doc.ActiveView</c> too early, a user who has navigated to a
+    /// different view between click and dispatch ends up painting the wrong view.
+    /// </summary>
+    private static Autodesk.Revit.DB.View GetCurrentView(UIApplication app, Document doc)
+    {
+        try
+        {
+            var uiDoc = app?.ActiveUIDocument;
+            if (uiDoc != null && uiDoc.ActiveView != null) return uiDoc.ActiveView;
+        }
+        catch { /* fall through */ }
+        return doc.ActiveView;
+    }
+
+    private string? ExecuteSelect(UIApplication app, Document doc, Request req)
     {
         var rawIds = req.RawIds;
         var action = req.Action;
@@ -273,7 +292,7 @@ public class PbiActionEventHandler : IExternalEventHandler
             {
                 using var tx = new Transaction(doc, "PBI isolate");
                 tx.Start();
-                doc.ActiveView.IsolateElementsTemporary(validIds);
+                GetCurrentView(app, doc).IsolateElementsTemporary(validIds);
                 tx.Commit();
             }
             catch (Exception ex)
@@ -285,7 +304,7 @@ public class PbiActionEventHandler : IExternalEventHandler
         return validIds.Count.ToString();
     }
 
-    private string? ExecuteColor(Document doc, Request req)
+    private string? ExecuteColor(UIApplication app, Document doc, Request req)
     {
         var items = req.Colors;
         if (items == null || items.Count == 0) return "0";
@@ -310,13 +329,13 @@ public class PbiActionEventHandler : IExternalEventHandler
 
         using var tx = new Transaction(doc, "PBI color override");
         tx.Start();
-        var view = doc.ActiveView;
+        var view = GetCurrentView(app, doc);
         var painted = new List<ElementId>(resolved.Count);
         foreach (var (eid, color) in resolved)
         {
-            // Pattern fill only — projection/cut line colors are left untouched so
-            // the model's own edges stay legible (otherwise the colored outlines
-            // overwhelm the geometry on busy views).
+            // Override surface/cut patterns + projection/cut line colors so the
+            // color is visible regardless of display style (wireframe, hidden line,
+            // shaded, realistic). Patterns alone don't show in wireframe views.
             var ogs = new OverrideGraphicSettings();
             if (solidFillId != ElementId.InvalidElementId)
             {
@@ -327,6 +346,8 @@ public class PbiActionEventHandler : IExternalEventHandler
                 ogs.SetCutForegroundPatternId(solidFillId);
                 ogs.SetCutForegroundPatternVisible(true);
             }
+            ogs.SetProjectionLineColor(color);
+            ogs.SetCutLineColor(color);
             try
             {
                 view.SetElementOverrides(eid, ogs);
@@ -342,9 +363,9 @@ public class PbiActionEventHandler : IExternalEventHandler
         return resolved.Count.ToString();
     }
 
-    private string? ExecuteResetOverrides(Document doc)
+    private string? ExecuteResetOverrides(UIApplication app, Document doc)
     {
-        var view = doc.ActiveView;
+        var view = GetCurrentView(app, doc);
         int overridesCleared = 0;
         bool isolationCleared = false;
 
