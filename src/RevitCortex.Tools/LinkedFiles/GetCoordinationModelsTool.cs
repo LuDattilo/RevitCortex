@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
-#if REVIT2026_OR_GREATER
+#if REVIT2027_OR_GREATER
 using Autodesk.Revit.DB.ExternalData;
 #endif
 using Newtonsoft.Json.Linq;
@@ -56,7 +56,7 @@ public class GetCoordinationModelsTool : ICortexTool, ICacheableTool
 
         try
         {
-#if REVIT2026_OR_GREATER
+#if REVIT2027_OR_GREATER
             return ExecuteWithCoordinationModelApi(doc, nameFilter, includeInstances, maxInstances);
 #else
             return UnsupportedTargetResult();
@@ -121,7 +121,7 @@ public class GetCoordinationModelsTool : ICortexTool, ICacheableTool
         });
     }
 
-#if REVIT2026_OR_GREATER
+#if REVIT2027_OR_GREATER
     private static CortexResult<object> ExecuteWithCoordinationModelApi(
         Document doc,
         string? nameFilter,

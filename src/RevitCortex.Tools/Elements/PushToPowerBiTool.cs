@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -40,6 +41,12 @@ public class PushToPowerBiTool : ICortexTool
         // Optional: explicit column mapping with aliases and formulas. When set,
         // overrides the parameter discovery + ordering logic.
         var columnMappingsRaw = input["columnMappings"] as JArray;
+        // Optional: per-column type hints + .pq generation. When provided we
+        // emit a sibling Power Query file with explicit Table.TransformColumnTypes
+        // and, for numeric-typed columns, write <col>_Raw companions in invariant
+        // culture so PBI doesn't have to strip "1500 mm" unit suffixes itself.
+        var columnTypesRaw = input["columnTypes"] as JArray;
+        var schemaMappingMode = input["schemaMappingMode"]?.Value<string>() ?? "Auto";
 
         // ── Schedule mode: one CSV per schedule, columns = schedule fields ──
         if (scheduleIds.Count > 0)
@@ -232,10 +239,40 @@ public class PushToPowerBiTool : ICortexTool
             else
             {
                 // ── Discovery mode (default, retro-compatible) ──
+                // When schemaMappingMode != "Auto", numeric-typed columns get a
+                // sibling "<col>_Raw" companion containing the invariant-culture
+                // raw value. The display column keeps the locale-formatted value
+                // with unit suffix (e.g. "1500 mm") for human readability.
+                var columnTypes = ParseColumnTypes(columnTypesRaw);
+                bool useTypeMapping = !string.Equals(schemaMappingMode, "Auto", StringComparison.OrdinalIgnoreCase)
+                                    && columnTypes.Count > 0;
+
                 var header = new List<string> { "ElementId", "Category", "Family", "Type" };
-                header.AddRange(instanceParamNames.Items);
+                var rawCompanionInst = new HashSet<string>(); // instance param names that need _Raw
+                var rawCompanionType = new HashSet<string>(); // type param names (without [Type] prefix) that need _Raw
+
+                foreach (var name in instanceParamNames.Items)
+                {
+                    header.Add(name);
+                    if (useTypeMapping && IsNumericMapped(columnTypes, name))
+                    {
+                        header.Add(name + "_Raw");
+                        rawCompanionInst.Add(name);
+                    }
+                }
                 if (includeTypeParams)
-                    header.AddRange(typeParamNames.Items.Select(n => $"[Type] {n}"));
+                {
+                    foreach (var name in typeParamNames.Items)
+                    {
+                        var prefixed = $"[Type] {name}";
+                        header.Add(prefixed);
+                        if (useTypeMapping && IsNumericMapped(columnTypes, prefixed))
+                        {
+                            header.Add(prefixed + "_Raw");
+                            rawCompanionType.Add(name);
+                        }
+                    }
+                }
                 columnCount = header.Count;
                 sb.AppendLine(ToCsvRow(header));
 
@@ -250,7 +287,7 @@ public class PushToPowerBiTool : ICortexTool
 
                     var row = new List<string>
                     {
-                        ToolHelpers.GetElementIdValue(elem.Id).ToString(),
+                        ToolHelpers.GetElementIdValue(elem.Id).ToString(CultureInfo.InvariantCulture),
                         CsvEscape(elem.Category?.Name ?? ""),
                         CsvEscape(elem.LookupParameter("Family Name")?.AsString()
                             ?? (typeElem as ElementType)?.FamilyName ?? ""),
@@ -262,6 +299,8 @@ public class PushToPowerBiTool : ICortexTool
                     {
                         var p = elem.LookupParameter(name);
                         row.Add(CsvEscape(p != null ? GetParamDisplayValue(p) : ""));
+                        if (rawCompanionInst.Contains(name))
+                            row.Add(p != null ? GetParamRawValue(p) : "");
                     }
 
                     if (includeTypeParams)
@@ -270,14 +309,24 @@ public class PushToPowerBiTool : ICortexTool
                         {
                             var p = typeElem?.LookupParameter(name);
                             row.Add(CsvEscape(p != null ? GetParamDisplayValue(p) : ""));
+                            if (rawCompanionType.Contains(name))
+                                row.Add(p != null ? GetParamRawValue(p) : "");
                         }
                     }
 
                     sb.AppendLine(ToCsvRow(row));
                 }
+
+                // Power Query sidecar (only when mapping is requested and there's
+                // at least one non-auto column type to transform).
+                if (useTypeMapping)
+                {
+                    try { WritePowerQuerySidecar(filePath, header, columnTypes); }
+                    catch { /* never block export on .pq emission failure */ }
+                }
             }
 
-            File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
+            WriteCsvAtomic(filePath, sb.ToString());
 
             // Write metadata sidecar
             var meta = new JObject
@@ -437,7 +486,7 @@ public class PushToPowerBiTool : ICortexTool
                     written_rows++;
                 }
 
-                File.WriteAllText(csvPath, sb.ToString(), Encoding.UTF8);
+                WriteCsvAtomic(csvPath, sb.ToString());
                 totalRows += written_rows;
                 written.Add(new
                 {
@@ -656,18 +705,159 @@ public class PushToPowerBiTool : ICortexTool
         return ip != null ? GetParamDisplayValue(ip) : "";
     }
 
+    /// <summary>
+    /// Stringifies a Parameter value for CSV output. Numeric fallbacks use
+    /// <see cref="CultureInfo.InvariantCulture"/> so a locale with comma
+    /// decimal separator (e.g. it-IT) does not produce "1,5" that Power BI
+    /// — reading with Delimiter="," — would split into two columns.
+    /// Note: <c>AsValueString()</c> still returns Revit's locale-formatted
+    /// display string (e.g. "1500 mm"); the invariant-culture pass only
+    /// kicks in when Revit can't format the value itself.
+    /// </summary>
     private static string GetParamDisplayValue(Parameter p)
     {
         if (!p.HasValue) return "";
         return p.StorageType switch
         {
             StorageType.String => p.AsString() ?? "",
-            StorageType.Integer => p.AsInteger().ToString(),
-            StorageType.Double => p.AsValueString() ?? p.AsDouble().ToString("F4"),
+            StorageType.Integer => p.AsInteger().ToString(CultureInfo.InvariantCulture),
+            StorageType.Double => p.AsValueString() ?? p.AsDouble().ToString("F4", CultureInfo.InvariantCulture),
             StorageType.ElementId => p.AsValueString() ?? p.AsElementId().ToString(),
             _ => ""
         };
     }
+
+    /// <summary>
+    /// Writes a CSV atomically: first to a sibling .tmp file, then renames
+    /// onto the target path with overwrite. This prevents Power BI scheduled
+    /// refresh from reading a half-written file when the export coincides
+    /// with the refresh window.
+    /// </summary>
+    private static void WriteCsvAtomic(string targetPath, string content)
+    {
+        var tmpPath = targetPath + ".tmp";
+        File.WriteAllText(tmpPath, content, Encoding.UTF8);
+        // File.Move with overwrite is atomic on NTFS — safe even if Power BI
+        // is reading targetPath right now (the open handle keeps the old file
+        // alive until released; the new write replaces the entry).
+        if (File.Exists(targetPath)) File.Delete(targetPath);
+        File.Move(tmpPath, targetPath);
+    }
+
+    private class ColumnTypeDef
+    {
+        public string PbiType { get; set; } = "auto";
+        public string? Format { get; set; }
+        public bool IsNumeric => PbiType is "int" or "number" or "fixed" or "percent";
+        public bool IsAuto => string.Equals(PbiType, "auto", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Dictionary<string, ColumnTypeDef> ParseColumnTypes(JArray? arr)
+    {
+        var dict = new Dictionary<string, ColumnTypeDef>(StringComparer.OrdinalIgnoreCase);
+        if (arr == null) return dict;
+        foreach (var item in arr.OfType<JObject>())
+        {
+            var name = item["ColumnName"]?.ToString() ?? item["columnName"]?.ToString() ?? "";
+            if (string.IsNullOrEmpty(name)) continue;
+            dict[name] = new ColumnTypeDef
+            {
+                PbiType = item["PbiType"]?.ToString() ?? item["pbiType"]?.ToString() ?? "auto",
+                Format = item["Format"]?.ToString() ?? item["format"]?.ToString()
+            };
+        }
+        return dict;
+    }
+
+    private static bool IsNumericMapped(Dictionary<string, ColumnTypeDef> map, string colName)
+        => map.TryGetValue(colName, out var def) && def.IsNumeric;
+
+    /// <summary>
+    /// Raw invariant-culture value for a parameter, used to fill <c>&lt;col&gt;_Raw</c>
+    /// companion columns when the user maps a column to a numeric Power BI type.
+    /// </summary>
+    private static string GetParamRawValue(Parameter p)
+    {
+        if (!p.HasValue) return "";
+        return p.StorageType switch
+        {
+            StorageType.Integer => p.AsInteger().ToString(CultureInfo.InvariantCulture),
+            StorageType.Double => p.AsDouble().ToString("G", CultureInfo.InvariantCulture),
+            _ => ""
+        };
+    }
+
+    private static string MapToPowerQueryType(string pbiType) => (pbiType ?? "auto").ToLowerInvariant() switch
+    {
+        "int"      => "Int64.Type",
+        "number"   => "type number",
+        "fixed"    => "Currency.Type",
+        "percent"  => "Percentage.Type",
+        "bool"     => "type logical",
+        "date"     => "type date",
+        "datetime" => "type datetime",
+        "duration" => "type duration",
+        _          => "type text"
+    };
+
+    /// <summary>
+    /// Writes a Power Query (.pq) sidecar that PBI can load via 'Get Data →
+    /// Blank Query → Advanced Editor'. For numeric-typed columns we type the
+    /// <c>_Raw</c> companion (the invariant-culture value), leaving the display
+    /// column as text so the locale-formatted "1500 mm" string remains usable
+    /// for labels. Auto-typed columns are skipped (PBI auto-infers them).
+    /// </summary>
+    private static void WritePowerQuerySidecar(string csvPath, List<string> headers, Dictionary<string, ColumnTypeDef> columnTypes)
+    {
+        var transforms = new List<string>();
+        var headerSet = new HashSet<string>(headers, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var h in headers)
+        {
+            // _Raw companion: type as the numeric PBI type.
+            if (h.EndsWith("_Raw", StringComparison.Ordinal))
+            {
+                var baseName = h.Substring(0, h.Length - 4);
+                if (columnTypes.TryGetValue(baseName, out var defR) && !defR.IsAuto)
+                {
+                    transforms.Add($"        {{\"{EscapeForPq(h)}\", {MapToPowerQueryType(defR.PbiType)}}}");
+                }
+                continue;
+            }
+            // Display column: if it has a _Raw companion (i.e. is a mapped numeric
+            // column) leave it text. Otherwise emit the user-chosen type.
+            if (columnTypes.TryGetValue(h, out var def) && !def.IsAuto)
+            {
+                if (def.IsNumeric && headerSet.Contains(h + "_Raw"))
+                    transforms.Add($"        {{\"{EscapeForPq(h)}\", type text}}");
+                else
+                    transforms.Add($"        {{\"{EscapeForPq(h)}\", {MapToPowerQueryType(def.PbiType)}}}");
+            }
+        }
+
+        if (transforms.Count == 0) return; // nothing to emit
+
+        var transformBlock = string.Join(",\r\n", transforms);
+        var fullCsv = csvPath.Replace("\\", "\\\\");
+        var pq = $@"// Auto-generated by RevitCortex push_to_powerbi.
+// Load in Power BI Desktop: Get Data → Blank Query → Advanced Editor → paste this.
+// For scheduled refresh, point the dataset at this query (it embeds the CSV path).
+let
+    Source = Csv.Document(File.Contents(""{fullCsv}""), [Delimiter="","", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+    Typed = Table.TransformColumnTypes(Promoted, {{
+{transformBlock}
+    }})
+in
+    Typed
+";
+
+        var pqPath = Path.ChangeExtension(csvPath, ".pq");
+        File.WriteAllText(pqPath, pq, Encoding.UTF8);
+    }
+
+    private static string EscapeForPq(string columnName)
+        => columnName.Replace("\\", "\\\\").Replace("\"", "\"\"");
 
     private static string ToCsvRow(IEnumerable<string> fields) =>
         string.Join(",", fields);

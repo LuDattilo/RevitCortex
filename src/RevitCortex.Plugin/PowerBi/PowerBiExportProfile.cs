@@ -48,11 +48,18 @@ public class PowerBiExportProfile
     public string ScopeMode { get; set; } = "WholeModel";
 
     /// <summary>
-    /// Optional explicit column mapping. When non-empty it OVERRIDES the
-    /// InstanceParameters / TypeParameters lists and gives the user full control
-    /// over column order, alias headers, and computed-formula columns.
+    /// Optional schema mapping mode for Power BI: "Auto" (default — let PBI
+    /// infer), "Suggested" (server-derived types), "Custom" (user-edited).
+    /// When non-Auto the export writes a sibling .pq file with explicit
+    /// Table.TransformColumnTypes so PBI doesn't rely on locale-dependent
+    /// inference.
     /// </summary>
-    public List<ColumnMapping> ColumnMappings { get; set; } = new();
+    public string SchemaMappingMode { get; set; } = "Auto";
+
+    /// <summary>
+    /// Per-column type hints. Only consulted when SchemaMappingMode != "Auto".
+    /// </summary>
+    public List<ColumnTypeMapping> ColumnTypes { get; set; } = new();
 
     public DateTime LastUsed { get; set; } = DateTime.UtcNow;
 }

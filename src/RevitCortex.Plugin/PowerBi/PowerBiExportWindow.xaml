@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
-        Title="RevitCortex — Power BI Export" Height="680" Width="1100"
+        Title="RevitCortex — Power BI Export" Height="680" Width="1200"
         WindowStartupLocation="CenterScreen"
         Background="#FAFAFA">
     <Window.Resources>
@@ -56,7 +56,7 @@
         <Border Grid.Row="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="20,14">
             <StackPanel Orientation="Horizontal">
                 <TextBlock x:Name="Step1Label" Text="① Categorie" FontSize="14" FontWeight="SemiBold" Foreground="#00838F" Margin="0,0,32,0"/>
-                <TextBlock x:Name="Step2Label" Text="② Parametri" FontSize="14" Foreground="#9E9E9E" Margin="0,0,32,0"/>
+                <TextBlock x:Name="Step2Label" Text="② Parametri" FontSize="14" Foreground="#9E9E9E" Margin="0,0,32,0" Visibility="Collapsed"/>
                 <TextBlock x:Name="Step3Label" Text="③ Output" FontSize="14" Foreground="#9E9E9E"/>
             </StackPanel>
         </Border>
@@ -69,56 +69,73 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0">
                     <TextBlock Style="{StaticResource StepHeader}" Text="Sorgente dati"/>
                     <TextBlock Style="{StaticResource StepSubtitle}"
-                               Text="Scegli come selezionare gli elementi: per categoria + parametri (massima flessibilità) oppure riusa una schedule esistente del modello."/>
+                               Text="Scegli l'ambito e seleziona le categorie: i parametri disponibili appaiono a destra non appena selezioni. Oppure usa Schedule per riusare le tabelle esistenti del modello."/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
-                    <RadioButton x:Name="ModeCategoriesRadio" Content="Categorie + Parametri" IsChecked="True"
-                                 GroupName="SourceMode" Margin="0,0,24,0" Checked="SourceMode_Changed"/>
-                    <RadioButton x:Name="ModeSchedulesRadio" Content="Schedule esistenti del modello"
-                                 GroupName="SourceMode" Checked="SourceMode_Changed"/>
-                </StackPanel>
-
-                <!-- Scope toggle (SheetLink-style: Whole/Active View/Selection) -->
-                <StackPanel x:Name="ScopePanel" Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,8">
-                    <TextBlock Text="Ambito:" VerticalAlignment="Center" Foreground="#616161" Margin="0,0,8,0" FontSize="12"/>
+                <!-- Combined scope + source-mode row -->
+                <StackPanel x:Name="ScopePanel" Grid.Row="1" Orientation="Horizontal" Margin="0,4,0,8">
                     <RadioButton x:Name="ScopeWholeRadio" Content="Tutto il modello" IsChecked="True"
-                                 GroupName="Scope" Margin="0,0,16,0" Checked="Scope_Changed"/>
+                                 GroupName="SourceScope" Margin="0,0,16,0" Checked="SourceScope_Changed"/>
                     <RadioButton x:Name="ScopeViewRadio" Content="Vista attiva"
-                                 GroupName="Scope" Margin="0,0,16,0" Checked="Scope_Changed"/>
+                                 GroupName="SourceScope" Margin="0,0,16,0" Checked="SourceScope_Changed"/>
                     <RadioButton x:Name="ScopeSelectionRadio" Content="Selezione corrente"
-                                 GroupName="Scope" Checked="Scope_Changed"/>
+                                 GroupName="SourceScope" Margin="0,0,24,0" Checked="SourceScope_Changed"/>
+                    <Separator Width="1" Background="#E0E0E0" Margin="0,0,16,0"/>
+                    <RadioButton x:Name="ModeSchedulesRadio" Content="Schedule"
+                                 GroupName="SourceScope" Checked="SourceScope_Changed"/>
                 </StackPanel>
 
-                <!-- Filter bar (shared) -->
-                <Grid Grid.Row="3" Margin="0,0,0,8">
+                <!-- Filter bar: left = selection buttons, right = param filter (hidden in schedule mode) -->
+                <Grid Grid.Row="2" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="280"/>
+                        <ColumnDefinition Width="8"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="CategoryFilter" Grid.Column="0" Padding="6,4"
-                             ToolTip="Filtra per nome, codice OST o nome schedule"
-                             TextChanged="CategoryFilter_TextChanged"/>
-                    <Button Grid.Column="1" Content="Tutte" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"
-                            Click="SelectAllCategories_Click"/>
-                    <Button Grid.Column="2" Content="Nessuna" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"
-                            Click="SelectNoneCategories_Click"/>
-                    <Button Grid.Column="3" Content="Profili…" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"
-                            Click="LoadProfile_Click"/>
+                    <!-- Selection buttons -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <Button Content="Tutte" Style="{StaticResource SecondaryButton}"
+                                Click="SelectAllCategories_Click"/>
+                        <Button Content="Nessuna" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"
+                                Click="SelectNoneCategories_Click"/>
+                        <Button Content="Profili…" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"
+                                Click="LoadProfile_Click"/>
+                    </StackPanel>
+                    <!-- Parameter filter + options (hidden in schedule mode) -->
+                    <Grid x:Name="ParamFilterPanel" Grid.Column="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="ParameterFilter" Grid.Column="0" Padding="6,4"
+                                 ToolTip="Filtra per nome o gruppo (in entrambi i pannelli)"
+                                 TextChanged="ParameterFilter_TextChanged"/>
+                        <CheckBox x:Name="IncludeTypeParametersBox" Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"
+                                  Content="Includi parametri di tipo" Checked="IncludeTypeParameters_Changed" Unchecked="IncludeTypeParameters_Changed"/>
+                        <CheckBox x:Name="HideEmptyBox" Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center"
+                                  Content="Nascondi sempre vuoti" IsChecked="True" Checked="HideEmpty_Changed" Unchecked="HideEmpty_Changed"/>
+                    </Grid>
                 </Grid>
 
-                <!-- Categories tabs (mode A) — alla Revit Visibility/Graphics Overrides -->
-                <Grid x:Name="CategoryTableBorder" Grid.Row="4">
-                    <TabControl x:Name="CategoryTabControl" BorderBrush="#E0E0E0" BorderThickness="1" Background="White"
+                <!-- Categories + Parameters 3-pane layout (mode A) -->
+                <Grid x:Name="CategoryTableBorder" Grid.Row="3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="280"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Col 0: Category tabs -->
+                    <TabControl x:Name="CategoryTabControl" Grid.Column="0"
+                                BorderBrush="#E0E0E0" BorderThickness="1" Background="White"
                                 SelectionChanged="CategoryTab_Changed">
                         <TabItem x:Name="ModelCategoriesTab" Header="Model Categories">
                             <DataGrid x:Name="CategoryDataGrid"
@@ -142,11 +159,16 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Header="✓" Width="36"
-                                                            Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                    <DataGridTextColumn Header="Categoria" Width="300" Binding="{Binding DisplayName}" IsReadOnly="True"/>
-                                    <DataGridTextColumn Header="OST Code" Width="260" Binding="{Binding OstCode}" IsReadOnly="True"/>
-                                    <DataGridTextColumn Header="Elementi" Width="100" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
+                                    <DataGridTemplateColumn Header="✓" Width="36" IsReadOnly="True">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}" IsHitTestVisible="False"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Categoria" Width="*" Binding="{Binding DisplayName}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="n" Width="48" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
@@ -172,11 +194,16 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Header="✓" Width="36"
-                                                            Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                    <DataGridTextColumn Header="Categoria" Width="300" Binding="{Binding DisplayName}" IsReadOnly="True"/>
-                                    <DataGridTextColumn Header="OST Code" Width="260" Binding="{Binding OstCode}" IsReadOnly="True"/>
-                                    <DataGridTextColumn Header="Elementi" Width="100" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
+                                    <DataGridTemplateColumn Header="✓" Width="36" IsReadOnly="True">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}" IsHitTestVisible="False"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Categoria" Width="*" Binding="{Binding DisplayName}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="n" Width="48" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
@@ -202,11 +229,16 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Header="✓" Width="36"
-                                                            Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                    <DataGridTextColumn Header="Categoria" Width="300" Binding="{Binding DisplayName}" IsReadOnly="True"/>
-                                    <DataGridTextColumn Header="OST Code" Width="260" Binding="{Binding OstCode}" IsReadOnly="True"/>
-                                    <DataGridTextColumn Header="Elementi" Width="100" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
+                                    <DataGridTemplateColumn Header="✓" Width="36" IsReadOnly="True">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}" IsHitTestVisible="False"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Categoria" Width="*" Binding="{Binding DisplayName}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="n" Width="48" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
@@ -232,107 +264,23 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Header="✓" Width="36"
-                                                            Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                    <DataGridTextColumn Header="Categoria" Width="300" Binding="{Binding DisplayName}" IsReadOnly="True"/>
-                                    <DataGridTextColumn Header="OST Code" Width="260" Binding="{Binding OstCode}" IsReadOnly="True"/>
-                                    <DataGridTextColumn Header="Elementi" Width="100" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
+                                    <DataGridTemplateColumn Header="✓" Width="36" IsReadOnly="True">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}" IsHitTestVisible="False"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Categoria" Width="*" Binding="{Binding DisplayName}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="n" Width="48" Binding="{Binding InstanceCount}" IsReadOnly="True"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
                     </TabControl>
-                </Grid>
 
-                <!-- Schedules table (mode B) -->
-                <Border x:Name="ScheduleTableBorder" Grid.Row="4" BorderBrush="#E0E0E0" BorderThickness="1" Background="White" Visibility="Collapsed">
-                    <DataGrid x:Name="ScheduleDataGrid"
-                              AutoGenerateColumns="False"
-                              CanUserAddRows="False"
-                              CanUserDeleteRows="False"
-                              CanUserSortColumns="True"
-                              SelectionMode="Extended"
-                              SelectionUnit="FullRow"
-                              GridLinesVisibility="Horizontal"
-                              HeadersVisibility="Column"
-                              AlternatingRowBackground="#FAFAFA"
-                              RowHeight="28"
-                              BorderThickness="0"
-                              VerticalGridLinesBrush="Transparent"
-                              IsReadOnly="False"
-                              MouseDoubleClick="ScheduleDataGrid_DoubleClick">
-                        <DataGrid.RowStyle>
-                            <Style TargetType="DataGridRow">
-                                <EventSetter Event="MouseLeftButtonUp" Handler="ScheduleRow_Click"/>
-                            </Style>
-                        </DataGrid.RowStyle>
-                        <DataGrid.Columns>
-                            <DataGridCheckBoxColumn Header="✓" Width="36"
-                                                    Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                            <DataGridTextColumn Header="Nome schedule" Width="280" Binding="{Binding Name}" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Categoria" Width="200" Binding="{Binding CategoryName}" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Colonne" Width="80" Binding="{Binding ColumnCount}" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Righe" Width="80" Binding="{Binding RowCount}" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="ID" Width="100" Binding="{Binding ScheduleId}" IsReadOnly="True"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Border>
-            </Grid>
-
-            <!-- STEP 2: Parameters (dual-pane Available / Selected, SheetLink-style) -->
-            <Grid x:Name="Step2Panel" Visibility="Collapsed">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <StackPanel Grid.Row="0">
-                    <TextBlock Style="{StaticResource StepHeader}" Text="Seleziona i parametri da esportare"/>
-                    <TextBlock Style="{StaticResource StepSubtitle}"
-                               Text="Sposta i parametri da 'Disponibili' a 'Selezionati' (frecce o doppio-click). L'ordine in 'Selezionati' e l'ordine delle colonne nel CSV."/>
-                </StackPanel>
-
-                <!-- Color legend (SheetLink-style) -->
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-                    <Border Width="14" Height="14" Background="#C8E6C9" BorderBrush="#2E7D32" BorderThickness="1" VerticalAlignment="Center"/>
-                    <TextBlock Text="Istanza" Margin="6,0,16,0" VerticalAlignment="Center" FontSize="11"/>
-                    <Border Width="14" Height="14" Background="#FFF9C4" BorderBrush="#F9A825" BorderThickness="1" VerticalAlignment="Center"/>
-                    <TextBlock Text="Tipo" Margin="6,0,16,0" VerticalAlignment="Center" FontSize="11"/>
-                    <Border Width="14" Height="14" Background="#FFCDD2" BorderBrush="#C62828" BorderThickness="1" VerticalAlignment="Center"/>
-                    <TextBlock Text="Read-only" Margin="6,0,16,0" VerticalAlignment="Center" FontSize="11"/>
-                    <Border Width="14" Height="14" Background="White" BorderBrush="#9E9E9E" BorderThickness="1" VerticalAlignment="Center">
-                        <TextBlock Text="◆" FontSize="9" HorizontalAlignment="Center" Foreground="#1565C0"/>
-                    </Border>
-                    <TextBlock Text="Shared" Margin="6,0,16,0" VerticalAlignment="Center" FontSize="11"/>
-                </StackPanel>
-
-                <!-- Filter + options bar -->
-                <Grid Grid.Row="2" Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBox x:Name="ParameterFilter" Grid.Column="0" Padding="6,4"
-                             ToolTip="Filtra per nome o gruppo (in entrambi i pannelli)"
-                             TextChanged="ParameterFilter_TextChanged"/>
-                    <CheckBox x:Name="IncludeTypeParametersBox" Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"
-                              Content="Includi parametri di tipo" Checked="IncludeTypeParameters_Changed" Unchecked="IncludeTypeParameters_Changed"/>
-                    <CheckBox x:Name="HideEmptyBox" Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center"
-                              Content="Nascondi sempre vuoti" IsChecked="True" Checked="HideEmpty_Changed" Unchecked="HideEmpty_Changed"/>
-                </Grid>
-
-                <!-- Dual-pane Available | Buttons | Selected -->
-                <Grid Grid.Row="3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Available -->
-                    <Border Grid.Column="0" BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
+                    <!-- Col 1: Available parameters -->
+                    <Border Grid.Column="1" Margin="8,0,0,0" BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -394,8 +342,8 @@
                         </Grid>
                     </Border>
 
-                    <!-- Transfer buttons -->
-                    <StackPanel Grid.Column="1" Orientation="Vertical" VerticalAlignment="Center" Margin="8,0">
+                    <!-- Col 2: Transfer + order buttons -->
+                    <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center" Margin="8,0">
                         <Button Content="▶" Width="36" Height="32" Margin="0,2" ToolTip="Aggiungi i selezionati" Click="MoveToSelected_Click"/>
                         <Button Content="▶▶" Width="36" Height="32" Margin="0,2" ToolTip="Aggiungi tutti i visibili" Click="MoveAllToSelected_Click"/>
                         <Border Height="8"/>
@@ -406,8 +354,8 @@
                         <Button Content="↓" Width="36" Height="32" Margin="0,2" ToolTip="Sposta giu" Click="MoveSelectedDown_Click"/>
                     </StackPanel>
 
-                    <!-- Selected -->
-                    <Border Grid.Column="2" BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
+                    <!-- Col 3: Selected parameters -->
+                    <Border Grid.Column="3" BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -461,7 +409,112 @@
                         </Grid>
                     </Border>
                 </Grid>
+
+                <!-- Schedules split pane (mode B): left = schedule list, right = column preview -->
+                <Grid x:Name="ScheduleTableBorder" Grid.Row="3" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: schedule list -->
+                    <Border Grid.Column="0" BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" Background="#F5F5F5" Padding="8,6" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+                                <TextBlock x:Name="SchedulesHeader" Text="Schedule" FontWeight="SemiBold" Foreground="#424242"/>
+                            </Border>
+                            <DataGrid x:Name="ScheduleDataGrid" Grid.Row="1"
+                                      AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                      CanUserSortColumns="True" SelectionMode="Extended" SelectionUnit="FullRow"
+                                      GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                                      AlternatingRowBackground="#FAFAFA" RowHeight="28" BorderThickness="0"
+                                      VerticalGridLinesBrush="Transparent" IsReadOnly="False"
+                                      MouseDoubleClick="ScheduleDataGrid_DoubleClick">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <EventSetter Event="MouseLeftButtonUp" Handler="ScheduleRow_Click"/>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="✓" Width="36" IsReadOnly="True">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}" IsHitTestVisible="False"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Nome schedule" Width="*" Binding="{Binding Name}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="Categoria" Width="160" Binding="{Binding CategoryName}" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="Righe" Width="60" Binding="{Binding RowCount}" IsReadOnly="True"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Right: column preview (auto-updates when a schedule row is clicked) -->
+                    <Border Grid.Column="1" BorderBrush="#E0E0E0" BorderThickness="0,1,1,1" Background="White">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" Background="#F5F5F5" Padding="8,6" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+                                <TextBlock x:Name="ScheduleFieldsHeader" Text="Colonne (clicca una schedule)" FontWeight="SemiBold" Foreground="#424242"/>
+                            </Border>
+                            <DataGrid x:Name="ScheduleFieldsGrid" Grid.Row="1"
+                                      AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                      CanUserSortColumns="False" SelectionMode="Single" SelectionUnit="FullRow"
+                                      GridLinesVisibility="None" HeadersVisibility="Column"
+                                      RowHeight="26" BorderThickness="0" IsReadOnly="True">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                                                <Setter Property="Background" Value="#FFCDD2"/>
+                                            </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsReadOnly}" Value="False"/>
+                                                    <Condition Binding="{Binding Scope}" Value="Instance"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#C8E6C9"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsReadOnly}" Value="False"/>
+                                                    <Condition Binding="{Binding Scope}" Value="Type"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#FFF9C4"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Colonna CSV" Width="*" Binding="{Binding Header}"/>
+                                    <DataGridTextColumn Header="Scope" Width="70" Binding="{Binding Scope}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="8,4">
+                                <Border Width="12" Height="12" Background="#C8E6C9" BorderBrush="#2E7D32" BorderThickness="1" VerticalAlignment="Center"/>
+                                <TextBlock Text="Istanza" Margin="4,0,12,0" VerticalAlignment="Center" FontSize="11"/>
+                                <Border Width="12" Height="12" Background="#FFF9C4" BorderBrush="#F9A825" BorderThickness="1" VerticalAlignment="Center"/>
+                                <TextBlock Text="Tipo" Margin="4,0,12,0" VerticalAlignment="Center" FontSize="11"/>
+                                <Border Width="12" Height="12" Background="#FFCDD2" BorderBrush="#C62828" BorderThickness="1" VerticalAlignment="Center"/>
+                                <TextBlock Text="Read-only / calcolato" Margin="4,0,0,0" VerticalAlignment="Center" FontSize="11"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
+
+            <!-- STEP 2: Parameters — merged into Step 1 inline view; placeholder kept for GoToStep() -->
+            <Grid x:Name="Step2Panel" Visibility="Collapsed"/>
 
             <!-- STEP 3: Output -->
             <Grid x:Name="Step3Panel" Visibility="Collapsed">
@@ -489,6 +542,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Cartella output:" VerticalAlignment="Center" Margin="0,4"/>
@@ -496,9 +550,8 @@
                     <Button Grid.Row="0" Grid.Column="2" Content="Sfoglia…" Margin="8,4,0,4"
                             Style="{StaticResource SecondaryButton}" Click="BrowseFolder_Click"/>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Nome file:" VerticalAlignment="Center" Margin="0,4"/>
-                    <TextBox x:Name="FileNameBox" Grid.Row="1" Grid.Column="1" Padding="6,4" Margin="0,4"
-                             Text="elements.csv"/>
+                    <TextBlock x:Name="FileNameLabel" Grid.Row="1" Grid.Column="0" Text="Nome file:" VerticalAlignment="Center" Margin="0,4"/>
+                    <TextBox x:Name="FileNameBox" Grid.Row="1" Grid.Column="1" Padding="6,4" Margin="0,4"/>
 
                     <CheckBox x:Name="OverwriteBox" Grid.Row="2" Grid.Column="1" Margin="0,8" IsChecked="True"
                               Content="Sovrascrivi file esistente (consigliato per scheduled refresh)"/>
@@ -508,6 +561,25 @@
 
                     <CheckBox x:Name="RegisterProtocolBox" Grid.Row="4" Grid.Column="1" Margin="0,4" IsChecked="True"
                               Content="Registra il protocol handler revitcortex:// (richiede privilegi utente)"/>
+
+                    <!-- Schedule mode: list of files that will be written (one per selected schedule) -->
+                    <Border x:Name="ScheduleFilesPanel" Grid.Row="5" Grid.ColumnSpan="3" Margin="0,4,0,0"
+                            BorderBrush="#E0E0E0" BorderThickness="1" Background="#F5F5F5" Padding="10,8"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock x:Name="ScheduleFilesHeader" Text="File CSV che verranno scritti (uno per schedule):"
+                                       FontWeight="SemiBold" Foreground="#424242" Margin="0,0,0,6"/>
+                            <ItemsControl x:Name="ScheduleFilesList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="#424242" FontFamily="Consolas" FontSize="11" Margin="8,1,0,1"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="Nota: i nomi file sono generati automaticamente dal nome della schedule e sovrascritti ad ogni export."
+                                       Foreground="#757575" FontSize="11" FontStyle="Italic" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
 
                 <Grid Grid.Row="2">
@@ -515,17 +587,9 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <Grid Grid.Row="0" Margin="0,0,0,6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Anteprima (prime 5 righe)" FontWeight="SemiBold" Foreground="#424242" VerticalAlignment="Center"/>
-                        <Button Grid.Column="1" x:Name="EditMappingsBtn" Content="Mappa colonne…" Style="{StaticResource SecondaryButton}"
-                                ToolTip="Personalizza header CSV (alias) e aggiungi colonne calcolate da formula"
-                                Click="EditMappings_Click"/>
-                    </Grid>
+                    <TextBlock Grid.Row="0" Text="Anteprima (prime 5 righe)" FontWeight="SemiBold" Foreground="#424242" Margin="0,0,0,6"/>
                     <Border Grid.Row="1" BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
                         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                             <DataGrid x:Name="PreviewGrid" AutoGenerateColumns="True" IsReadOnly="True"
@@ -534,6 +598,64 @@
                         </ScrollViewer>
                     </Border>
                     <TextBlock x:Name="SummaryText" Grid.Row="2" Margin="0,8,0,0" Foreground="#616161"/>
+
+                    <!-- Advanced: Schema Mapping (opt-in, collapsed by default; categories mode only) -->
+                    <Expander x:Name="SchemaMappingExpander" Grid.Row="3" Header="Avanzato — Schema Mapping (opzionale, per Power BI)"
+                              Foreground="#00838F" FontWeight="SemiBold" Margin="0,10,0,0" IsExpanded="False">
+                        <Border BorderBrush="#E0E0E0" BorderThickness="1" Background="#FAFAFA" Padding="10,8" Margin="0,4,0,0">
+                            <StackPanel>
+                                <TextBlock Foreground="#616161" FontWeight="Normal" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
+                                    <Run Text="Power BI auto-inferisce i tipi colonna, ma l'inferenza dipende da locale, valori vuoti nei primi record e ambiguità sulle date. Attivare il mapping garantisce tipi coerenti tra refresh e genera un file"/>
+                                    <Run Text="  .pq  " FontFamily="Consolas"/>
+                                    <Run Text="con Table.TransformColumnTypes accanto al CSV. Per le colonne numeriche viene aggiunta una colonna"/>
+                                    <Run Text="  _Raw  " FontFamily="Consolas"/>
+                                    <Run Text="in formato invariante (separatore decimale punto)."/>
+                                </TextBlock>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="Modalità:" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="Normal" Foreground="#424242"/>
+                                    <RadioButton x:Name="SchemaModeAutoRadio" Content="Auto (default)" IsChecked="True"
+                                                 GroupName="SchemaMode" Margin="0,0,12,0" FontWeight="Normal"
+                                                 Checked="SchemaMode_Changed"/>
+                                    <RadioButton x:Name="SchemaModeSuggestedRadio" Content="Suggested"
+                                                 GroupName="SchemaMode" Margin="0,0,12,0" FontWeight="Normal"
+                                                 Checked="SchemaMode_Changed"/>
+                                    <RadioButton x:Name="SchemaModeCustomRadio" Content="Custom"
+                                                 GroupName="SchemaMode" Margin="0,0,12,0" FontWeight="Normal"
+                                                 Checked="SchemaMode_Changed"/>
+                                    <Button x:Name="SuggestTypesBtn" Content="Suggerisci dai parametri"
+                                            Style="{StaticResource SecondaryButton}" Margin="12,0,0,0" Padding="10,3"
+                                            Click="SuggestTypes_Click"/>
+                                </StackPanel>
+                                <DataGrid x:Name="ColumnTypesGrid" Height="180" MaxHeight="240"
+                                          AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                          AlternatingRowBackground="#F5F5F5" RowHeight="26" BorderBrush="#E0E0E0" BorderThickness="1"
+                                          IsEnabled="False" FontWeight="Normal">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Colonna" Width="220" Binding="{Binding ColumnName}" IsReadOnly="True"/>
+                                        <DataGridComboBoxColumn x:Name="ColumnTypeCol" Header="Tipo Power BI" Width="160"
+                                                                SelectedItemBinding="{Binding PbiType, UpdateSourceTrigger=PropertyChanged}">
+                                            <DataGridComboBoxColumn.ItemsSource>
+                                                <x:Array Type="{x:Type sys:String}" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                                                    <sys:String>auto</sys:String>
+                                                    <sys:String>int</sys:String>
+                                                    <sys:String>number</sys:String>
+                                                    <sys:String>fixed</sys:String>
+                                                    <sys:String>percent</sys:String>
+                                                    <sys:String>bool</sys:String>
+                                                    <sys:String>date</sys:String>
+                                                    <sys:String>datetime</sys:String>
+                                                    <sys:String>text</sys:String>
+                                                    <sys:String>duration</sys:String>
+                                                </x:Array>
+                                            </DataGridComboBoxColumn.ItemsSource>
+                                        </DataGridComboBoxColumn>
+                                        <DataGridTextColumn Header="Formato (opz.)" Width="*" Binding="{Binding Format, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
                 </Grid>
             </Grid>
         </Grid>
@@ -553,9 +675,6 @@
                             ToolTip="Importa un profilo da un file .json (cartella di rete/condivisa)" Click="ImportProfile_Click"/>
                     <Button x:Name="OpenProfilesFolderBtn" Content="Apri cartella" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0"
                             ToolTip="Apri ~/.revitcortex/profiles per copiare/condividere i profili" Click="OpenProfilesFolder_Click"/>
-                    <Button x:Name="ApplyFromCsvBtn" Content="Applica da CSV…" Style="{StaticResource SecondaryButton}" Margin="12,0,0,0"
-                            ToolTip="Round-trip: legge un CSV (es. modificato in Excel) e scrive i parametri sugli elementi Revit"
-                            Click="ApplyFromCsv_Click"/>
                 </StackPanel>
                 <TextBlock Grid.Column="1" x:Name="StatusText" VerticalAlignment="Center" Margin="16,0" Foreground="#424242"/>
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
