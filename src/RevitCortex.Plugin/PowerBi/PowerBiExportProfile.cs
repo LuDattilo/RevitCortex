@@ -41,6 +41,15 @@ public class PowerBiExportProfile
     /// <summary>If true, re-runs export when the model is saved.</summary>
     public bool AutoExportOnSave { get; set; }
 
+    /// <summary>If true, triggers a Power BI Service dataset refresh after a successful export.</summary>
+    public bool TriggerPbiRefresh { get; set; }
+
+    /// <summary>Power BI workspace (group) GUID for the CSV-backed Import dataset.</summary>
+    public string? RefreshWorkspaceId { get; set; }
+
+    /// <summary>Power BI dataset GUID of the Import dataset to refresh.</summary>
+    public string? RefreshDatasetId { get; set; }
+
     /// <summary>
     /// Scope mode for the export: "WholeModel" (default), "ActiveView", "Selection".
     /// SheetLink-style 3-state radio. The plugin enforces this on the server side.

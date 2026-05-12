@@ -520,7 +520,7 @@
             <Grid x:Name="Step3Panel" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto" MaxHeight="340"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -530,13 +530,16 @@
                                Text="Il file CSV verra salvato nella cartella selezionata. Per dashboard Power BI con scheduled refresh, imposta una cartella sincronizzata su OneDrive/SharePoint e mantieni un nome file fisso."/>
                 </StackPanel>
 
-                <Grid Grid.Row="1" Margin="0,0,0,12">
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,12">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="160"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -568,8 +571,39 @@
                     <CheckBox x:Name="RegisterProtocolBox" Grid.Row="4" Grid.Column="1" Margin="0,4" IsChecked="True"
                               Content="Registra il protocol handler revitcortex:// (richiede privilegi utente)"/>
 
+                    <CheckBox x:Name="TriggerRefreshBox" Grid.Row="5" Grid.Column="1" Margin="0,8"
+                              Content="Aggiorna dashboard Power BI Service dopo export"
+                              Checked="TriggerRefreshBox_Changed" Unchecked="TriggerRefreshBox_Changed"/>
+
+                    <!-- Refresh config: shown only when TriggerRefreshBox is checked -->
+                    <Border x:Name="RefreshConfigPanel" Grid.Row="6" Grid.ColumnSpan="3"
+                            Margin="0,2,0,6" Padding="10,8"
+                            BorderBrush="#B0BEC5" BorderThickness="1" Background="#F0F4F7"
+                            Visibility="Collapsed">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Workspace ID:" VerticalAlignment="Center" Margin="0,4" Foreground="#424242"/>
+                            <TextBox x:Name="RefreshWorkspaceIdBox" Grid.Row="0" Grid.Column="1" Padding="6,4" Margin="0,4"
+                                     ToolTip="GUID del workspace Power BI — visibile nell'URL su app.powerbi.com/groups/{guid}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Dataset ID:" VerticalAlignment="Center" Margin="0,4" Foreground="#424242"/>
+                            <TextBox x:Name="RefreshDatasetIdBox" Grid.Row="1" Grid.Column="1" Padding="6,4" Margin="0,4"
+                                     ToolTip="GUID del dataset Import nel workspace. Visibile nell'URL del dataset su app.powerbi.com"/>
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Margin="0,4,0,0"
+                                       Foreground="#607D8B" FontSize="11" FontStyle="Italic" TextWrapping="Wrap"
+                                       Text="Pubblica il .pbix nel workspace, poi copia i GUID dall'URL del dataset (app.powerbi.com/groups/&lt;workspaceId&gt;/datasets/&lt;datasetId&gt;)."/>
+                        </Grid>
+                    </Border>
+
                     <!-- Schedule mode: list of files that will be written (one per selected schedule) -->
-                    <Border x:Name="ScheduleFilesPanel" Grid.Row="5" Grid.ColumnSpan="3" Margin="0,4,0,0"
+                    <Border x:Name="ScheduleFilesPanel" Grid.Row="7" Grid.ColumnSpan="3" Margin="0,4,0,0"
                             BorderBrush="#E0E0E0" BorderThickness="1" Background="#F5F5F5" Padding="10,8"
                             Visibility="Collapsed">
                         <StackPanel>
@@ -587,6 +621,7 @@
                         </StackPanel>
                     </Border>
                 </Grid>
+                </ScrollViewer>
 
                 <Grid Grid.Row="2">
                     <Grid.RowDefinitions>

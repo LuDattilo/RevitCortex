@@ -1028,6 +1028,12 @@ public partial class PowerBiExportWindow : Window
         if (!string.IsNullOrEmpty(profile.FileName)) FileNameBox.Text = profile.FileName;
         OverwriteBox.IsChecked = profile.OverwriteFile;
         AutoExportBox.IsChecked = profile.AutoExportOnSave;
+        TriggerRefreshBox.IsChecked = profile.TriggerPbiRefresh;
+        RefreshWorkspaceIdBox.Text = profile.RefreshWorkspaceId ?? "";
+        RefreshDatasetIdBox.Text = profile.RefreshDatasetId ?? "";
+        RefreshConfigPanel.Visibility = profile.TriggerPbiRefresh
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
         // Restore schema mapping
         _columnTypes.Clear();
         foreach (var ct in profile.ColumnTypes ?? new List<ColumnTypeMapping>())
@@ -1146,6 +1152,9 @@ public partial class PowerBiExportWindow : Window
             FileName = FileNameBox.Text,
             OverwriteFile = OverwriteBox.IsChecked == true,
             AutoExportOnSave = AutoExportBox.IsChecked == true,
+            TriggerPbiRefresh = TriggerRefreshBox.IsChecked == true,
+            RefreshWorkspaceId = string.IsNullOrWhiteSpace(RefreshWorkspaceIdBox.Text) ? null : RefreshWorkspaceIdBox.Text.Trim(),
+            RefreshDatasetId = string.IsNullOrWhiteSpace(RefreshDatasetIdBox.Text) ? null : RefreshDatasetIdBox.Text.Trim(),
             ScopeMode = _scope.ToString(),
             SchemaMappingMode = SchemaModeWireValue(),
             ColumnTypes = _columnTypes.Select(c => new ColumnTypeMapping
@@ -1155,6 +1164,43 @@ public partial class PowerBiExportWindow : Window
                 Format = c.Format
             }).ToList()
         };
+    }
+
+    // ───────────────────────── PBI Refresh ─────────────────────────
+
+    private void TriggerRefreshBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (RefreshConfigPanel == null) return;
+        RefreshConfigPanel.Visibility = TriggerRefreshBox.IsChecked == true
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
+    }
+
+    private async System.Threading.Tasks.Task FirePbiRefreshAsync(string workspaceId, string datasetId)
+    {
+        try
+        {
+            SetStatus("Trigger refresh Power BI…");
+            var settings = RevitCortex.Plugin.PowerBiLive.PowerBiSettings.Load();
+            var auth = new RevitCortex.Plugin.PowerBiLive.PowerBiAuthService(settings);
+            var authState = await auth.TryAcquireSilentAsync();
+            if (!authState.IsSignedIn || string.IsNullOrEmpty(authState.AccessToken))
+            {
+                SetStatus("Export completato. Refresh non triggerato: non sei autenticato a Power BI (esegui pbi_check_auth).");
+                return;
+            }
+            using var client = new RevitCortex.Plugin.PowerBiLive.PowerBiServiceClient(authState.AccessToken!);
+            var requestId = await client.TriggerRefreshAsync(workspaceId, datasetId);
+            var tip = string.IsNullOrEmpty(requestId)
+                ? "Refresh in coda (Pro — nessun requestId)."
+                : $"Refresh avviato (requestId: {requestId}).";
+            SetStatus($"Export completato. {tip} La dashboard sarà aggiornata tra ~30s.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Export completato. Refresh fallito: {ex.Message}");
+            DebugLog($"FirePbiRefreshAsync EXCEPTION: {ex}");
+        }
     }
 
     // ───────────────────────── Output ─────────────────────────
@@ -1607,6 +1653,14 @@ public partial class PowerBiExportWindow : Window
             // status bar. "Apri cartella" deep-links to Explorer in the output
             // folder for quick verification.
             ShowExportSuccessDialog(count, path);
+
+            // Fire PBI refresh in background (non-blocking — doesn't hold Revit main thread).
+            if (profile.TriggerPbiRefresh
+                && !string.IsNullOrWhiteSpace(profile.RefreshWorkspaceId)
+                && !string.IsNullOrWhiteSpace(profile.RefreshDatasetId))
+            {
+                _ = FirePbiRefreshAsync(profile.RefreshWorkspaceId!, profile.RefreshDatasetId!);
+            }
         }
         catch (Exception ex)
         {
