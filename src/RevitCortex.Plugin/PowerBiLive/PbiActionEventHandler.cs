@@ -52,22 +52,45 @@ public class PbiActionEventHandler : IExternalEventHandler
         public IReadOnlyList<PbiSelectHttpListener.ColorOverride> Colors { get; }
         public string? ViewName { get; }
 
+        /// <summary>
+        /// Optional UniqueId strings (PBI dataset "UniqueId" column). When provided
+        /// they are resolved first (stable across purge / family reload); raw
+        /// ElementIds are used as a fallback.
+        /// </summary>
+        public IReadOnlyList<string>? RawUniqueIds { get; }
+
+        /// <summary>
+        /// Optional Revit document title the visual believes is active. If set
+        /// and doesn't match <c>doc.Title</c> the action is aborted with
+        /// <c>Error = "wrong_document:&lt;expected&gt;|&lt;actual&gt;"</c>.
+        /// </summary>
+        public string? ExpectedDocumentTitle { get; }
+
         public ManualResetEventSlim Done { get; } = new(initialState: false);
         // Non-volatile fields are safe to read after Done is set (release fence).
         public string? Result;
+        /// <summary>
+        /// Structured error string. Format: <c>"&lt;code&gt;:&lt;message&gt;"</c>. When set,
+        /// the listener returns it in <c>error</c> and ignores <c>Result</c>.
+        /// </summary>
+        public string? Error;
         public volatile bool Cancelled;
 
         public Request(Kind kind,
             IReadOnlyList<long>? rawIds,
             string action,
             IReadOnlyList<PbiSelectHttpListener.ColorOverride>? colors,
-            string? viewName)
+            string? viewName,
+            IReadOnlyList<string>? rawUniqueIds = null,
+            string? expectedDocumentTitle = null)
         {
             Kind = kind;
             RawIds = rawIds ?? Array.Empty<long>();
             Action = action ?? "";
             Colors = colors ?? Array.Empty<PbiSelectHttpListener.ColorOverride>();
             ViewName = viewName;
+            RawUniqueIds = rawUniqueIds;
+            ExpectedDocumentTitle = expectedDocumentTitle;
         }
     }
 
@@ -128,6 +151,49 @@ public class PbiActionEventHandler : IExternalEventHandler
     public string? DispatchCreateView(IList<long> rawIds, string? viewName) =>
         Dispatch(new Request(Kind.CreateView, rawIds?.ToArray(), "createView", null, viewName));
 
+    // ─── v1.0.0.10 rich-dispatch overloads ──────────────────────────────────
+    // Backward-compatible: when the visual sends UniqueIds and/or a document
+    // title for validation, callers route through these methods. The legacy
+    // overloads above remain for tests and AI clients that don't need either.
+
+    /// <summary>
+    /// Selection with optional UniqueIds (preferred over ElementIds) and an
+    /// optional expected document title for sanity check. Returns one of:
+    ///   - resolved-count string ("118") on success
+    ///   - null if the doc check failed or the action couldn't run; in that
+    ///     case caller should consult <see cref="Request.Error"/> via the
+    ///     direct <see cref="Dispatch"/> overload.
+    /// </summary>
+    public Request DispatchSelectionRich(
+        IList<long> rawIds, IList<string>? uniqueIds, string action, string? expectedDocumentTitle)
+    {
+        var req = new Request(
+            Kind.Select,
+            rawIds?.ToArray(),
+            action ?? "select",
+            null,
+            null,
+            uniqueIds?.ToArray(),
+            expectedDocumentTitle);
+        Dispatch(req);
+        return req;
+    }
+
+    public Request DispatchCreateViewRich(
+        IList<long> rawIds, IList<string>? uniqueIds, string? viewName, string? expectedDocumentTitle)
+    {
+        var req = new Request(
+            Kind.CreateView,
+            rawIds?.ToArray(),
+            "createView",
+            null,
+            viewName,
+            uniqueIds?.ToArray(),
+            expectedDocumentTitle);
+        Dispatch(req);
+        return req;
+    }
+
     public void Execute(UIApplication app)
     {
         // Drain in a loop — a single Raise() can correspond to multiple enqueued
@@ -148,6 +214,13 @@ public class PbiActionEventHandler : IExternalEventHandler
                 if (doc == null)
                 {
                     System.Diagnostics.Trace.WriteLine("[PbiActionEventHandler] doc null on UI thread.");
+                    req.Error = "no_document:No active Revit document.";
+                    req.Result = null;
+                }
+                else if (!ValidateDocumentTitle(doc, req))
+                {
+                    // Title mismatch — visual sent uniqueIds from a different model.
+                    // Don't touch the model; surface a structured error.
                     req.Result = null;
                 }
                 else
@@ -180,9 +253,15 @@ public class PbiActionEventHandler : IExternalEventHandler
     {
         var rawIds = req.RawIds;
         var action = req.Action;
-        if (rawIds == null || rawIds.Count == 0) return "0";
+        bool hasAnyIds = (rawIds != null && rawIds.Count > 0)
+                      || (req.RawUniqueIds != null && req.RawUniqueIds.Count > 0);
+        if (!hasAnyIds) return "0";
 
-        var validIds = ResolveIds(doc, rawIds);
+        // Prefer the merged resolver (UniqueId then ElementId) when the visual
+        // sent both. Fall back to legacy ElementId-only path for old payloads.
+        var validIds = req.RawUniqueIds != null
+            ? ResolveIdsMerged(doc, req)
+            : ResolveIds(doc, rawIds!);
         if (validIds.Count == 0) return "0";
 
         var uiDoc = new UIDocument(doc);
@@ -317,9 +396,13 @@ public class PbiActionEventHandler : IExternalEventHandler
     private string? ExecuteCreateView(Document doc, UIApplication app, Request req)
     {
         var rawIds = req.RawIds;
-        if (rawIds == null || rawIds.Count == 0) return null;
+        bool hasAnyIds = (rawIds != null && rawIds.Count > 0)
+                      || (req.RawUniqueIds != null && req.RawUniqueIds.Count > 0);
+        if (!hasAnyIds) return null;
 
-        var validIds = ResolveIds(doc, rawIds);
+        var validIds = req.RawUniqueIds != null
+            ? ResolveIdsMerged(doc, req)
+            : ResolveIds(doc, rawIds!);
         if (validIds.Count == 0) return "0";
 
         var view3DType = new FilteredElementCollector(doc)
@@ -411,6 +494,81 @@ public class PbiActionEventHandler : IExternalEventHandler
                 valid.Add(eid);
         }
         return valid;
+    }
+
+    /// <summary>
+    /// Merged resolver used by rich-dispatch paths. Prefers UniqueIds when
+    /// the visual provides them (stable across purge / family reload) and
+    /// falls back to ElementIds for ids the UniqueId lookup couldn't resolve.
+    /// Deduplicates by ElementId. Caller's RawIds + RawUniqueIds are treated
+    /// as parallel arrays of the same set, NOT as additive — the visual is
+    /// expected to send the UniqueId alongside the matching ElementId.
+    /// </summary>
+    private static IList<ElementId> ResolveIdsMerged(Document doc, Request req)
+    {
+        var seen = new HashSet<long>();
+        var valid = new List<ElementId>();
+
+        // Pass 1: UniqueIds — preferred when available because they survive
+        // purge/family-reload while ElementIds get reassigned.
+        if (req.RawUniqueIds != null)
+        {
+            foreach (var uid in req.RawUniqueIds)
+            {
+                if (string.IsNullOrEmpty(uid)) continue;
+                Element? elem = null;
+                try { elem = doc.GetElement(uid); } catch { /* malformed uid */ }
+                if (elem == null) continue;
+                long key = GetEidValue(elem.Id);
+                if (seen.Add(key)) valid.Add(elem.Id);
+            }
+        }
+
+        // Pass 2: ElementIds — adds anything the UniqueId pass missed.
+        foreach (var v in req.RawIds)
+        {
+#if REVIT2024_OR_GREATER
+            var eid = new ElementId(v);
+#else
+            var eid = new ElementId((int)v);
+#endif
+            if (!seen.Add(v)) continue;
+            if (doc.GetElement(eid) != null)
+                valid.Add(eid);
+            else
+                seen.Remove(v); // didn't actually add it
+        }
+        return valid;
+    }
+
+    private static long GetEidValue(ElementId id)
+    {
+#if REVIT2024_OR_GREATER
+        return id.Value;
+#else
+        return id.IntegerValue;
+#endif
+    }
+
+    /// <summary>
+    /// Optional document-title sanity check. The visual maps an optional
+    /// "Document title" data role; when it sends one and it doesn't match
+    /// the active doc, we refuse the action and surface a structured error.
+    /// </summary>
+    private static bool ValidateDocumentTitle(Document doc, Request req)
+    {
+        if (string.IsNullOrEmpty(req.ExpectedDocumentTitle)) return true;
+        var actual = doc.Title ?? "";
+        var expected = req.ExpectedDocumentTitle!;
+        // Tolerate the ".rvt" suffix being present on one side and not the other.
+        var actualBase = actual.EndsWith(".rvt", StringComparison.OrdinalIgnoreCase)
+            ? actual.Substring(0, actual.Length - 4) : actual;
+        var expectedBase = expected.EndsWith(".rvt", StringComparison.OrdinalIgnoreCase)
+            ? expected.Substring(0, expected.Length - 4) : expected;
+        if (string.Equals(actualBase, expectedBase, StringComparison.OrdinalIgnoreCase))
+            return true;
+        req.Error = $"wrong_document:expected '{expected}' but active document is '{actual}'";
+        return false;
     }
 
     private static ElementId GetSolidFillPatternId(Document doc)

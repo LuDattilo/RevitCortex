@@ -4,7 +4,19 @@
       "name": "elementIds",
       "kind": "Grouping",
       "displayName": "Element ID",
-      "description": "Map the ElementId column from the Elements table"
+      "description": "Map the ElementId (Whole Number) column from the dataset"
+    },
+    {
+      "name": "uniqueIds",
+      "kind": "Grouping",
+      "displayName": "Unique ID (optional)",
+      "description": "Optional but recommended. Map the UniqueId (Text) column. When provided it is used as the primary stable key for resolving elements in Revit — survives purge and family reload, unlike ElementId."
+    },
+    {
+      "name": "documentTitle",
+      "kind": "Grouping",
+      "displayName": "Document title (optional)",
+      "description": "Optional. Map the DocumentTitle (Text) column. When provided, RevitCortex verifies the active Revit document matches before any action — prevents accidentally selecting in the wrong open model."
     },
     {
       "name": "colorBy",
@@ -19,6 +31,8 @@
         "rows": {
           "select": [
             { "for": { "in": "elementIds" } },
+            { "for": { "in": "uniqueIds" } },
+            { "for": { "in": "documentTitle" } },
             { "for": { "in": "colorBy" } }
           ],
           "dataReductionAlgorithm": {

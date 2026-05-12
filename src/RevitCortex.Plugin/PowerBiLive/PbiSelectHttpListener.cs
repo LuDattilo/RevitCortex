@@ -49,16 +49,72 @@ public class PbiSelectHttpListener : IDisposable
         public Func<string?>? ResetOverrides { get; }
         public Func<IList<long>, string?, string?>? CreateView { get; }
 
+        // ── Rich-dispatch callbacks (opt-in, v1.0.0.10+) ───────────────────
+        // Listener prefers these whenever the request body carries `uniqueIds`
+        // and/or `documentTitle`. They return a (result, error) pair so the
+        // handler can surface structured errors like "wrong_document" without
+        // serializing them into the success-path result string.
+
+        public Func<RichRequestInput, RichRequestResult>? SelectionRich { get; }
+        public Func<RichRequestInput, RichRequestResult>? CreateViewRich { get; }
+
         public Callbacks(
             Func<IList<long>, string, string?> selection,
             Func<IList<ColorOverride>, string?>? color = null,
             Func<string?>? resetOverrides = null,
-            Func<IList<long>, string?, string?>? createView = null)
+            Func<IList<long>, string?, string?>? createView = null,
+            Func<RichRequestInput, RichRequestResult>? selectionRich = null,
+            Func<RichRequestInput, RichRequestResult>? createViewRich = null)
         {
             Selection = selection ?? throw new ArgumentNullException(nameof(selection));
             Color = color;
             ResetOverrides = resetOverrides;
             CreateView = createView;
+            SelectionRich = selectionRich;
+            CreateViewRich = createViewRich;
+        }
+    }
+
+    /// <summary>
+    /// Inputs for rich dispatch — carries the optional UniqueId/DocumentTitle
+    /// that legacy callbacks can't accept.
+    /// </summary>
+    public sealed class RichRequestInput
+    {
+        public IList<long> ElementIds { get; }
+        public IList<string>? UniqueIds { get; }
+        public string? DocumentTitle { get; }
+        public string Action { get; }
+        public string? ViewName { get; }
+
+        public RichRequestInput(IList<long> elementIds, string action,
+            IList<string>? uniqueIds = null, string? documentTitle = null, string? viewName = null)
+        {
+            ElementIds = elementIds ?? Array.Empty<long>();
+            Action = action ?? "";
+            UniqueIds = uniqueIds;
+            DocumentTitle = documentTitle;
+            ViewName = viewName;
+        }
+    }
+
+    /// <summary>
+    /// Either a success payload (Result) or a structured error (ErrorCode + Message).
+    /// </summary>
+    public sealed class RichRequestResult
+    {
+        public string? Result { get; }
+        public string? ErrorCode { get; }
+        public string? ErrorMessage { get; }
+
+        public static RichRequestResult Ok(string? result) => new(result, null, null);
+        public static RichRequestResult Fail(string code, string message) => new(null, code, message);
+
+        private RichRequestResult(string? result, string? code, string? message)
+        {
+            Result = result;
+            ErrorCode = code;
+            ErrorMessage = message;
         }
     }
 
@@ -267,17 +323,32 @@ public class PbiSelectHttpListener : IDisposable
         if (!TryParseBody(resp, bodyText, out var body)) return;
 
         var rawIds = body["elementIds"] as JArray;
+        var rawUniqueIds = body["uniqueIds"] as JArray;
+        var documentTitle = body["documentTitle"]?.Value<string>();
         var action = (body["action"]?.Value<string>() ?? "select").ToLowerInvariant();
 
-        if (rawIds == null || rawIds.Count == 0)
+        bool hasElementIds = rawIds != null && rawIds.Count > 0;
+        bool hasUniqueIds  = rawUniqueIds != null && rawUniqueIds.Count > 0;
+        if (!hasElementIds && !hasUniqueIds)
         {
             WriteJson(resp, 200, new { success = true, elementCount = 0, warning = "No ElementIds provided." });
             return;
         }
 
         var ids = ParseLongArray(rawIds);
+        var uids = ParseStringArray(rawUniqueIds);
         System.Diagnostics.Trace.WriteLine(
-            $"[PbiSelectHttpListener] /pbi-select: ids={ids.Count}, action={action}");
+            $"[PbiSelectHttpListener] /pbi-select: ids={ids.Count}, uids={uids.Count}, action={action}, doc={documentTitle ?? "(any)"}");
+
+        // Rich path: take it when the visual sent anything the legacy callback
+        // can't represent (uniqueIds, documentTitle). Falls through to legacy.
+        bool useRich = _callbacks.SelectionRich != null && (hasUniqueIds || !string.IsNullOrEmpty(documentTitle));
+        if (useRich)
+        {
+            var richResult = _callbacks.SelectionRich!(new RichRequestInput(ids, action, uids, documentTitle));
+            WriteRichResult(resp, richResult, () => new { success = true, elementCount = ids.Count, action, validated = richResult.Result });
+            return;
+        }
 
         var result = _callbacks.Selection(ids, action);
         if (result == null)
@@ -366,17 +437,30 @@ public class PbiSelectHttpListener : IDisposable
         if (!TryParseBody(resp, bodyText, out var body)) return;
 
         var rawIds = body["elementIds"] as JArray;
+        var rawUniqueIds = body["uniqueIds"] as JArray;
+        var documentTitle = body["documentTitle"]?.Value<string>();
         var viewName = body["viewName"]?.Value<string>();
 
-        if (rawIds == null || rawIds.Count == 0)
+        bool hasElementIds = rawIds != null && rawIds.Count > 0;
+        bool hasUniqueIds  = rawUniqueIds != null && rawUniqueIds.Count > 0;
+        if (!hasElementIds && !hasUniqueIds)
         {
             WriteJson(resp, 400, new { success = false, error = "No ElementIds provided." });
             return;
         }
 
         var ids = ParseLongArray(rawIds);
+        var uids = ParseStringArray(rawUniqueIds);
         System.Diagnostics.Trace.WriteLine(
-            $"[PbiSelectHttpListener] /pbi-create-view: ids={ids.Count}, viewName={viewName ?? "(auto)"}");
+            $"[PbiSelectHttpListener] /pbi-create-view: ids={ids.Count}, uids={uids.Count}, viewName={viewName ?? "(auto)"}, doc={documentTitle ?? "(any)"}");
+
+        bool useRich = _callbacks.CreateViewRich != null && (hasUniqueIds || !string.IsNullOrEmpty(documentTitle));
+        if (useRich)
+        {
+            var richResult = _callbacks.CreateViewRich!(new RichRequestInput(ids, "createView", uids, documentTitle, viewName));
+            WriteRichResult(resp, richResult, () => new { success = true, elementCount = ids.Count, validated = richResult.Result });
+            return;
+        }
 
         var result = _callbacks.CreateView(ids, viewName);
         if (result == null)
@@ -385,6 +469,41 @@ public class PbiSelectHttpListener : IDisposable
             return;
         }
         WriteJson(resp, 200, new { success = true, elementCount = ids.Count, validated = result });
+    }
+
+    /// <summary>
+    /// Writes a structured error or success payload from a rich-dispatch result.
+    /// </summary>
+    private static void WriteRichResult(HttpListenerResponse resp, RichRequestResult r, Func<object> successPayload)
+    {
+        if (r.ErrorCode != null)
+        {
+            WriteJson(resp, 200, new
+            {
+                success = false,
+                error = r.ErrorMessage ?? r.ErrorCode,
+                errorCode = r.ErrorCode
+            });
+            return;
+        }
+        if (r.Result == null)
+        {
+            WriteJson(resp, 200, new { success = false, error = "No active Revit document or cancelled." });
+            return;
+        }
+        WriteJson(resp, 200, successPayload());
+    }
+
+    private static IList<string> ParseStringArray(JArray? arr)
+    {
+        var list = new List<string>();
+        if (arr == null) return list;
+        foreach (var token in arr)
+        {
+            try { var s = token.Value<string>(); if (!string.IsNullOrEmpty(s)) list.Add(s); }
+            catch { /* skip unparseable */ }
+        }
+        return list;
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────

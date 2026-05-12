@@ -247,7 +247,12 @@ public class PushToPowerBiTool : ICortexTool
                 bool useTypeMapping = !string.Equals(schemaMappingMode, "Auto", StringComparison.OrdinalIgnoreCase)
                                     && columnTypes.Count > 0;
 
-                var header = new List<string> { "ElementId", "Category", "Family", "Type" };
+                // ElementId + UniqueId are both emitted: ElementId for fast joins,
+                // UniqueId for the PBI selection visual which prefers it as a stable
+                // key (survives purge / family reload). DocumentTitle helps multi-
+                // model dashboards filter by source doc and lets the visual
+                // validate that the active Revit doc matches the dataset.
+                var header = new List<string> { "ElementId", "UniqueId", "Category", "Family", "Type", "DocumentTitle" };
                 var rawCompanionInst = new HashSet<string>(); // instance param names that need _Raw
                 var rawCompanionType = new HashSet<string>(); // type param names (without [Type] prefix) that need _Raw
 
@@ -288,11 +293,13 @@ public class PushToPowerBiTool : ICortexTool
                     var row = new List<string>
                     {
                         ToolHelpers.GetElementIdValue(elem.Id).ToString(CultureInfo.InvariantCulture),
+                        CsvEscape(elem.UniqueId ?? ""),
                         CsvEscape(elem.Category?.Name ?? ""),
                         CsvEscape(elem.LookupParameter("Family Name")?.AsString()
                             ?? (typeElem as ElementType)?.FamilyName ?? ""),
                         CsvEscape(elem.LookupParameter("Type Name")?.AsValueString()
-                            ?? (typeElem as ElementType)?.Name ?? "")
+                            ?? (typeElem as ElementType)?.Name ?? ""),
+                        CsvEscape(doc.Title ?? "")
                     };
 
                     foreach (var name in instanceParamNames.Items)
@@ -432,8 +439,10 @@ public class PushToPowerBiTool : ICortexTool
                     fieldBips.Add(bip);
                 }
 
-                // ElementId is always the first column — required for Elements ↔ Schedule join in PBI
-                var headerCells = new List<string> { "ElementId" };
+                // ElementId / UniqueId / DocumentTitle are always emitted: ElementId
+                // for fast joins, UniqueId for the PBI selection visual (stable across
+                // purge/family reload), DocumentTitle for multi-model filtering.
+                var headerCells = new List<string> { "ElementId", "UniqueId", "DocumentTitle" };
                 headerCells.AddRange(fieldHeadings.Select(CsvEscape));
                 sb.AppendLine(string.Join(",", headerCells));
 
@@ -456,9 +465,11 @@ public class PushToPowerBiTool : ICortexTool
                     }
                     catch { }
 
-                    var row = new List<string>(fieldHeadings.Count + 1)
+                    var row = new List<string>(fieldHeadings.Count + 3)
                     {
-                        ToolHelpers.GetElementIdValue(elem.Id).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        ToolHelpers.GetElementIdValue(elem.Id).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        CsvEscape(elem.UniqueId ?? ""),
+                        CsvEscape(doc.Title ?? "")
                     };
                     for (int i = 0; i < fieldHeadings.Count; i++)
                     {

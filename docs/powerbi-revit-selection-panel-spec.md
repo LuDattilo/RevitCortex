@@ -1,10 +1,10 @@
 # RevitCortex Selection — Power BI Visual Specification
 
-**Status:** Patch 1 applied — pending commit (v1.0.0.9)
+**Status:** Patch 2 applied — pending commit (v1.0.0.10)
 **Date:** 2026-05-12
 **Visual GUID:** `revitcortexselectionvisual1A2B3C4D`
 **Display name:** RevitCortex Selection
-**Current version:** `1.0.0.9` (pending) — last committed `1.0.0.7`. Intermediate `1.0.0.8` superseded.
+**Current version:** `1.0.0.10` (pending) — last committed `1.0.0.9`. Intermediate `1.0.0.8` superseded.
 
 **Files:**
 - `powerbi-visual/src/visual.tsx` — main React/TS source (~800 lines)
@@ -238,13 +238,12 @@ Implementation: `Feedback` union extended with `{ kind: "error"; message: string
 
 ## 9. Known gaps / open improvements
 
-Patch 1 (v1.0.0.9) addresses #1 (error toast) and #6 (reset clean-state messaging) and adds Reset-isolation + CreateView-activate. The list below is what remains for a hypothetical Patch 2:
+Patch 2 (v1.0.0.10) addresses #2 (UniqueId) and #3 (Document title) and adds
+the wire/CSV plumbing for both. The list below is what remains:
 
 1. ~~No error toast on failure.~~ **Fixed in v1.0.0.9.**
-
-2. **`UniqueId` support as primary stable key.** Today the visual sends `elementIds` as integers — these survive most edits but are invalidated by purge or family reload. UniqueId is stable across the model's lifetime. Cost: dual data role in `capabilities.json`, dual resolver server-side, CSV exporter has to include `UniqueId`. Patch 2 candidate.
-
-3. **Document title validation.** No check that the PBI dataset's `DocumentTitle` matches the active Revit doc. A user with two models open and the wrong one focused will silently get partial/no results. Add a `documentTitle` field to the POST payload; server returns `{ error: "wrong_document", expected: "...", actual: "..." }` and the error toast tells the user to switch. Patch 2 candidate.
+2. ~~UniqueId support.~~ **Fixed in v1.0.0.10.**
+3. ~~Document title validation.~~ **Fixed in v1.0.0.10.**
 
 4. **Reset overrides has no confirmation when N > 0.** Currently a single click clears all PBI-tracked overrides on the view. For most users this is fine because the scope is PBI-only, but a "Click again to confirm" pattern would be safer for large counts. Low priority.
 
@@ -318,6 +317,90 @@ If everything is wired correctly: the status dot turns green within 30 s; the pr
 ### Cross-feature
 
 - [ ] Trigger two actions in rapid succession. The second one is rejected silently (`runAction` guard); only the first runs. Spinner stays on the first button until it resolves.
+
+## 13. Patch 2 — v1.0.0.10 (applied)
+
+Triggered by a second-pass review highlighting two real gaps: `UniqueId` as a
+stable primary key (ElementId is invalidated by purge / family reload) and
+`DocumentTitle` validation (silent failure when the wrong model is active).
+Both changes are fully **backward-compatible** — when the visual doesn't map
+the new optional roles, the wire payload is unchanged and the server takes
+the legacy code path.
+
+### 13.1 Server-side
+
+**`PbiActionEventHandler.Request`** gained two optional fields:
+
+```csharp
+public IReadOnlyList<string>? RawUniqueIds { get; }
+public string? ExpectedDocumentTitle { get; }
+public string? Error;  // "<code>:<message>" format
+```
+
+**Two new rich-dispatch wrappers** (`DispatchSelectionRich`, `DispatchCreateViewRich`)
+return the full `Request` so the listener can inspect `Error` (e.g. `"wrong_document:..."`).
+Legacy `DispatchSelection` / `DispatchCreateView` remain for tests and AI clients.
+
+**`Execute` loop** now calls `ValidateDocumentTitle` before any action. The
+check tolerates the `.rvt` suffix being present on either side and bails out
+with `Error = "wrong_document:expected 'X' but active document is 'Y'"` on
+mismatch.
+
+**New resolver `ResolveIdsMerged`** is used by both `ExecuteSelect` and
+`ExecuteCreateView` when `RawUniqueIds` is present. It runs `doc.GetElement(uid)`
+for each UniqueId first, dedupes by ElementId, then back-fills from
+`RawIds`. Survives purge / family reload because UniqueId is stable.
+
+**`PbiSelectHttpListener.Callbacks`** got two optional rich callbacks
+(`SelectionRich`, `CreateViewRich`) returning a structured
+`RichRequestResult` (success-or-error-code). When the request body carries
+`uniqueIds` or `documentTitle`, the listener uses the rich path; otherwise
+it falls through to the legacy callback. Tests (16/16) confirm
+backward-compat.
+
+**`PushToPowerBiTool`** discovery-mode header is now
+`ElementId, UniqueId, Category, Family, Type, DocumentTitle, ...params`. Schedule
+export prepends `ElementId, UniqueId, DocumentTitle`. Existing PBI dashboards
+that referenced columns by name continue to work; new fields are appended,
+not renamed.
+
+### 13.2 Visual-side
+
+**`capabilities.json`** adds two new Grouping data roles:
+- `uniqueIds` (Text, optional but recommended)
+- `documentTitle` (Text, optional)
+
+**`extractData`** changed from order-based to role-based column lookup
+(`col.roles["uniqueIds"]`). UniqueIds are tracked as parallel arrays to
+ElementIds (same index = same row). DocumentTitle is read from the first
+non-null row.
+
+**Action payloads** include `uniqueIds` and `documentTitle` ONLY when the
+roles are mapped (no degenerate empty arrays). Backward-compat: a PBI report
+that only maps `elementIds` produces the same wire payload as v1.0.0.9.
+
+**Error toast** picks up the server's `error` text automatically, so
+`wrong_document:expected 'X' but active document is 'Y'` shows up as a red
+toast with the verbatim message. No new strings needed.
+
+**Bump**: `1.0.0.9` → `1.0.0.10`. Built artifact:
+`dist/revitcortexselectionvisual1A2B3C4D.1.0.0.10.pbiviz` (52 KB), also
+copied to `~/Downloads/` for quick PBI Desktop import.
+
+### 13.3 Test additions for v1.0.0.10
+
+- [ ] Map `UniqueId` and `DocumentTitle` columns in the visual. Verify the
+      visual still works (no JS errors in browser console).
+- [ ] Click Select — server log should show `uids=N, doc=<title>`.
+- [ ] In Revit, purge an unused family then reload. Click Select again —
+      should still resolve correctly because UniqueId is stable.
+- [ ] Open a SECOND Revit model alongside the first. The visual was wired to
+      the first model's data. Click Select with the wrong model active —
+      red toast "expected 'X' but active document is 'Y'" appears.
+- [ ] Unmap the `documentTitle` role. Click Select with any model open — no
+      validation, action proceeds. (Backward-compat path.)
+- [ ] Unmap `uniqueIds`. Click Select — falls back to ElementId-only resolve,
+      identical to v1.0.0.9 behaviour.
 
 ## 12. Commit (v1.0.0.9 — Patch 1)
 

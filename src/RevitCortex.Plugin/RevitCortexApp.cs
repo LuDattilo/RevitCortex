@@ -202,7 +202,12 @@ public class RevitCortexApp : IExternalApplication
                         selection:       (ids, action) => _uiApplication == null ? null : handler.DispatchSelection(ids, action),
                         color:           items         => _uiApplication == null ? null : handler.DispatchColor(items),
                         resetOverrides:  ()            => _uiApplication == null ? null : handler.DispatchReset(),
-                        createView:      (ids, name)   => _uiApplication == null ? null : handler.DispatchCreateView(ids, name)),
+                        createView:      (ids, name)   => _uiApplication == null ? null : handler.DispatchCreateView(ids, name),
+                        // Rich callbacks: take UniqueIds + DocumentTitle into account.
+                        // Returns a structured (result, errorCode, errorMessage) tuple so
+                        // wrong_document validation can be surfaced cleanly to the visual.
+                        selectionRich:   input => RichDispatch(handler, input, isCreateView: false),
+                        createViewRich:  input => RichDispatch(handler, input, isCreateView: true)),
                     port: 27016);
                 _pbiSelectListener.Start();
             }
@@ -219,6 +224,34 @@ public class RevitCortexApp : IExternalApplication
         _socketService?.Stop();
         UpdateConnectionButtonIcon();
         ServiceStateChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Shared rich-dispatch shim: forwards both Select and CreateView to the
+    /// handler's *Rich overload, then unpacks Request.Error into the
+    /// structured listener response.
+    /// </summary>
+    private PbiSelectHttpListener.RichRequestResult RichDispatch(
+        PbiActionEventHandler handler,
+        PbiSelectHttpListener.RichRequestInput input,
+        bool isCreateView)
+    {
+        if (_uiApplication == null)
+            return PbiSelectHttpListener.RichRequestResult.Fail("no_application", "RevitCortex not bound to a UIApplication.");
+
+        var req = isCreateView
+            ? handler.DispatchCreateViewRich(input.ElementIds, input.UniqueIds, input.ViewName, input.DocumentTitle)
+            : handler.DispatchSelectionRich(input.ElementIds, input.UniqueIds, input.Action, input.DocumentTitle);
+
+        // Request.Error is "code:message"; parse and forward.
+        if (!string.IsNullOrEmpty(req.Error))
+        {
+            var sep = req.Error!.IndexOf(':');
+            return sep > 0
+                ? PbiSelectHttpListener.RichRequestResult.Fail(req.Error.Substring(0, sep), req.Error.Substring(sep + 1))
+                : PbiSelectHttpListener.RichRequestResult.Fail(req.Error, req.Error);
+        }
+        return PbiSelectHttpListener.RichRequestResult.Ok(req.Result);
     }
 
     private void UpdateConnectionButtonIcon()

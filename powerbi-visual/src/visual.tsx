@@ -159,9 +159,13 @@ interface ColoredRow {
 interface ExtractedData {
   filteredIds: number[];
   highlightedIds: number[];
+  filteredUniqueIds: string[];     // parallel to filteredIds
+  highlightedUniqueIds: string[];  // parallel to highlightedIds
+  documentTitle: string | null;    // when the role is mapped, the first row's value
   filteredColored: ColoredRow[];
   highlightedColored: ColoredRow[];
   hasColorColumn: boolean;
+  hasUniqueIdColumn: boolean;
 }
 
 // Categorical palette — Power BI default-ish colors, 16 stops. Reused as the
@@ -209,29 +213,46 @@ function resolveColor(raw: powerbi.PrimitiveValue | null | undefined): string | 
 
 /**
  * Extract all the data we need from the table data view in a single pass.
- * Column order matches the `dataViewMappings.table.rows.select` declaration:
- *   [0] elementIds
- *   [1] colorBy (optional)
+ * Roles are looked up by name (not column order) so adding new roles in
+ * `capabilities.json` doesn't require re-ordering.
+ *
+ * Roles consumed (all from `dataViewMappings.table.rows.select`):
+ *   - `elementIds`     required, Whole Number
+ *   - `uniqueIds`      optional, Text. Used as the stable primary key when present.
+ *   - `documentTitle`  optional, Text. Validated server-side against active doc.
+ *   - `colorBy`        optional, any categorical (used for Color action)
  */
 function extractData(dataView: powerbi.DataView): ExtractedData {
   const empty: ExtractedData = {
     filteredIds: [],
     highlightedIds: [],
+    filteredUniqueIds: [],
+    highlightedUniqueIds: [],
+    documentTitle: null,
     filteredColored: [],
     highlightedColored: [],
     hasColorColumn: false,
+    hasUniqueIdColumn: false,
   };
   const rows = dataView.table?.rows ?? [];
   if (rows.length === 0) return empty;
 
   const columns = dataView.table?.columns ?? [];
-  let idIdx = 0;
+  let idIdx = -1;
+  let uniqueIdx = -1;
+  let docTitleIdx = -1;
   let colorByIdx = -1;
   columns.forEach((col, i) => {
     if (col?.roles?.["elementIds"]) idIdx = i;
+    if (col?.roles?.["uniqueIds"]) uniqueIdx = i;
+    if (col?.roles?.["documentTitle"]) docTitleIdx = i;
     if (col?.roles?.["colorBy"]) colorByIdx = i;
   });
+  // elementIds is required by capabilities, but PBI may still call update()
+  // before the user maps it — guard with a sane fallback.
+  if (idIdx < 0) idIdx = 0;
   const hasColorColumn = colorByIdx >= 0;
+  const hasUniqueIdColumn = uniqueIdx >= 0;
 
   // Highlights array (cross-filter). Not in the public type — runtime-populated.
   const tableAny = dataView.table as unknown as {
@@ -241,17 +262,35 @@ function extractData(dataView: powerbi.DataView): ExtractedData {
 
   const filteredIds: number[] = [];
   const highlightedIds: number[] = [];
+  const filteredUniqueIds: string[] = [];
+  const highlightedUniqueIds: string[] = [];
   const filteredColored: ColoredRow[] = [];
   const highlightedColored: ColoredRow[] = [];
+  let documentTitle: string | null = null;
 
   rows.forEach((row, i) => {
     const id = row[idIdx];
     if (typeof id !== "number") return;
     filteredIds.push(id);
+    // UniqueId is optional. We pass an empty string for rows that don't have
+    // one so the parallel-array invariant (same index = same logical row) is
+    // preserved server-side.
+    if (hasUniqueIdColumn) {
+      const u = row[uniqueIdx];
+      filteredUniqueIds.push(u == null ? "" : String(u));
+    }
+    if (docTitleIdx >= 0 && documentTitle == null) {
+      const t = row[docTitleIdx];
+      if (t != null && String(t).length > 0) documentTitle = String(t);
+    }
     const hex = hasColorColumn ? resolveColor(row[colorByIdx]) : null;
     if (hex) filteredColored.push({ id, hex });
     if (highlights && highlights[i] != null) {
       highlightedIds.push(id);
+      if (hasUniqueIdColumn) {
+        const u = row[uniqueIdx];
+        highlightedUniqueIds.push(u == null ? "" : String(u));
+      }
       if (hex) highlightedColored.push({ id, hex });
     }
   });
@@ -259,9 +298,13 @@ function extractData(dataView: powerbi.DataView): ExtractedData {
   return {
     filteredIds,
     highlightedIds,
+    filteredUniqueIds,
+    highlightedUniqueIds,
+    documentTitle,
     filteredColored,
     highlightedColored,
     hasColorColumn,
+    hasUniqueIdColumn,
   };
 }
 
@@ -655,9 +698,13 @@ export class RevitCortexSelectionVisual implements IVisual {
   private readonly strings: Strings;
   private filteredIds: number[] = [];
   private highlightedIds: number[] = [];
+  private filteredUniqueIds: string[] = [];
+  private highlightedUniqueIds: string[] = [];
+  private documentTitle: string | null = null;
   private filteredColored: ColoredRow[] = [];
   private highlightedColored: ColoredRow[] = [];
   private hasColorColumn: boolean = false;
+  private hasUniqueIdColumn: boolean = false;
   private connected: boolean = false;
   private feedback: Feedback | null = null;
   private feedbackVisible: boolean = false;
@@ -690,18 +737,36 @@ export class RevitCortexSelectionVisual implements IVisual {
     if (!dv) {
       this.filteredIds = [];
       this.highlightedIds = [];
+      this.filteredUniqueIds = [];
+      this.highlightedUniqueIds = [];
+      this.documentTitle = null;
       this.filteredColored = [];
       this.highlightedColored = [];
       this.hasColorColumn = false;
+      this.hasUniqueIdColumn = false;
     } else {
       const data = extractData(dv);
       this.filteredIds = data.filteredIds;
       this.highlightedIds = data.highlightedIds;
+      this.filteredUniqueIds = data.filteredUniqueIds;
+      this.highlightedUniqueIds = data.highlightedUniqueIds;
+      this.documentTitle = data.documentTitle;
       this.filteredColored = data.filteredColored;
       this.highlightedColored = data.highlightedColored;
       this.hasColorColumn = data.hasColorColumn;
+      this.hasUniqueIdColumn = data.hasUniqueIdColumn;
     }
     this.render();
+  }
+
+  /**
+   * Pick the right UniqueIds parallel array for the active id set. Returns
+   * undefined when no UniqueId column is mapped so we don't ship a degenerate
+   * empty array that would skip the rich code path server-side.
+   */
+  private activeUniqueIds(useHighlighted: boolean): string[] | undefined {
+    if (!this.hasUniqueIdColumn) return undefined;
+    return useHighlighted ? this.highlightedUniqueIds : this.filteredUniqueIds;
   }
 
   private showFeedback(f: Feedback): void {
@@ -751,11 +816,13 @@ export class RevitCortexSelectionVisual implements IVisual {
 
   private async onSelect(ids: number[], action: "select" | "isolate"): Promise<void> {
     return this.runAction(action === "isolate" ? "isolate" : "select", async () => {
-      const r = await post(PBI_SELECT_URL, { elementIds: ids, action });
+      const useHighlighted = this.highlightedIds.length > 0;
+      const uniqueIds = this.activeUniqueIds(useHighlighted);
+      const payload: Record<string, unknown> = { elementIds: ids, action };
+      if (uniqueIds !== undefined) payload.uniqueIds = uniqueIds;
+      if (this.documentTitle) payload.documentTitle = this.documentTitle;
+      const r = await post(PBI_SELECT_URL, payload);
       if (r.ok && r.body?.success) {
-        // Server returns `validated` = ResolvedCount (string). When it's less
-        // than ids.length, some IDs didn't exist in the active doc — surface
-        // the partial outcome to the user instead of pretending it was clean.
         const resolved = parseInt(r.body.validated ?? `${ids.length}`, 10);
         const count = Number.isFinite(resolved) ? resolved : ids.length;
         this.showFeedback({ kind: "sent", count, requested: ids.length });
@@ -791,7 +858,12 @@ export class RevitCortexSelectionVisual implements IVisual {
 
   private async onCreateView(ids: number[]): Promise<void> {
     return this.runAction("view", async () => {
-      const r = await post(PBI_CREATE_VIEW_URL, { elementIds: ids });
+      const useHighlighted = this.highlightedIds.length > 0;
+      const uniqueIds = this.activeUniqueIds(useHighlighted);
+      const payload: Record<string, unknown> = { elementIds: ids };
+      if (uniqueIds !== undefined) payload.uniqueIds = uniqueIds;
+      if (this.documentTitle) payload.documentTitle = this.documentTitle;
+      const r = await post(PBI_CREATE_VIEW_URL, payload);
       if (r.ok && r.body?.success) {
         const name = String(r.body.validated ?? "");
         this.showFeedback({ kind: "view", name });
