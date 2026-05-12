@@ -201,14 +201,17 @@ public class PowerBiScheduleExporter
             long elementId = GetElementIdValue(elem.Id);
             string uniqueId = SafeString(() => elem.UniqueId) ?? "";
 
+            // Check cell budget BEFORE emitting any field for this element:
+            // either include the full element or exclude it entirely.
+            // Partial rows (some fields yes, some no) corrupt Power BI aggregations.
+            if (maxCellsPerSchedule > 0 && cellsEmitted + fields.Count > maxCellsPerSchedule)
+            {
+                truncatedByCells = true;
+                break;
+            }
+
             foreach (var field in fields)
             {
-                if (maxCellsPerSchedule > 0 && cellsEmitted >= maxCellsPerSchedule)
-                {
-                    truncatedByCells = true;
-                    break;
-                }
-
                 var parameter = ResolveScheduleFieldParameter(doc, elem, field.ParameterId);
                 var value = ReadParameterValue(doc, parameter);
 
@@ -233,7 +236,6 @@ public class PowerBiScheduleExporter
                 });
                 cellsEmitted++;
             }
-            if (truncatedByCells) break;
 
             elementCount++;
         }

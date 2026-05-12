@@ -219,27 +219,40 @@ public partial class PowerBiExportWindow : Window
         }
         else
         {
-            // Single pass: collect all category ElementId integers present in scope
+            // Single pass: collect all category ElementId integers present in scope.
+            // BuildSelectionCollector now returns null when the user's selection
+            // is empty — in that case we skip iteration entirely so presentIds
+            // stays empty and every category gets InScope=false (correct: there
+            // are zero elements selected, so no category is "in scope").
             var presentIds = new HashSet<int>();
+            FilteredElementCollector? col = null;
             try
             {
-                FilteredElementCollector col = _scope == Scope.ActiveView
+                col = _scope == Scope.ActiveView
                     ? new FilteredElementCollector(_doc, _doc.ActiveView.Id)
                     : BuildSelectionCollector();
-                foreach (var elem in col.WhereElementIsNotElementType())
+                if (col != null)
                 {
-                    if (elem.Category?.Id is { } catId)
+                    foreach (var elem in col.WhereElementIsNotElementType())
+                    {
+                        if (elem.Category?.Id is { } catId)
 #if REVIT2024_OR_GREATER
-                        presentIds.Add((int)catId.Value);
+                            presentIds.Add((int)catId.Value);
 #else
-                        presentIds.Add(catId.IntegerValue);
+                            presentIds.Add(catId.IntegerValue);
 #endif
+                    }
                 }
             }
             catch (Exception ex)
             {
                 DebugLog($"RefreshScopeFilter collector failed: {ex.Message}");
             }
+
+            // Surface "empty selection" to the user as a status message —
+            // otherwise the list just goes blank with no explanation.
+            if (_scope == Scope.Selection && col == null)
+                SetStatus("Selezione corrente in Revit: nessun elemento selezionato. Seleziona elementi nel modello e ri-clicca 'Selezione corrente'.");
 
             foreach (var c in _allCategories)
             {
@@ -407,6 +420,11 @@ public partial class PowerBiExportWindow : Window
             SchemaMappingExpander.Visibility = System.Windows.Visibility.Visible;
             if (string.IsNullOrWhiteSpace(FileNameBox.Text))
                 FileNameBox.Text = SuggestFileName();
+            // Auto-populate / sync the schema-mapping grid with the current
+            // column set. Even in Auto mode this gives the user visibility
+            // into what columns the CSV will have; non-auto types entered
+            // previously are preserved for still-existing columns.
+            SyncColumnTypesWithSelection();
         }
         RefreshPreview();
     }
@@ -448,14 +466,24 @@ public partial class PowerBiExportWindow : Window
         _columnTypes.Clear();
         if (_mode != SourceMode.Categories) return;
 
-        // Built-in columns: ElementId is integer, the others are text.
-        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "ElementId", PbiType = "int" });
-        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "Category", PbiType = "text" });
-        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "Family", PbiType = "text" });
-        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "Type", PbiType = "text" });
+        // All built-in columns the CSV always writes. Keep the type by convention.
+        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "ElementId",     PbiType = "int"  });
+        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "UniqueId",      PbiType = "text" });
+        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "Category",      PbiType = "text" });
+        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "Family",        PbiType = "text" });
+        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "Type",          PbiType = "text" });
+        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "DocumentTitle", PbiType = "text" });
+        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "DocumentPath",  PbiType = "text" });
+        _columnTypes.Add(new ColumnTypeMapping { ColumnName = "EpisodeId",     PbiType = "text" });
 
+        // Skip params that duplicate built-in column names — they are filtered
+        // server-side at CSV write time (the built-in column already carries
+        // the value), so emitting a mapping entry for them would be a ghost.
+        var builtIns = BuiltInColumnNames();
         foreach (var p in _selectedParams)
         {
+            if (string.IsNullOrEmpty(p.Name)) continue;
+            if (builtIns.Contains(p.Name)) continue;
             var colName = p.Scope == "Type" ? $"[Type] {p.Name}" : p.Name;
             _columnTypes.Add(new ColumnTypeMapping
             {
@@ -464,6 +492,67 @@ public partial class PowerBiExportWindow : Window
             });
         }
 
+        ColumnTypesGrid?.Items.Refresh();
+    }
+
+    /// <summary>
+    /// Single source of truth for the built-in column header set. Used by both
+    /// preview dedup logic and schema-mapping generation so they always agree.
+    /// Mirrors the server-side header in <c>PushToPowerBiTool</c> (v2 schema).
+    /// </summary>
+    private static HashSet<string> BuiltInColumnNames() => new HashSet<string>(
+        new[] { "ElementId", "UniqueId", "Category", "Family", "Type", "DocumentTitle", "DocumentPath", "EpisodeId" },
+        StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Returns the full ordered list of CSV column headers that would be
+    /// emitted for the current Categories-mode selection. Same logic as the
+    /// server-side discovery + dedup, so the in-UI Schema Mapping grid stays
+    /// consistent with the real CSV output.
+    /// </summary>
+    private List<string> ComputeCurrentColumnNames()
+    {
+        var cols = new List<string>
+        {
+            "ElementId", "UniqueId", "Category", "Family", "Type", "DocumentTitle", "DocumentPath", "EpisodeId"
+        };
+        if (_mode != SourceMode.Categories) return cols;
+
+        var builtIns = BuiltInColumnNames();
+        foreach (var p in _selectedParams)
+        {
+            if (string.IsNullOrEmpty(p.Name)) continue;
+            if (builtIns.Contains(p.Name)) continue;
+            cols.Add(p.Scope == "Type" ? $"[Type] {p.Name}" : p.Name);
+        }
+        return cols;
+    }
+
+    /// <summary>
+    /// Synchronizes the Schema-Mapping grid with the current column selection
+    /// while PRESERVING any non-auto types the user (or the Suggested heuristic)
+    /// has already set on still-existing columns. This is what makes "Auto"
+    /// mode informative — the grid shows the actual columns of the upcoming
+    /// CSV with <c>auto</c> as the default type — and what lets the user
+    /// freely tweak categories/params without losing their typed columns.
+    /// </summary>
+    private void SyncColumnTypesWithSelection()
+    {
+        var desired = ComputeCurrentColumnNames();
+        var existing = _columnTypes.ToDictionary(c => c.ColumnName, c => c, StringComparer.OrdinalIgnoreCase);
+
+        _columnTypes.Clear();
+        foreach (var col in desired)
+        {
+            if (existing.TryGetValue(col, out var prev))
+            {
+                _columnTypes.Add(prev); // preserve user/Suggested type
+            }
+            else
+            {
+                _columnTypes.Add(new ColumnTypeMapping { ColumnName = col, PbiType = "auto" });
+            }
+        }
         ColumnTypesGrid?.Items.Refresh();
     }
 
@@ -1013,6 +1102,35 @@ public partial class PowerBiExportWindow : Window
         }
     }
 
+    /// <summary>
+    /// Opens the current Output folder in Windows Explorer. Companion to the
+    /// "Sfoglia…" button: Sfoglia changes the selection (folder picker, shows
+    /// folders only by Windows design); this one shows the actual file content
+    /// of whatever is currently in the box — useful for verifying that a
+    /// previous export produced the expected CSVs.
+    /// </summary>
+    private void OpenOutputFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dir = OutputFolderBox?.Text?.Trim();
+            if (string.IsNullOrEmpty(dir))
+            {
+                SetStatus("Imposta prima una cartella di output.");
+                return;
+            }
+            // Create on demand: the user might have typed a path that doesn't
+            // exist yet (e.g. they're planning ahead before exporting). Avoids
+            // an Explorer error popup and matches "Apri profili" semantics.
+            Directory.CreateDirectory(dir!);
+            System.Diagnostics.Process.Start("explorer.exe", $"\"{dir}\"");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Apertura cartella output fallita: {ex.Message}");
+        }
+    }
+
     private PowerBiExportProfile BuildCurrentProfile(string name)
     {
         return new PowerBiExportProfile
@@ -1079,10 +1197,35 @@ public partial class PowerBiExportWindow : Window
         var instParams = _selectedParams.Where(p => p.Scope == "Instance").Select(p => p.Name).ToList();
         var typeParams = _selectedParams.Where(p => p.Scope == "Type").Select(p => p.Name).ToList();
 
+        // Built-in columns and well-known sidecar names that the CSV writes
+        // unconditionally. If the user selected a parameter with one of these
+        // names (e.g. "Family" or "Type"), we silently skip it for the preview
+        // and CSV — the built-in column already carries the same / closely
+        // related value, and DataTable would throw on a duplicate column name.
+        var builtIns = BuiltInColumnNames();
+
+        var dedupInst = new List<string>();
+        var dedupType = new List<string>();
+        int skipped = 0;
+        foreach (var n in instParams)
+        {
+            if (string.IsNullOrEmpty(n)) continue;
+            if (builtIns.Contains(n)) { skipped++; continue; }
+            dedupInst.Add(n);
+        }
+        foreach (var n in typeParams)
+        {
+            if (string.IsNullOrEmpty(n)) continue;
+            // Type params are prefixed with "[Type] " so collisions with built-ins
+            // are basically impossible, but guard anyway.
+            if (builtIns.Contains(n)) { skipped++; continue; }
+            dedupType.Add(n);
+        }
+
         var headers = new List<string> { "ElementId", "Category", "Family", "Type" };
-        headers.AddRange(instParams);
+        headers.AddRange(dedupInst);
         if (IncludeTypeParametersBox.IsChecked == true)
-            headers.AddRange(typeParams.Select(n => "[Type] " + n));
+            headers.AddRange(dedupType.Select(n => "[Type] " + n));
 
         var rows = new System.Data.DataTable();
         foreach (var h in headers) rows.Columns.Add(h);
@@ -1100,14 +1243,14 @@ public partial class PowerBiExportWindow : Window
             row[3] = (typeElem as ElementType)?.Name ?? "";
 
             int col = 4;
-            foreach (var pn in instParams)
+            foreach (var pn in dedupInst)
             {
                 var p = elem.LookupParameter(pn);
                 row[col++] = p != null ? GetParamDisplay(p) : "";
             }
             if (IncludeTypeParametersBox.IsChecked == true)
             {
-                foreach (var pn in typeParams)
+                foreach (var pn in dedupType)
                 {
                     var p = typeElem?.LookupParameter(pn);
                     row[col++] = p != null ? GetParamDisplay(p) : "";
@@ -1119,7 +1262,11 @@ public partial class PowerBiExportWindow : Window
         PreviewGrid.ItemsSource = rows.DefaultView;
 
         int totalRows = CountElementsForScope(ostCodes);
-        SummaryText.Text = $"Modalita Categorie · {ostCodes.Count} categorie · {instParams.Count + (IncludeTypeParametersBox.IsChecked == true ? typeParams.Count : 0)} parametri · ~{totalRows} elementi · ambito {_scope}";
+        var totalParams = dedupInst.Count + (IncludeTypeParametersBox.IsChecked == true ? dedupType.Count : 0);
+        var skipNote = skipped > 0
+            ? $" · {skipped} parametr{(skipped == 1 ? "o" : "i")} duplicat{(skipped == 1 ? "o" : "i")} con colonne built-in (saltati)"
+            : "";
+        SummaryText.Text = $"Modalita Categorie · {ostCodes.Count} categorie · {totalParams} parametri · ~{totalRows} elementi · ambito {_scope}{skipNote}";
     }
 
     private List<Element> CollectElementsForScope(List<string> ostCodes, int take)
@@ -1129,7 +1276,7 @@ public partial class PowerBiExportWindow : Window
         {
             if (elems.Count >= take) break;
             if (!Enum.TryParse<BuiltInCategory>(ost, out var bic)) continue;
-            FilteredElementCollector col;
+            FilteredElementCollector? col;
             try
             {
                 col = _scope switch
@@ -1143,6 +1290,7 @@ public partial class PowerBiExportWindow : Window
             {
                 col = new FilteredElementCollector(_doc);
             }
+            if (col == null) continue;  // Selection mode with empty selection — nothing to preview
             elems.AddRange(col.OfCategory(bic).WhereElementIsNotElementType().Take(take - elems.Count));
         }
         return elems;
@@ -1154,7 +1302,7 @@ public partial class PowerBiExportWindow : Window
         foreach (var ost in ostCodes)
         {
             if (!Enum.TryParse<BuiltInCategory>(ost, out var bic)) continue;
-            FilteredElementCollector col;
+            FilteredElementCollector? col;
             try
             {
                 col = _scope switch
@@ -1168,18 +1316,26 @@ public partial class PowerBiExportWindow : Window
             {
                 col = new FilteredElementCollector(_doc);
             }
+            if (col == null) continue;  // Selection mode with empty selection — count stays 0
             total += col.OfCategory(bic).WhereElementIsNotElementType().GetElementCount();
         }
         return total;
     }
 
-    private FilteredElementCollector BuildSelectionCollector()
+    /// <summary>
+    /// Returns a collector over the user's current Revit selection, or
+    /// <c>null</c> when the selection is empty. Callers must treat null as
+    /// "no elements" — NEVER fall back to whole-model, which was the previous
+    /// bug that made "Selezione corrente" show every category when nothing
+    /// was actually selected.
+    /// </summary>
+    private FilteredElementCollector? BuildSelectionCollector()
     {
         var ui = RevitCortexApp.Instance?.UiApplication;
         var sel = ui?.ActiveUIDocument?.Selection.GetElementIds();
         if (sel != null && sel.Count > 0)
             return new FilteredElementCollector(_doc, sel);
-        return new FilteredElementCollector(_doc);
+        return null;
     }
 
     private void RefreshScheduleFields(ScheduleRow? target = null)
@@ -1415,7 +1571,7 @@ public partial class PowerBiExportWindow : Window
                 try { ProtocolHandlerRegistrar.Register(); }
                 catch (Exception regEx) { DebugLog($"ProtocolHandler register failed: {regEx.Message}"); }
             }
-            if (AutoExportBox.IsChecked == true) AutoExportHook.Enable(profile);
+            if (AutoExportBox.IsChecked == true) AutoExportHook.Enable(profile, _doc);
             else AutoExportHook.Disable();
 
             if (result == null)
@@ -1446,6 +1602,11 @@ public partial class PowerBiExportWindow : Window
             catch { /* fall through */ }
 
             SetStatus($"Export completato: {count ?? "?"} righe → {path ?? "(percorso sconosciuto)"}");
+
+            // Modal feedback so the user gets a clear "done" signal beyond the
+            // status bar. "Apri cartella" deep-links to Explorer in the output
+            // folder for quick verification.
+            ShowExportSuccessDialog(count, path);
         }
         catch (Exception ex)
         {
@@ -1457,6 +1618,65 @@ public partial class PowerBiExportWindow : Window
         {
             ExportBtn.IsEnabled = true;
             BackBtn.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Modal success TaskDialog shown after a completed export. Tells the user
+    /// what was written and offers a deep-link to the output folder. Falls
+    /// back to a silent no-op if Revit's TaskDialog can't be created (e.g.
+    /// from unit tests). Path may point to a CSV file or, in schedule mode
+    /// with multiple files, the parent folder — both are handled.
+    /// </summary>
+    private void ShowExportSuccessDialog(string? count, string? path)
+    {
+        try
+        {
+            string folder = "";
+            if (!string.IsNullOrEmpty(path))
+            {
+                folder = Directory.Exists(path)
+                    ? path!
+                    : Path.GetDirectoryName(path) ?? "";
+            }
+            if (string.IsNullOrEmpty(folder) && !string.IsNullOrEmpty(OutputFolderBox?.Text))
+                folder = OutputFolderBox.Text;
+
+            string title, instruction, content;
+            if (_mode == SourceMode.Schedules)
+            {
+                var n = _allSchedules.Count(s => s.IsSelected);
+                title = "Export Power BI completato";
+                instruction = $"Esportate {n} schedule";
+                content = $"File generati in: {folder}";
+            }
+            else
+            {
+                title = "Export Power BI completato";
+                instruction = $"Esportate {count ?? "?"} righe";
+                content = $"File: {path}";
+            }
+
+            var td = new Autodesk.Revit.UI.TaskDialog(title)
+            {
+                MainInstruction = instruction,
+                MainContent = content,
+                CommonButtons = Autodesk.Revit.UI.TaskDialogCommonButtons.Close,
+                DefaultButton = Autodesk.Revit.UI.TaskDialogResult.Close
+            };
+            td.AddCommandLink(Autodesk.Revit.UI.TaskDialogCommandLinkId.CommandLink1,
+                "Apri cartella", "Apri Esplora risorse nella cartella di output");
+
+            var r = td.Show();
+            if (r == Autodesk.Revit.UI.TaskDialogResult.CommandLink1 && !string.IsNullOrEmpty(folder) && Directory.Exists(folder))
+            {
+                try { System.Diagnostics.Process.Start("explorer.exe", $"\"{folder}\""); }
+                catch (Exception ex) { DebugLog($"Explorer open failed: {ex.Message}"); }
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"ShowExportSuccessDialog failed (non-fatal): {ex.Message}");
         }
     }
 

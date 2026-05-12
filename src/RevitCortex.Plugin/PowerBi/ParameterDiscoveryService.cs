@@ -284,8 +284,7 @@ public class ParameterDiscoveryService
                 .Take(sampleSize)
                 .ToList();
 
-            int sampled = elems.Count;
-            if (sampled == 0) continue;
+            if (elems.Count == 0) continue;
 
             foreach (var elem in elems)
             {
@@ -307,11 +306,6 @@ public class ParameterDiscoveryService
                     }
                 }
             }
-
-            // Update sample sizes for coverage calculation
-            foreach (var stat in instanceStats.Values) stat.SampleSize += sampled;
-            if (includeTypeParameters)
-                foreach (var stat in typeStats.Values) stat.SampleSize += sampled;
         }
 
         var result = new List<ParameterInfo>();
@@ -374,6 +368,10 @@ public class ParameterDiscoveryService
                     };
                     stats[name] = s;
                 }
+                // SampleSize = number of elements that have this parameter present,
+                // regardless of whether it has a value. This gives a denominator of
+                // "elements where the param is applicable", not "all selected elements".
+                s.SampleSize++;
                 if (SafeIsReadOnly(p)) s.IsReadOnly = true;
                 if (HasMeaningfulValue(p)) s.PopulatedCount++;
             }

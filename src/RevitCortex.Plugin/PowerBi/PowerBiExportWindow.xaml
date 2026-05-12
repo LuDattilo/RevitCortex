@@ -547,8 +547,14 @@
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Cartella output:" VerticalAlignment="Center" Margin="0,4"/>
                     <TextBox x:Name="OutputFolderBox" Grid.Row="0" Grid.Column="1" Padding="6,4" Margin="0,4"/>
-                    <Button Grid.Row="0" Grid.Column="2" Content="Sfoglia…" Margin="8,4,0,4"
-                            Style="{StaticResource SecondaryButton}" Click="BrowseFolder_Click"/>
+                    <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal">
+                        <Button Content="Sfoglia…" Margin="8,4,0,4" Style="{StaticResource SecondaryButton}"
+                                ToolTip="Cambia la cartella di output (selezione cartella; i file non sono visibili nel dialog Windows per design)"
+                                Click="BrowseFolder_Click"/>
+                        <Button x:Name="OpenOutputFolderBtn" Content="Apri" Margin="4,4,0,4" Style="{StaticResource SecondaryButton}"
+                                ToolTip="Apri questa cartella in Esplora risorse — utile per verificare i CSV già esportati"
+                                Click="OpenOutputFolder_Click"/>
+                    </StackPanel>
 
                     <TextBlock x:Name="FileNameLabel" Grid.Row="1" Grid.Column="0" Text="Nome file:" VerticalAlignment="Center" Margin="0,4"/>
                     <TextBox x:Name="FileNameBox" Grid.Row="1" Grid.Column="1" Padding="6,4" Margin="0,4"/>
@@ -673,7 +679,7 @@
                             Click="SaveProfile_Click"/>
                     <Button x:Name="ImportProfileBtn" Content="Importa…" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0"
                             ToolTip="Importa un profilo da un file .json (cartella di rete/condivisa)" Click="ImportProfile_Click"/>
-                    <Button x:Name="OpenProfilesFolderBtn" Content="Apri cartella" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0"
+                    <Button x:Name="OpenProfilesFolderBtn" Content="Apri profili" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0"
                             ToolTip="Apri ~/.revitcortex/profiles per copiare/condividere i profili" Click="OpenProfilesFolder_Click"/>
                 </StackPanel>
                 <TextBlock Grid.Column="1" x:Name="StatusText" VerticalAlignment="Center" Margin="16,0" Foreground="#424242"/>

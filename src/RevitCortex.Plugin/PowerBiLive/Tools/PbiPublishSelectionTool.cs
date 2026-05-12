@@ -203,7 +203,7 @@ public class PbiPublishSelectionTool : ICortexTool
                 table = PowerBiDatasetSchema.TableSelection,
                 exportRunId = selectionRows.Count > 0 ? exportRunId : null,
                 rowCount = result.RowCount,
-                batchCount = 0,
+                batchCount = result.BatchCount,
                 durationMs = sw.ElapsedMilliseconds
             });
         }
@@ -290,12 +290,14 @@ public class PbiPublishSelectionTool : ICortexTool
                 asObjects).ConfigureAwait(false);
         }
 
-        return new PublishSummary { DatasetId = datasetId!, RowCount = posted };
+        int batchCount = rows.Count == 0 ? 0 : (int)Math.Ceiling(rows.Count / 10_000.0);
+        return new PublishSummary { DatasetId = datasetId!, RowCount = posted, BatchCount = batchCount };
     }
 
     private class PublishSummary
     {
         public string DatasetId { get; set; } = "";
         public int RowCount { get; set; }
+        public int BatchCount { get; set; }
     }
 }

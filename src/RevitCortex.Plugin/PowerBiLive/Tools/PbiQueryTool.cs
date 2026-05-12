@@ -319,7 +319,14 @@ public class PbiQueryTool : ICortexTool
             conditions.Add($"Elements[Level] = \"{EscapeDax(level!)}\"");
 
         if (!string.IsNullOrWhiteSpace(parameterName) && !string.IsNullOrWhiteSpace(parameterValue))
+        {
+            // Validate parameterName before embedding it as a DAX column identifier.
+            // '[' and ']' would break the column reference syntax and allow injection.
+            if (parameterName!.IndexOf('[') >= 0 || parameterName.IndexOf(']') >= 0)
+                throw new ArgumentException(
+                    $"parameterName contains invalid DAX identifier characters: {parameterName}");
             conditions.Add($"Elements[{parameterName}] = \"{EscapeDax(parameterValue!)}\"");
+        }
 
         if (!string.IsNullOrWhiteSpace(exportRunId))
             conditions.Add($"Elements[ExportRunId] = \"{EscapeDax(exportRunId!)}\"");

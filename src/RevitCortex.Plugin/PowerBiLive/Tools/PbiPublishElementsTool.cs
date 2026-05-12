@@ -353,14 +353,8 @@ public class PbiPublishElementsTool : ICortexTool
 
         if (mode == "create" || mode == "replace")
         {
-            var body = PowerBiDatasetSchema.BuildCreateDatasetBody(datasetName,
-                new[]
-                {
-                    PowerBiDatasetSchema.TableMetadata,
-                    PowerBiDatasetSchema.TableElements,
-                    PowerBiDatasetSchema.TableSchedules,
-                    PowerBiDatasetSchema.TableSelection
-                });
+            var body = PowerBiDatasetSchema.BuildCreateDatasetBody(
+                datasetName, PowerBiDatasetSchema.AllTables);
             var newId = await client.CreatePushDatasetAsync(workspaceId, body)
                 .ConfigureAwait(false);
             warnings.Add($"Dataset '{datasetName}' did not exist — created automatically.");

@@ -84,8 +84,15 @@ public class PowerBiAuthService
         }
         catch (MsalUiRequiredException)
         {
-            // Cache is present but token expired and refresh failed
+            // Cache is present but token expired and refresh token no longer valid
             return AuthState.NotSignedIn();
+        }
+        catch (MsalServiceException ex)
+        {
+            // Transient Microsoft Identity service error (503, DNS failure, proxy).
+            // Surface as AuthState.Error so callers can show a network-error hint
+            // instead of an unhandled exception stack trace.
+            return AuthState.Error(ex);
         }
     }
 

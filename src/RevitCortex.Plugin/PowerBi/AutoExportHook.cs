@@ -16,21 +16,28 @@ namespace RevitCortex.Plugin.PowerBi;
 public static class AutoExportHook
 {
     private static PowerBiExportProfile? _profile;
+    private static string? _targetDocumentPath;
     private static bool _attached;
     private static EventHandler<DocumentSavedEventArgs>? _handler;
 
-    public static void Enable(PowerBiExportProfile profile)
+    /// <summary>
+    /// Attiva l'auto-export per il documento specificato.
+    /// Se già attivato, aggiorna solo profilo e documento target senza
+    /// ri-sottoscrivere l'evento (evita doppia registrazione del delegate).
+    /// </summary>
+    public static void Enable(PowerBiExportProfile profile, Document targetDocument)
     {
         _profile = profile;
+        _targetDocumentPath = targetDocument?.PathName;
+
+        if (_attached) return; // aggiorna solo i campi, non ri-registrare
+
         var ui = RevitCortexApp.Instance?.UiApplication;
         if (ui == null) return;
 
-        if (!_attached)
-        {
-            _handler = OnDocumentSaved;
-            ui.Application.DocumentSaved += _handler;
-            _attached = true;
-        }
+        _handler = OnDocumentSaved;
+        ui.Application.DocumentSaved += _handler;
+        _attached = true;
     }
 
     public static void Disable()
@@ -42,11 +49,20 @@ public static class AutoExportHook
         }
         _attached = false;
         _profile = null;
+        _targetDocumentPath = null;
     }
 
     private static async void OnDocumentSaved(object? sender, DocumentSavedEventArgs e)
     {
         if (_profile == null) return;
+
+        // Filtra per documento: esporta solo se il documento salvato corrisponde
+        // a quello per cui è stato attivato l'auto-export.
+        if (_targetDocumentPath != null &&
+            !string.Equals(e.Document?.PathName, _targetDocumentPath,
+                StringComparison.OrdinalIgnoreCase))
+            return;
+
         try
         {
             var port = RevitCortexApp.Instance?.Port ?? 8080;

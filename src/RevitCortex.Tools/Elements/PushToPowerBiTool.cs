@@ -84,6 +84,14 @@ public class PushToPowerBiTool : ICortexTool
         // Also write a metadata sidecar so PBI knows when the data was refreshed
         var metaPath = Path.Combine(outputFolder, "last_refresh.json");
 
+        // Document identity columns (shared between CSV body and manifest):
+        //   DocumentPath: file location (cloud URN or local path), not stable
+        //                 across rename/move but useful for human filtering.
+        //   EpisodeId:    immutable Revit document GUID; recommended cross-
+        //                 file join key. Stable across rename/move.
+        var documentPath = GetDocumentPath(doc);
+        var episodeId    = GetEpisodeId(doc);
+
         // Scope filter (SheetLink-style: WholeModel | ActiveView | Selection)
         var scopeMode = (input["scopeMode"]?.Value<string>() ?? "WholeModel").Trim();
         var selectionIds = input["selectionIds"]?.ToObject<List<long>>();
@@ -155,7 +163,16 @@ public class PushToPowerBiTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     "No elements found matching the requested categories.");
 
-            // Discover parameter columns (sample first 100 for performance)
+            // Discover parameter columns (sample first 100 for performance).
+            // We skip parameter names that collide with the built-in column
+            // headers we always emit (ElementId, UniqueId, Category, Family,
+            // Type, DocumentTitle, DocumentGuid). Otherwise Power Query would
+            // see two columns named "Family" (one from FamilyName, one from
+            // the user-selected param) and complain about ambiguity. The
+            // built-in column already carries the relevant value.
+            var builtInColumnNames = new HashSet<string>(
+                new[] { "ElementId", "UniqueId", "Category", "Family", "Type", "DocumentTitle", "DocumentGuid" },
+                StringComparer.OrdinalIgnoreCase);
             var instanceParamNames = new LinkedHashSet();
             var typeParamNames = new LinkedHashSet();
             var typeCache = new Dictionary<ElementId, Element?>();
@@ -164,8 +181,10 @@ public class PushToPowerBiTool : ICortexTool
             {
                 foreach (Parameter p in elem.Parameters)
                 {
-                    if (parameterNames.Count == 0 || parameterNames.Contains(p.Definition.Name))
-                        instanceParamNames.Add(p.Definition.Name);
+                    var name = p.Definition.Name;
+                    if (builtInColumnNames.Contains(name)) continue;
+                    if (parameterNames.Count == 0 || parameterNames.Contains(name))
+                        instanceParamNames.Add(name);
                 }
 
                 if (includeTypeParams)
@@ -182,8 +201,13 @@ public class PushToPowerBiTool : ICortexTool
                         {
                             foreach (Parameter p in typeElem.Parameters)
                             {
-                                if (parameterNames.Count == 0 || parameterNames.Contains(p.Definition.Name))
-                                    typeParamNames.Add(p.Definition.Name);
+                                var name = p.Definition.Name;
+                                // Type params are emitted as "[Type] <name>" so they
+                                // can't collide with the built-in headers, but we still
+                                // filter explicit user requests for built-in names.
+                                if (builtInColumnNames.Contains(name)) continue;
+                                if (parameterNames.Count == 0 || parameterNames.Contains(name))
+                                    typeParamNames.Add(name);
                             }
                         }
                     }
@@ -247,12 +271,16 @@ public class PushToPowerBiTool : ICortexTool
                 bool useTypeMapping = !string.Equals(schemaMappingMode, "Auto", StringComparison.OrdinalIgnoreCase)
                                     && columnTypes.Count > 0;
 
-                // ElementId + UniqueId are both emitted: ElementId for fast joins,
-                // UniqueId for the PBI selection visual which prefers it as a stable
-                // key (survives purge / family reload). DocumentTitle helps multi-
-                // model dashboards filter by source doc and lets the visual
-                // validate that the active Revit doc matches the dataset.
-                var header = new List<string> { "ElementId", "UniqueId", "Category", "Family", "Type", "DocumentTitle" };
+                // Built-in columns, in order:
+                //   ElementId / UniqueId  — element identity (UniqueId stable across
+                //                           purge / family reload)
+                //   Category / Family / Type — built-in classifiers
+                //   DocumentTitle  — human label
+                //   DocumentPath   — file system path (cloud URN or local) — useful
+                //                    for filtering, NOT stable across rename
+                //   EpisodeId      — immutable Revit document GUID (extracted from
+                //                    UniqueId prefix); recommended cross-file join key
+                var header = new List<string> { "ElementId", "UniqueId", "Category", "Family", "Type", "DocumentTitle", "DocumentPath", "EpisodeId" };
                 var rawCompanionInst = new HashSet<string>(); // instance param names that need _Raw
                 var rawCompanionType = new HashSet<string>(); // type param names (without [Type] prefix) that need _Raw
 
@@ -299,7 +327,9 @@ public class PushToPowerBiTool : ICortexTool
                             ?? (typeElem as ElementType)?.FamilyName ?? ""),
                         CsvEscape(elem.LookupParameter("Type Name")?.AsValueString()
                             ?? (typeElem as ElementType)?.Name ?? ""),
-                        CsvEscape(doc.Title ?? "")
+                        CsvEscape(doc.Title ?? ""),
+                        CsvEscape(documentPath),
+                        CsvEscape(episodeId)
                     };
 
                     foreach (var name in instanceParamNames.Items)
@@ -335,16 +365,42 @@ public class PushToPowerBiTool : ICortexTool
 
             WriteCsvAtomic(filePath, sb.ToString());
 
-            // Write metadata sidecar
+            // Write metadata sidecar with manifest section that declares schema,
+            // grain, primary key and suggested join keys. Power BI doesn't read
+            // this directly but it documents the data model for downstream tools
+            // and for users wiring relationships manually in Power BI Desktop.
+            // For multi-source dashboards: join on (DocumentGuid, UniqueId).
             var meta = new JObject
             {
-                ["refreshed_at"] = DateTime.UtcNow.ToString("o"),
-                ["document"] = doc.Title,
-                ["element_count"] = elemList.Count,
-                ["categories"] = categories.Count > 0 ? string.Join(", ", categories) : "all",
-                ["file"] = fileName,
-                ["column_count"] = columnCount,
-                ["mode"] = columnMappingsRaw != null && columnMappingsRaw.Count > 0 ? "mapping" : "discovery"
+                ["refreshed_at"]   = DateTime.UtcNow.ToString("o"),
+                ["document"]       = doc.Title,
+                ["document_path"]  = documentPath,
+                ["episode_id"]     = episodeId,
+                ["element_count"]  = elemList.Count,
+                ["categories"]     = categories.Count > 0 ? string.Join(", ", categories) : "all",
+                ["file"]           = fileName,
+                ["column_count"]   = columnCount,
+                ["mode"]           = columnMappingsRaw != null && columnMappingsRaw.Count > 0 ? "mapping" : "discovery",
+                ["schema_version"] = "2.0",  // bumped from 1.0: DocumentGuid → DocumentPath; new EpisodeId column
+                ["manifest"] = new JObject
+                {
+                    ["schemaVersion"] = "2.0",
+                    ["grain"]         = "one row per element",
+                    ["primaryKey"]    = new JArray("EpisodeId", "UniqueId"),
+                    ["stableJoinKeys"] = new JObject
+                    {
+                        ["EpisodeId"]    = "immutable Revit document GUID extracted from UniqueId prefix; same value for all elements of the same .rvt, survives rename/move/cloud-roundtrip — RECOMMENDED join key for cross-file dashboards",
+                        ["UniqueId"]     = "stable per element across edits, purge and family reload — recommended element-level key",
+                        ["DocumentPath"] = "file system path (cloud URN or local) of the source doc — useful for filtering / drill-back to Revit, NOT stable across file moves",
+                        ["DocumentTitle"]= "human-readable doc name — for labels only, NOT for joins (can collide between models with same name)",
+                        ["ElementId"]    = "fast join inside single doc + export run; NOT globally unique"
+                    },
+                    ["suggestedRelationships"] = new JArray(
+                        "Cross-file element drill-through: join on (EpisodeId, UniqueId) — works correctly even if the .rvt is moved or saved-as.",
+                        "Multi-model dashboards: filter by EpisodeId to discriminate documents; DocumentTitle as the slicer label.",
+                        "Element ⋈ schedule join: still (EpisodeId, UniqueId) — both files share the same EpisodeId of the parent doc."
+                    )
+                }
             };
             File.WriteAllText(metaPath, meta.ToString(), Encoding.UTF8);
 
@@ -368,6 +424,10 @@ public class PushToPowerBiTool : ICortexTool
 
     private static CortexResult<object> ExportSchedules(Document doc, List<long> scheduleIds, string? outputFolder)
     {
+        // Document identity columns — see element-mode branch for the rationale.
+        var documentPath = GetDocumentPath(doc);
+        var episodeId    = GetEpisodeId(doc);
+
         if (string.IsNullOrEmpty(outputFolder))
         {
             var oneDrive = FindOneDriveFolder();
@@ -439,10 +499,10 @@ public class PushToPowerBiTool : ICortexTool
                     fieldBips.Add(bip);
                 }
 
-                // ElementId / UniqueId / DocumentTitle are always emitted: ElementId
-                // for fast joins, UniqueId for the PBI selection visual (stable across
-                // purge/family reload), DocumentTitle for multi-model filtering.
-                var headerCells = new List<string> { "ElementId", "UniqueId", "DocumentTitle" };
+                // Built-in prefix: ElementId / UniqueId / DocumentTitle /
+                // DocumentPath / EpisodeId. See element-mode branch for column
+                // semantics. EpisodeId is the recommended cross-file join key.
+                var headerCells = new List<string> { "ElementId", "UniqueId", "DocumentTitle", "DocumentPath", "EpisodeId" };
                 headerCells.AddRange(fieldHeadings.Select(CsvEscape));
                 sb.AppendLine(string.Join(",", headerCells));
 
@@ -465,11 +525,13 @@ public class PushToPowerBiTool : ICortexTool
                     }
                     catch { }
 
-                    var row = new List<string>(fieldHeadings.Count + 3)
+                    var row = new List<string>(fieldHeadings.Count + 5)
                     {
                         ToolHelpers.GetElementIdValue(elem.Id).ToString(System.Globalization.CultureInfo.InvariantCulture),
                         CsvEscape(elem.UniqueId ?? ""),
-                        CsvEscape(doc.Title ?? "")
+                        CsvEscape(doc.Title ?? ""),
+                        CsvEscape(documentPath),
+                        CsvEscape(episodeId)
                     };
                     for (int i = 0; i < fieldHeadings.Count; i++)
                     {
@@ -519,14 +581,41 @@ public class PushToPowerBiTool : ICortexTool
             }
         }
 
-        // Metadata sidecar
+        // Metadata sidecar with manifest section - see element-export branch for the same shape.
         var meta = new JObject
         {
-            ["refreshed_at"] = DateTime.UtcNow.ToString("o"),
-            ["document"] = doc.Title,
-            ["mode"] = "schedule",
+            ["refreshed_at"]   = DateTime.UtcNow.ToString("o"),
+            ["document"]       = doc.Title,
+            ["document_path"]  = documentPath,
+            ["episode_id"]     = episodeId,
+            ["mode"]           = "schedule",
             ["schedule_count"] = scheduleIds.Count,
-            ["total_rows"] = totalRows
+            ["total_rows"]     = totalRows,
+            ["schema_version"] = "2.0",
+            ["manifest"] = new JObject
+            {
+                ["schemaVersion"] = "2.0",
+                ["grain"]         = "one row per scheduled element",
+                // PK is (EpisodeId, UniqueId). ScheduleName is encoded in the
+                // FILENAME (schedule_<Name>.csv), not in the CSV body — so it's
+                // not part of the in-file PK. To distinguish schedules in a
+                // unioned table, derive ScheduleName from the source filename
+                // in Power Query (e.g. via Folder.Files [Name] column).
+                ["primaryKey"]    = new JArray("EpisodeId", "UniqueId"),
+                ["stableJoinKeys"] = new JObject
+                {
+                    ["EpisodeId"]    = "immutable Revit document GUID extracted from UniqueId prefix; same value for all elements of the same .rvt, survives rename/move/cloud-roundtrip — RECOMMENDED join key for cross-file dashboards",
+                    ["UniqueId"]     = "stable per element across edits — recommended element-level key",
+                    ["DocumentPath"] = "file system path (cloud URN or local) of the source doc — useful for filtering / drill-back to Revit",
+                    ["DocumentTitle"]= "human-readable doc name — for labels only, NOT for joins",
+                    ["ElementId"]    = "fast join inside single doc + export run; NOT globally unique"
+                },
+                ["suggestedRelationships"] = new JArray(
+                    "Join schedule_*.csv to an element-export CSV from the same doc on (EpisodeId, UniqueId) for cell-level drill-through. EpisodeId is the same across all CSVs from the same .rvt.",
+                    "Multiple schedule_*.csv files share EpisodeId + UniqueId namespace, so they can be unioned in Power Query. Add a 'ScheduleName' column from the source filename to discriminate.",
+                    "Multi-model dashboards: filter by EpisodeId to discriminate documents (more robust than DocumentPath which changes on file move)."
+                )
+            }
         };
         File.WriteAllText(Path.Combine(outputFolder, "last_refresh.json"), meta.ToString(), Encoding.UTF8);
 
@@ -539,6 +628,50 @@ public class PushToPowerBiTool : ICortexTool
             files = written,
             tip = "Connect Power BI Desktop to this folder via 'Get Data → Folder' (one schedule per CSV)."
         });
+    }
+
+    /// <summary>
+    /// Document path identity (cloud URN or local file path). Used for the
+    /// <c>DocumentPath</c> CSV column. Returns the cloud model path when
+    /// available, otherwise <see cref="Document.PathName"/>. This is NOT
+    /// a stable doc identifier — file moves/renames change it. For a stable
+    /// identifier use <see cref="GetEpisodeId"/>.
+    /// </summary>
+    private static string GetDocumentPath(Document doc)
+    {
+        try
+        {
+            var cloudPath = doc.GetCloudModelPath();
+            if (cloudPath != null) return cloudPath.ToString();
+        }
+        catch { /* not a cloud doc */ }
+        try { return doc.PathName ?? ""; } catch { return ""; }
+    }
+
+    /// <summary>
+    /// Returns the Revit "EpisodeId" — the immutable internal document
+    /// identifier. Same value for every element in the same .rvt; survives
+    /// rename, move, cloud-roundtrip. Extracted from the first 36 chars of
+    /// any element's UniqueId (Revit's UniqueId format is
+    /// <c>8-4-4-4-12-8</c> hex, where the leading 36 chars are the
+    /// document's GUID and the trailing 8 chars are the element's id).
+    /// We read it from <see cref="Document.ProjectInformation"/> because
+    /// that element exists in every doc and avoids enumerating model elements.
+    /// Documented by Jeremy Tammik / Building Coder as the canonical doc GUID.
+    /// Returns empty string when the API can't fulfill it (e.g. brand-new
+    /// unsaved family).
+    /// </summary>
+    private static string GetEpisodeId(Document doc)
+    {
+        try
+        {
+            var pi = doc?.ProjectInformation;
+            var uid = pi?.UniqueId;
+            if (!string.IsNullOrEmpty(uid) && uid!.Length >= 36)
+                return uid.Substring(0, 36);
+        }
+        catch { /* malformed doc */ }
+        return "";
     }
 
     private static string FindOneDriveFolder()

@@ -25,13 +25,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 /// </summary>
 public class PbiCreateDatasetTool : ICortexTool
 {
-    private static readonly string[] DefaultTables =
-    {
-        PowerBiDatasetSchema.TableMetadata,
-        PowerBiDatasetSchema.TableElements,
-        PowerBiDatasetSchema.TableSchedules,
-        PowerBiDatasetSchema.TableSelection
-    };
+    private static readonly string[] DefaultTables = PowerBiDatasetSchema.AllTables;
 
     public string Name => "pbi_create_dataset";
     public string Category => "PowerBI";

@@ -180,12 +180,12 @@ public class PbiPublishSchedulesTool : ICortexTool
                     "Append mode posts rows without clearing Power BI first; rerunning the same logical export can create duplicates across runs.");
             }
 
-            // Count distinct schedules
-            var seen = new System.Collections.Generic.HashSet<object?>();
+            // Count distinct schedules — use typed HashSet to avoid boxing equality surprises.
+            var seen = new System.Collections.Generic.HashSet<long>();
             foreach (var r in scheduleRows)
             {
-                if (r.TryGetValue("ScheduleId", out var sid))
-                    seen.Add(sid);
+                if (r.TryGetValue("ScheduleId", out var sid) && sid is long schId)
+                    seen.Add(schId);
             }
             scheduleCount = seen.Count;
         }

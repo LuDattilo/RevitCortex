@@ -28,7 +28,9 @@ public class PowerBiServiceClient : IDisposable
     private static readonly TimeSpan MaxDelay = TimeSpan.FromSeconds(10);
 
     private readonly HttpClient _http;
+    // Random is not thread-safe on net48. Lock guards concurrent callers.
     private static readonly Random _rng = new Random();
+    private static readonly object _rngLock = new object();
 
     public PowerBiServiceClient(string accessToken)
     {
@@ -189,6 +191,88 @@ public class PowerBiServiceClient : IDisposable
         return ParseElementIds(resp);
     }
 
+    // ─── Refresh ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// POST groups/{workspaceId}/datasets/{datasetId}/refreshes — triggers an
+    /// on-demand refresh of an Import-mode dataset (e.g. the .pbix the user
+    /// published from RevitCortex CSV folder).
+    ///
+    /// Returns the refresh request id (Premium / Enhanced Refresh) or an empty
+    /// string when running against a Pro workspace (which still queues the
+    /// refresh but does not expose a tracking id).
+    ///
+    /// Pro limit: 8 refreshes/day. Premium / PPU: 48/day. Throws if the per-day
+    /// quota is hit (HTTP 400 with code RefreshOverLimit).
+    /// </summary>
+    public async Task<string> TriggerRefreshAsync(
+        string workspaceId,
+        string datasetId,
+        bool notifyOnFailure = false,
+        CancellationToken ct = default)
+    {
+        var url = $"groups/{workspaceId}/datasets/{datasetId}/refreshes";
+        var body = new
+        {
+            notifyOption = notifyOnFailure ? "MailOnFailure" : "NoNotification"
+        };
+        var json = JsonConvert.SerializeObject(body);
+        var req = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        // Premium returns 202 Accepted with a x-ms-request-id header carrying
+        // the refresh request id. Pro returns 202 with no body / no id.
+        // Send via the retry pipeline to share throttling logic.
+        var responseBody = await SendWithRetryAsync(req, ct).ConfigureAwait(false);
+        // Attempt to parse the response, but tolerate empty bodies (Pro case).
+        if (string.IsNullOrWhiteSpace(responseBody)) return "";
+        try
+        {
+            var parsed = JObject.Parse(responseBody);
+            return parsed["requestId"]?.ToString()
+                ?? parsed["id"]?.ToString()
+                ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    /// <summary>
+    /// GET groups/{workspaceId}/datasets/{datasetId}/refreshes/{refreshId} —
+    /// returns the refresh status: "Unknown" | "InProgress" | "Completed" |
+    /// "Failed" | "Disabled". Only available on Premium / Enhanced Refresh.
+    /// </summary>
+    public async Task<string> GetRefreshStatusAsync(
+        string workspaceId,
+        string datasetId,
+        string refreshId,
+        CancellationToken ct = default)
+    {
+        var url = $"groups/{workspaceId}/datasets/{datasetId}/refreshes/{refreshId}";
+        var body = await GetAsync(url, ct).ConfigureAwait(false);
+        return body["status"]?.ToString() ?? "Unknown";
+    }
+
+    /// <summary>
+    /// GET groups/{workspaceId}/datasets/{datasetId}/refreshes?$top=1 —
+    /// returns the status of the most recent refresh for the dataset, which
+    /// is the easiest way to verify an on-demand refresh on Pro workspaces
+    /// (no requestId is returned to the caller).
+    /// </summary>
+    public async Task<string> GetLastRefreshStatusAsync(
+        string workspaceId,
+        string datasetId,
+        CancellationToken ct = default)
+    {
+        var url = $"groups/{workspaceId}/datasets/{datasetId}/refreshes?$top=1";
+        var body = await GetAsync(url, ct).ConfigureAwait(false);
+        var first = (body["value"] as JArray)?.OfType<JObject>().FirstOrDefault();
+        return first?["status"]?.ToString() ?? "Unknown";
+    }
+
     private static List<long> ParseElementIds(JObject responseRoot)
     {
         var result = new List<long>();
@@ -290,13 +374,16 @@ public class PowerBiServiceClient : IDisposable
             }
         }
 
-        throw lastEx!;
+        throw lastEx ?? new InvalidOperationException(
+            $"Power BI request failed after {MaxRetries + 1} attempts.");
     }
 
     private static async Task DelayAsync(int attempt, TimeSpan? retryAfter, CancellationToken ct)
     {
+        double jitter;
+        lock (_rngLock) { jitter = _rng.NextDouble(); }
         double ms = BaseDelay.TotalMilliseconds * Math.Pow(2, attempt);
-        ms *= 0.8 + _rng.NextDouble() * 0.4; // +-20% jitter
+        ms *= 0.8 + jitter * 0.4; // +-20% jitter
         var delay = TimeSpan.FromMilliseconds(Math.Min(ms, MaxDelay.TotalMilliseconds));
         if (retryAfter.HasValue && retryAfter.Value > delay) delay = retryAfter.Value;
         await Task.Delay(delay, ct).ConfigureAwait(false);

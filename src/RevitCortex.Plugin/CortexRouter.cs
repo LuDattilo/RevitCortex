@@ -27,6 +27,15 @@ public class CortexRouter
     // worker thread inside Route. The cheap guarantee is a full acquire/release
     // barrier so the worker never sees a partially-initialised dispatcher.
     private volatile RevitThreadDispatcher? _dispatcher;
+
+    // UI-thread id, captured when the dispatcher is wired in OnStartup.
+    // Used to detect callers that are ALREADY on the UI thread (e.g. WPF
+    // button handlers like the Power BI Export panel) so we can run the
+    // tool inline instead of dispatching via ExternalEvent — which would
+    // deadlock because Revit's external-event machinery can only fire when
+    // the UI thread is idle, and a UI-thread caller blocked in
+    // WaitForCompletion holds it busy until timeout.
+    private int _uiThreadId;
     private readonly HashSet<string> _disabledTools = new();
     private bool _readOnlyMode;
 
@@ -127,7 +136,17 @@ public class CortexRouter
 
         try
         {
-            if (_dispatcher != null)
+            // Dispatch path:
+            //  - From a background thread (socket worker, listener, etc.):
+            //    go through ExternalEvent so the tool runs on Revit's UI
+            //    thread (Revit API requirement).
+            //  - From the UI thread itself (e.g. PowerBiExportWindow's
+            //    "Esporta" button handler): run inline. Going through
+            //    ExternalEvent here would deadlock — see _uiThreadId comment.
+            bool onUiThread = _dispatcher != null
+                && System.Threading.Thread.CurrentThread.ManagedThreadId == _uiThreadId;
+
+            if (_dispatcher != null && !onUiThread)
             {
                 var timeoutSeconds = (tool as ICommandTimeoutTool)?.CommandTimeoutSeconds ?? 120;
                 result = _dispatcher.Execute(tool, input, _session, timeoutSeconds * 1000);
@@ -296,6 +315,9 @@ public class CortexRouter
     public void SetDispatcher(RevitThreadDispatcher dispatcher)
     {
         _dispatcher = dispatcher;
+        // SetDispatcher is called from OnStartup on the Revit UI thread, so
+        // capturing here gives us the right id to compare against in Route.
+        _uiThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
     }
 
     public void OnDocumentChanged(object document, string? locale = null)

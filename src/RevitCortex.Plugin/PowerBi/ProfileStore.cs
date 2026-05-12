@@ -62,6 +62,14 @@ public static class ProfileStore
         }
     }
 
+    // Windows device names that cannot be used as file names on any path.
+    private static readonly HashSet<string> WindowsReservedNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
+
     public static void Save(PowerBiExportProfile profile)
     {
         if (string.IsNullOrWhiteSpace(profile.Name))
@@ -70,7 +78,14 @@ public static class ProfileStore
         Directory.CreateDirectory(ProfilesDir);
         profile.LastUsed = DateTime.UtcNow;
         var json = JsonConvert.SerializeObject(profile, JsonSettings);
-        File.WriteAllText(ProfilePath(profile.Name), json);
+
+        // Atomic write: write to .tmp then rename, consistent with WriteCsvAtomic used
+        // elsewhere in the project. Prevents a corrupt profile file on Revit crash.
+        var finalPath = ProfilePath(profile.Name);
+        var tmpPath = finalPath + ".tmp";
+        File.WriteAllText(tmpPath, json);
+        if (File.Exists(finalPath)) File.Delete(finalPath);
+        File.Move(tmpPath, finalPath);
     }
 
     public static bool Delete(string name)
@@ -90,6 +105,11 @@ public static class ProfileStore
     private static string SanitizeFileName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
-        return string.Concat(name.Select(c => invalid.Contains(c) ? '_' : c)).Trim();
+        var safe = string.Concat(name.Select(c => invalid.Contains(c) ? '_' : c)).Trim();
+        // Prevent Windows reserved device names (NUL, CON, COM1 …) which silently
+        // discard writes or throw unpredictable exceptions.
+        if (string.IsNullOrEmpty(safe) || WindowsReservedNames.Contains(safe))
+            safe = "_" + safe;
+        return safe;
     }
 }

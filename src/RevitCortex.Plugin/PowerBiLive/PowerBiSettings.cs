@@ -86,8 +86,12 @@ public class PowerBiSettings
     {
         var dir = Path.GetDirectoryName(SettingsPath)!;
         Directory.CreateDirectory(dir);
-        File.WriteAllText(SettingsPath,
-            JsonConvert.SerializeObject(this, Formatting.Indented));
+        // Atomic write: .tmp then rename. If Revit crashes mid-write the previous
+        // settings file (and all ProjectBindings) are preserved intact.
+        var tmp = SettingsPath + ".tmp";
+        File.WriteAllText(tmp, JsonConvert.SerializeObject(this, Formatting.Indented));
+        if (File.Exists(SettingsPath)) File.Delete(SettingsPath);
+        File.Move(tmp, SettingsPath);
     }
 
     /// <summary>
@@ -198,6 +202,6 @@ public static class ProjectDocumentKey
         var sb = new StringBuilder(hash.Length * 2);
         foreach (var b in hash)
             sb.AppendFormat("{0:x2}", b);
-        return sb.ToString().Substring(0, 16); // 16 hex chars — enough for collision resistance
+        return sb.ToString().Substring(0, 32); // 32 hex chars (128 bit) — collision-safe
     }
 }

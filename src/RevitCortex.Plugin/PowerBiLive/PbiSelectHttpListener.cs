@@ -523,9 +523,10 @@ public class PbiSelectHttpListener : IDisposable
         }
     }
 
-    private static IList<long> ParseLongArray(JArray arr)
+    private static IList<long> ParseLongArray(JArray? arr)
     {
         var ids = new List<long>();
+        if (arr == null) return ids;
         foreach (var token in arr)
         {
             try { ids.Add(token.Value<long>()); }

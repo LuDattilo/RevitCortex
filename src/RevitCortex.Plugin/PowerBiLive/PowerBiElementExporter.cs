@@ -34,6 +34,11 @@ public class PowerBiElementExporter
 
         var collector = new FilteredElementCollector(doc).WhereElementIsNotElementType();
 
+        // Convert to HashSet for O(1) per-element lookup instead of O(n) linear scan.
+        HashSet<BuiltInCategory>? categorySet = categoryFilter != null
+            ? new HashSet<BuiltInCategory>(categoryFilter)
+            : null;
+
         var rows = new List<Dictionary<string, object?>>();
         int count = 0;
 
@@ -44,14 +49,14 @@ public class PowerBiElementExporter
             if (elem == null) continue;
 
             // Category filter
-            if (categoryFilter != null)
+            if (categorySet != null)
             {
                 BuiltInCategory elemBic = BuiltInCategory.INVALID;
                 try
                 {
 #if REVIT2024_OR_GREATER
                     if (elem.Category?.Id != null)
-                        elemBic = (BuiltInCategory)elem.Category.Id.Value;
+                        elemBic = (BuiltInCategory)(int)elem.Category.Id.Value;
 #else
                     if (elem.Category?.Id != null)
                         elemBic = (BuiltInCategory)elem.Category.Id.IntegerValue;
@@ -59,12 +64,7 @@ public class PowerBiElementExporter
                 }
                 catch { continue; }
 
-                bool match = false;
-                foreach (var bic in categoryFilter)
-                {
-                    if (bic == elemBic) { match = true; break; }
-                }
-                if (!match) continue;
+                if (!categorySet.Contains(elemBic)) continue;
             }
 
             var row = BuildRow(doc, elem, exportRunId, exportedAtUtc,
@@ -220,7 +220,10 @@ public class PowerBiElementExporter
         {
             if (elem.Category?.Id == null) return "";
             long idVal = GetElementIdValue(elem.Category.Id);
-            var bic = (BuiltInCategory)idVal;
+            // Safe cast: BuiltInCategory is int-backed. Truncate to int only after
+            // range-checking, mirroring ParameterDiscoveryService.TryGetBuiltInCategory.
+            if (idVal < int.MinValue || idVal > int.MaxValue) return $"OST_{idVal}";
+            var bic = (BuiltInCategory)(int)idVal;
             if (Enum.IsDefined(typeof(BuiltInCategory), bic))
                 return bic.ToString();
             return $"OST_{idVal}";
@@ -284,7 +287,7 @@ public class PowerBiElementExporter
         string documentGuid = "";
         try { projectId = doc.ProjectInformation?.UniqueId ?? ""; } catch { }
         try { projectName = doc.ProjectInformation?.Name ?? doc.Title ?? ""; } catch { }
-        try { documentGuid = doc.PathName ?? ""; } catch { }
+        try { documentGuid = GetDocumentGuid(doc); } catch { }
 
         var now = exportedAtUtc.ToString("o");
         var rows = new List<Dictionary<string, object?>>();
