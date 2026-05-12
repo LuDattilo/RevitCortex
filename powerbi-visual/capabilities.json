@@ -23,12 +23,18 @@
       "kind": "Grouping",
       "displayName": "Color by",
       "description": "Optional. Drop any categorical field (e.g. Discipline, Family, Status, Workset). Each distinct value gets a deterministic color from the palette, applied as an override in Revit. Hex strings like '#E53935' are honored as-is."
+    },
+    {
+      "name": "highlightSync",
+      "kind": "Measure",
+      "displayName": "Element ID (count)",
+      "description": "Drop the same ElementId field used in 'Element ID' above. PBI auto-aggregates as Count — that's the only meaningful aggregation here. This binding is required by Power BI to propagate cross-filter highlights to the visual."
     }
   ],
   "dataViewMappings": [
     {
-      "table": {
-        "rows": {
+      "categorical": {
+        "categories": {
           "select": [
             { "for": { "in": "elementIds" } },
             { "for": { "in": "uniqueIds" } },
@@ -38,6 +44,9 @@
           "dataReductionAlgorithm": {
             "top": { "count": 30000 }
           }
+        },
+        "values": {
+          "for": { "in": "highlightSync" }
         }
       }
     }

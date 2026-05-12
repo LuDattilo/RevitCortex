@@ -200,29 +200,49 @@ function colorForCategory(value: string): string {
 /**
  * Resolve a row value to a hex color.
  * - If the raw value is already a valid #RRGGBB(AA) string, pass through.
- * - Otherwise treat as a categorical value and hash → palette slot.
+ * - Otherwise treat as a categorical value:
+ *     - With a host palette (preferred): use PBI's host palette so the color
+ *       matches other visuals in the report (Treemap, Bar chart, etc.).
+ *     - Without (fallback / test): hash → internal palette slot.
  * - null/undefined/empty → null (no override for this row).
  */
-function resolveColor(raw: powerbi.PrimitiveValue | null | undefined): string | null {
+function resolveColor(
+  raw: powerbi.PrimitiveValue | null | undefined,
+  hostPalette: powerbi.extensibility.ISandboxExtendedColorPalette | null,
+): string | null {
   if (raw == null) return null;
   const s = String(raw);
   if (s.length === 0) return null;
   if (HEX_RE.test(s)) return normalizeHex(s);
+  if (hostPalette != null) {
+    try {
+      const c = hostPalette.getColor(s)?.value;
+      if (c && HEX_RE.test(c)) return normalizeHex(c);
+    } catch { /* fall through to local hash */ }
+  }
   return colorForCategory(s);
 }
 
 /**
- * Extract all the data we need from the table data view in a single pass.
+ * Extract all the data we need from the categorical data view in a single pass.
  * Roles are looked up by name (not column order) so adding new roles in
  * `capabilities.json` doesn't require re-ordering.
  *
- * Roles consumed (all from `dataViewMappings.table.rows.select`):
+ * Roles consumed (all from `dataViewMappings.categorical.categories.select`):
  *   - `elementIds`     required, Whole Number
  *   - `uniqueIds`      optional, Text. Used as the stable primary key when present.
  *   - `documentTitle`  optional, Text. Validated server-side against active doc.
  *   - `colorBy`        optional, any categorical (used for Color action)
+ *
+ * Why categorical (not table): with `supportsHighlight: true`, the categorical
+ * data view properly populates per-category `highlights` arrays when another
+ * visual cross-filters this one. Table view's highlights are unreliable for our
+ * use case and do not synchronize when a sibling visual filters by selection.
  */
-function extractData(dataView: powerbi.DataView): ExtractedData {
+function extractData(
+  dataView: powerbi.DataView,
+  hostPalette: powerbi.extensibility.ISandboxExtendedColorPalette | null,
+): ExtractedData {
   const empty: ExtractedData = {
     filteredIds: [],
     highlightedIds: [],
@@ -234,31 +254,47 @@ function extractData(dataView: powerbi.DataView): ExtractedData {
     hasColorColumn: false,
     hasUniqueIdColumn: false,
   };
-  const rows = dataView.table?.rows ?? [];
-  if (rows.length === 0) return empty;
 
-  const columns = dataView.table?.columns ?? [];
-  let idIdx = -1;
-  let uniqueIdx = -1;
-  let docTitleIdx = -1;
-  let colorByIdx = -1;
-  columns.forEach((col, i) => {
-    if (col?.roles?.["elementIds"]) idIdx = i;
-    if (col?.roles?.["uniqueIds"]) uniqueIdx = i;
-    if (col?.roles?.["documentTitle"]) docTitleIdx = i;
-    if (col?.roles?.["colorBy"]) colorByIdx = i;
+  const categorical = dataView.categorical;
+  const categories = categorical?.categories ?? [];
+  if (categories.length === 0) return empty;
+
+  // Locate each role's category by name. PBI may swap order so role-based
+  // lookup is mandatory.
+  let idCat: powerbi.DataViewCategoryColumn | null = null;
+  let uniqueCat: powerbi.DataViewCategoryColumn | null = null;
+  let docTitleCat: powerbi.DataViewCategoryColumn | null = null;
+  let colorByCat: powerbi.DataViewCategoryColumn | null = null;
+  categories.forEach((cat) => {
+    const roles = cat?.source?.roles ?? {};
+    if (roles["elementIds"] && !idCat) idCat = cat;
+    if (roles["uniqueIds"] && !uniqueCat) uniqueCat = cat;
+    if (roles["documentTitle"] && !docTitleCat) docTitleCat = cat;
+    if (roles["colorBy"] && !colorByCat) colorByCat = cat;
   });
   // elementIds is required by capabilities, but PBI may still call update()
-  // before the user maps it — guard with a sane fallback.
-  if (idIdx < 0) idIdx = 0;
-  const hasColorColumn = colorByIdx >= 0;
-  const hasUniqueIdColumn = uniqueIdx >= 0;
+  // before the user maps it — guard with a fallback to the first category.
+  if (!idCat) idCat = categories[0];
+  const idCatNN = idCat as powerbi.DataViewCategoryColumn;
 
-  // Highlights array (cross-filter). Not in the public type — runtime-populated.
-  const tableAny = dataView.table as unknown as {
-    highlights?: (powerbi.PrimitiveValue | null)[];
-  };
-  const highlights = tableAny?.highlights;
+  const idValues = idCatNN.values ?? [];
+  if (idValues.length === 0) return empty;
+
+  // Highlights live on the categorical `values` bucket (a measure column),
+  // parallel to its `values` array. Each cell is either the original numeric
+  // value (if the row is highlighted via cross-filter) or null (if not).
+  // Without a measure bound to the `highlightSync` role, PBI does not produce
+  // highlights at all — in that case the visual falls back to using all rows.
+  const valuesArr = categorical?.values ?? null;
+  const highlights = valuesArr && valuesArr.length > 0
+    ? (valuesArr[0] as unknown as { highlights?: (powerbi.PrimitiveValue | null)[] }).highlights
+    : undefined;
+
+  const hasColorColumn = colorByCat != null;
+  const hasUniqueIdColumn = uniqueCat != null;
+  const uniqueValues = uniqueCat?.values ?? null;
+  const docTitleValues = docTitleCat?.values ?? null;
+  const colorByValues = colorByCat?.values ?? null;
 
   const filteredIds: number[] = [];
   const highlightedIds: number[] = [];
@@ -268,32 +304,33 @@ function extractData(dataView: powerbi.DataView): ExtractedData {
   const highlightedColored: ColoredRow[] = [];
   let documentTitle: string | null = null;
 
-  rows.forEach((row, i) => {
-    const id = row[idIdx];
-    if (typeof id !== "number") return;
+  for (let i = 0; i < idValues.length; i++) {
+    const raw = idValues[i];
+    const id = typeof raw === "number" ? raw : Number(raw);
+    if (!Number.isFinite(id)) continue;
     filteredIds.push(id);
     // UniqueId is optional. We pass an empty string for rows that don't have
     // one so the parallel-array invariant (same index = same logical row) is
     // preserved server-side.
-    if (hasUniqueIdColumn) {
-      const u = row[uniqueIdx];
+    if (hasUniqueIdColumn && uniqueValues) {
+      const u = uniqueValues[i];
       filteredUniqueIds.push(u == null ? "" : String(u));
     }
-    if (docTitleIdx >= 0 && documentTitle == null) {
-      const t = row[docTitleIdx];
+    if (docTitleValues && documentTitle == null) {
+      const t = docTitleValues[i];
       if (t != null && String(t).length > 0) documentTitle = String(t);
     }
-    const hex = hasColorColumn ? resolveColor(row[colorByIdx]) : null;
+    const hex = hasColorColumn && colorByValues ? resolveColor(colorByValues[i], hostPalette) : null;
     if (hex) filteredColored.push({ id, hex });
     if (highlights && highlights[i] != null) {
       highlightedIds.push(id);
-      if (hasUniqueIdColumn) {
-        const u = row[uniqueIdx];
+      if (hasUniqueIdColumn && uniqueValues) {
+        const u = uniqueValues[i];
         highlightedUniqueIds.push(u == null ? "" : String(u));
       }
       if (hex) highlightedColored.push({ id, hex });
     }
-  });
+  }
 
   return {
     filteredIds,
@@ -696,6 +733,7 @@ function computeButtonStyle(variant: Variant, s: ButtonState): React.CSSProperti
 export class RevitCortexSelectionVisual implements IVisual {
   private readonly target: HTMLElement;
   private readonly strings: Strings;
+  private readonly colorPalette: powerbi.extensibility.ISandboxExtendedColorPalette | null;
   private filteredIds: number[] = [];
   private highlightedIds: number[] = [];
   private filteredUniqueIds: string[] = [];
@@ -716,6 +754,10 @@ export class RevitCortexSelectionVisual implements IVisual {
   constructor(options: VisualConstructorOptions) {
     this.target = options.element;
     this.strings = STRINGS[detectLang(options.host)];
+    // Grab the host color palette so categorical values resolve to the same
+    // colors PBI assigns elsewhere in the report (Treemap, Bar chart, etc.).
+    // Falls back to null in test contexts where host is unavailable.
+    this.colorPalette = options.host?.colorPalette ?? null;
     ensureAnimationsInjected();
     this.startConnectionChecker();
   }
@@ -745,7 +787,7 @@ export class RevitCortexSelectionVisual implements IVisual {
       this.hasColorColumn = false;
       this.hasUniqueIdColumn = false;
     } else {
-      const data = extractData(dv);
+      const data = extractData(dv, this.colorPalette);
       this.filteredIds = data.filteredIds;
       this.highlightedIds = data.highlightedIds;
       this.filteredUniqueIds = data.filteredUniqueIds;
