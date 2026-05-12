@@ -46,15 +46,51 @@ Il rischio residuo e il fork originale: se mcp-servers-for-revit o il fork LuDat
 
 - Transazioni esplicite con rollback automatico su errore (impedisce modifiche parziali e corruzione del modello)
 - Error handling tipizzato che non espone stack trace all'utente finale
-- Nessun accesso di rete in uscita da parte dei tool
 - Binding socket solo su `IPAddress.Loopback` (127.0.0.1)
 - Conferma utente obbligatoria per operazioni distruttive via `RequestConfirmation()`
+
+> **Nota (2026-05-12):** la dichiarazione "Nessun accesso di rete in uscita da parte dei tool" non è più corretta. I tool `PowerBiLive` (`PbiPublish*`, `PbiTriggerRefreshTool`) e `PowerBiServiceClient` effettuano chiamate HTTPS verso `api.powerbi.com` e `login.microsoftonline.com` (auth MSAL). Vedere sezione "Nuova superficie di rete — PBI REST" più sotto.
 
 ### Implementate come requisiti di sicurezza
 
 - **Sandbox per `send_code_to_revit`**: lista di namespace .NET proibiti verificata prima dell'esecuzione
 - **Audit log locale**: ogni operazione registrata in `~/.revitcortex/audit.jsonl` (tool, elementi, timestamp)
 - **Modalita read-only**: flag configurabile che disabilita tutti i tool di scrittura
+
+## Nuova superficie di rete — PBI REST API (2026-05-12)
+
+Con l'integrazione `PowerBiLive` (Pipeline B) e `PbiTriggerRefreshTool` (Opzione C), il plugin effettua chiamate HTTPS in uscita verso:
+
+| Endpoint | Scopo | Attivato da |
+|---|---|---|
+| `https://login.microsoftonline.com/...` | MSAL OAuth — acquisizione/rinnovo access token | Sign-in utente, silent refresh |
+| `https://api.powerbi.com/v1.0/myorg/...` | Push righe, trigger refresh, list datasets/workspaces | Tools `PbiPublish*`, `PbiTriggerRefreshTool` |
+
+### Caratteristiche
+
+- **Solo su azione esplicita utente**: le chiamate partono unicamente quando l'utente preme "Esporta" (con checkbox refresh attivo) o invoca un tool via chat. Non c'è polling o heartbeat.
+- **Auth tramite MSAL**: nessuna credenziale è salvata in chiaro. MSAL usa la cache DPAPI (`~/.revitcortex/msal_cache.json`, cifrata per l'utente corrente).
+- **Dati trasmessi**: ID di workspace e dataset (GUID, non sensibili), payload righe CSV aggregate (dati del modello BIM). Nessuna credenziale, nessun file completo.
+- **AllowExternalWrites flag**: `PowerBiSettings.AllowExternalWrites` deve essere `true` per abilitare le chiamate. Default `false` → tutte le push bloccate finché l'utente non abilita esplicitamente.
+
+### Classificazione rischio
+
+| Area | Livello | Note |
+|---|---|---|
+| HTTPS verso api.powerbi.com | Basso | Transport cifrato, API ufficiale Microsoft, token OAuth short-lived |
+| Dati BIM verso PBI Service | Medio | Stesso tenant M365 dell'utente — dati non escono dall'organizzazione |
+| Token MSAL in cache locale | Basso | DPAPI cifra per utente, non leggibile da altri utenti |
+
+### GDPR — aggiornamento
+
+I dati del modello Revit trasmessi via RevitCortex raggiungono ora **tre destinazioni cloud**:
+1. **Anthropic** (Claude/LLM): parametri e descrizioni inviati nelle prompt. Vedi DPA Anthropic.
+2. **Microsoft OneDrive / SharePoint**: file CSV scritti nella cartella OneDrive locale e sincronizzati in cloud. Soggetto alla DPA Microsoft 365 del tenant GPA.
+3. **Microsoft Power BI Service**: righe aggregate inviate via REST API al workspace. Stesso tenant M365 — trattamento interno all'organizzazione.
+
+Per tutte e tre: base giuridica = legittimo interesse professionale / esecuzione contratto con il cliente. Se i modelli contengono dati riferibili a persone fisiche (es. dati catastali nominativi), documentare il flusso nel registro trattamenti GDPR.
+
+---
 
 ## PBI Live Phase 2C — listener HTTP locale (porta 27016)
 
@@ -85,7 +121,7 @@ Se in futuro venissero esposte operazioni distruttive via HTTP:
 2. **Allowlist `Host` header**: rifiutare richieste con `Host` diverso da `localhost:27016` (mitiga DNS rebinding)
 3. **Rate limiting**: max N richieste/secondo per evitare flooding
 
-### Stato attuale (v1.0.0.2)
+### Stato attuale (v1.0.0.10)
 
 Il listener Phase 2C è classificato come **rischio basso**: operazioni non distruttive, binding loopback, auto-stop al cambio documento. Il rischio principale residuo è un'altra app locale che fa selezioni indesiderate (UX, non security).
 
@@ -102,3 +138,5 @@ Il listener Phase 2C è classificato come **rischio basso**: operazioni non dist
 | Corruzione modello per errore | Basso | Transazioni con rollback |
 | Audit trail operazioni | Basso | Implementato audit log |
 | PBI listener localhost (Phase 2C) | Basso | Loopback + operazioni non distruttive + auto-stop |
+| PBI REST API in uscita (Pipeline B + Opzione C) | Basso | HTTPS, stesso tenant M365, dati non escono dall'org |
+| Token MSAL cache locale | Basso | DPAPI cifra per utente Windows corrente |

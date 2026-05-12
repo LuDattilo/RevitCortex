@@ -170,35 +170,38 @@ Tra le opzioni valutate:
 | **C (CSV + refresh trigger)** | CSV via OneDrive + `.pbix` Import + Cortex chiama API per triggerare refresh dopo ogni push | **SCELTA**. Pragmatica, fattibile in 1-2 sessioni, riusa Pipeline A esistente, Premium supporta 48 refresh/giorno → on-demand di fatto. |
 | **D (Strada 3 originale)** | `.pbit` Import dal Live + Power Query pivot | **TECNICAMENTE IMPOSSIBILE**. PBI dataset connector non offre modalità Import per dataset cloud. |
 
-### 4.2 Flow utente (Opzione C, target)
+### 4.2 Flow utente (Opzione C — implementato)
+
+> **Prerequisito una tantum (assoluto):** installare **On-premises Data Gateway** sul PC dove gira Revit. Il gateway è necessario perché PBI Service non può leggere percorsi locali (`C:\Users\...`) da internet. Download: `app.powerbi.com → Settings → Manage gateways`. Dopo l'installazione si connette al tenant M365 e gira come servizio Windows in background. Setup ~10 minuti, mai più da rifare.
 
 ```
 1. SETUP UNA TANTUM (per ogni progetto Revit):
-   a. Utente apre PBI Desktop
-   b. Apre `dashboard-template.pq` v3.0 universale
-   c. Imposta FolderPath = "OneDrive/RevitCortex/<Progetto>/"
-   d. Materializza tabelle (Add as new query)
-   e. Crea relazioni star schema (8 click)
-   f. Salva come <progetto>.pbix
+   a. Cortex → Export panel → cartella output = percorso locale dentro OneDrive
+      es: C:\Users\luigi\OneDrive - GPA\Documenti\RevitCortex\<Progetto>\
+   b. Esporta → CSV scritti nella cartella
+   c. Apri PBI Desktop → incolla dashboard-template.pq → imposta FolderPath = stesso percorso
+   d. Materializza tabelle (Add as new query su ogni valore Table)
+   e. Crea relazioni star schema (autodetect + 1 manuale)
+   f. Aggiungi visual, salva come <progetto>.pbix
    g. File → Publish → workspace Premium
-   h. Annota il datasetId dal portal PBI
+   h. In app.powerbi.com: Settings → Gateway connections → mappa la cartella locale al gateway
+   i. Copia workspaceId e datasetId dall'URL del dataset
 
 2. CONFIGURAZIONE BINDING (una volta, nel pannello Cortex):
-   - Apri pannello PBI Export
-   - Nuova sezione "Cloud Refresh":
-       Workspace: [dropdown popolato via REST]
-       Dataset:   [dropdown popolato via REST]
-       ☐ Trigger refresh dopo export
-   - Cortex memorizza per (EpisodeId) la coppia (workspaceId, datasetId)
+   - Apri pannello PBI Export → tab Output
+   - Spunta "Aggiorna dashboard Power BI Service dopo export"
+   - Incolla Workspace ID e Dataset ID nei campi testo
+   - Salva profilo
 
-3. OGNI EXPORT (ricorrente):
-   - Utente in Revit clicca "Export & Push" nel pannello
+3. OGNI EXPORT (ricorrente — un click):
+   - Utente in Revit clicca "Esporta" nel pannello
    - Cortex:
-       a. scrive CSV in OneDrive
-       b. (se binding configurato) chiama POST /datasets/{id}/refreshes
+       a. scrive CSV nella cartella OneDrive locale
+       b. OneDrive client sincronizza automaticamente in cloud
+       c. chiama POST /datasets/{datasetId}/refreshes
    - PBI Service:
        a. coda refresh
-       b. legge CSV da OneDrive (auto-sync)
+       b. gateway legge CSV dal percorso locale
        c. ricomputa dataset
        d. aggiorna report cloud
    - Team su app.powerbi.com vede dashboard aggiornata in ~30-60s
@@ -212,15 +215,21 @@ Tra le opzioni valutate:
 - ✅ `PowerBiServiceClient.TriggerRefreshAsync()` + `GetRefreshStatusAsync()` + `GetLastRefreshStatusAsync()`
 - ✅ `PbiTriggerRefreshTool` (Cortex-callable) auto-registrato
 - ✅ Build verificato R23/R24/R25/R26 — 0 errori
+- ✅ UI checkbox "Aggiorna dashboard PBI dopo export" + pannello config (WorkspaceId + DatasetId TextBox) in `PowerBiExportWindow`
+- ✅ `PowerBiExportProfile` esteso con `TriggerPbiRefresh`, `RefreshWorkspaceId`, `RefreshDatasetId`
+- ✅ `FirePbiRefreshAsync` wired in `Export_Click` (fire-and-forget post-export)
+- ✅ Storage config via profilo JSON (`~/.revitcortex/profiles/`) — decisione: campi in `PowerBiExportProfile` (non in `ProjectBinding`) per coerenza con il profilo di export
 
-**TODO (next session)**:
-- ⏸ UI checkbox "Trigger refresh dopo export" + dropdown workspace/dataset nel pannello `PowerBiExportWindow`
-- ⏸ Storage binding per-document in `PowerBiSettings` (estendere `ProjectBinding` o nuovo `CsvRefreshBinding`)
-- ⏸ Auto-resolve workspace+dataset via REST list, con cache
-- ⏸ Wire dell'invocazione tool dopo CSV export riuscito
+**TODO (beta)**:
 - ⏸ Deploy multi-anno (R23/R24/R25/R26)
-- ⏸ Test end-to-end su Snowdon
+- ⏸ Test end-to-end su Snowdon: export → OneDrive sync → refresh trigger → cloud aggiornato
 - ⏸ Commit strutturato
+
+**FUTURE**:
+- 🔮 Auto-resolve workspace+dataset via REST list (dropdown al posto dei TextBox manuali)
+- 🔮 Generazione automatica `.pbit` da Cortex (reverse-engineering format binario)
+- 🔮 Opzione A (Composite Model) come template alternativo
+- 🔮 Opzione B (Dataflow) per portfolio multi-progetto
 
 **FUTURE**:
 - 🔮 Generazione automatica `.pbit` da Cortex (reverse-engineering format binario)
@@ -471,3 +480,6 @@ Senza altre info, **Filosofia A**: progetti BIM tipicamente eterogenei (schedule
 | 2026-05-12 | `.pq` reso universale (v3.0) | Eliminare l'hardcoding Snowdon-specific per supportare Filosofia A senza editing M. |
 | 2026-05-12 | `.pbit` generation rinviata | Reverse-engineering formato binario è 8-12h focused work. Opzione C copre il valore principale senza questo investimento. |
 | 2026-05-12 | Composite Model (Opzione A) rinviato | Possibile in iterazione 2 se Filosofia A si rivela limitante (es. utente vuole real-time vero). |
+| 2026-05-12 | Config refresh in `PowerBiExportProfile` (non in `ProjectBinding`) | `ProjectBinding` è schema-bound al dataset Live (Pipeline B). I campi CSV refresh viaggiano col profilo di export — separazione di responsabilità netta. |
+| 2026-05-12 | TextBox manuali per workspaceId/datasetId (non dropdown REST) | Auto-resolve via REST rinviato a FUTURE. Per beta è sufficiente incollare i GUID dall'URL di app.powerbi.com. |
+| 2026-05-12 | Gateway On-premises scelto come prerequisito | Alternativa SharePoint URL richiede cambio connector nel `.pq` (da `Folder.Files` a `SharePoint.Files`). Gateway riusa il template invariato. Valutare la migration SharePoint in iterazione futura. |
