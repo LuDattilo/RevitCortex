@@ -29,6 +29,8 @@ const PALETTE = {
   textDisabled:"#A19F9D", // neutralTertiary
   successBg:   "#DFF6DD",
   successText: "#107C10", // Fluent system green
+  errorBg:     "#FDE7E9",
+  errorText:   "#A4262C", // Fluent system red
   okDot:       "#107C10",
   offDot:      "#A19F9D",
 } as const;
@@ -47,8 +49,10 @@ interface Strings {
   filtered: string;        // "filtrati" / "filtered"
   totals: string;          // "totali" / "total"
   sent: (n: number) => string;
+  sentPartial: (resolved: number, requested: number) => string;
   colored: (n: number) => string;
   reset: (n: number) => string;
+  resetClean: string;      // shown when reset ran but nothing was painted
   viewCreated: (name: string) => string;
   connected: string;
   notConnected: string;
@@ -60,6 +64,9 @@ interface Strings {
   resetHint: string;
   createViewHint: string;
   noColorColumnHint: string;
+  errorGeneric: string;
+  errorTimeout: string;
+  errorNotConnected: string;
 }
 
 const STRINGS: Record<Lang, Strings> = {
@@ -68,15 +75,17 @@ const STRINGS: Record<Lang, Strings> = {
     selectButton: "Select in Revit",
     isolateButton: "Isolate in Revit",
     colorButton: "Color in Revit",
-    resetButton: "Reset overrides",
+    resetButton: "Reset view",
     createViewButton: "Create 3D view from selection",
     highlighted: "highlighted",
     filtered: "filtered",
     totals: "total",
     sent: (n) => `✓ Sent ${n} element${n === 1 ? "" : "s"}`,
+    sentPartial: (r, req) => `✓ Sent ${r} of ${req} (${req - r} not found)`,
     colored: (n) => `✓ Colored ${n} element${n === 1 ? "" : "s"}`,
-    reset: (n) => `✓ Reset ${n} element${n === 1 ? "" : "s"}`,
-    viewCreated: (name) => `✓ View created: ${name}`,
+    reset: (n) => `✓ View reset · ${n} override${n === 1 ? "" : "s"} cleared`,
+    resetClean: "✓ View reset (nothing was painted)",
+    viewCreated: (name) => `✓ View created and opened: ${name}`,
     connected: "Connected to Revit",
     notConnected: "RevitCortex not running",
     nothingToSelect: "Nothing to select",
@@ -84,24 +93,29 @@ const STRINGS: Record<Lang, Strings> = {
     hintSelect: (n, label) => `Select ${n} ${label} element${n === 1 ? "" : "s"} in Revit`,
     isolateHint: "Isolate the elements in the active view (in addition to selection)",
     colorHint: "Apply color override on the active view, one color per distinct value in the mapped 'Color by' field",
-    resetHint: "Reset all view overrides on the active view",
-    createViewHint: "Create a new 3D view with a section box around the elements (added to Project Browser; current view is preserved)",
+    resetHint: "Clears temporary isolation and removes graphic overrides applied by RevitCortex on the active view",
+    createViewHint: "Create a new 3D view with a section box around the elements, activate it and restore the selection",
     noColorColumnHint: "Drop a categorical field into 'Color by' to enable this button",
+    errorGeneric: "✗ Action failed in Revit",
+    errorTimeout: "✗ Revit did not respond",
+    errorNotConnected: "✗ RevitCortex not active",
   },
   it: {
     title: "RevitCortex Selection",
     selectButton: "Seleziona in Revit",
     isolateButton: "Isola in Revit",
     colorButton: "Colora in Revit",
-    resetButton: "Reset override",
+    resetButton: "Reset vista",
     createViewButton: "Crea vista 3D da selezione",
     highlighted: "evidenziati",
     filtered: "filtrati",
     totals: "totali",
     sent: (n) => `✓ Inviati ${n} element${n === 1 ? "o" : "i"}`,
+    sentPartial: (r, req) => `✓ Inviati ${r} di ${req} (${req - r} non trovat${req - r === 1 ? "o" : "i"})`,
     colored: (n) => `✓ Colorati ${n} element${n === 1 ? "o" : "i"}`,
-    reset: (n) => `✓ Reset di ${n} element${n === 1 ? "o" : "i"}`,
-    viewCreated: (name) => `✓ Vista creata: ${name}`,
+    reset: (n) => `✓ Vista ripristinata · ${n} override rimoss${n === 1 ? "o" : "i"}`,
+    resetClean: "✓ Vista ripristinata (nessun override RevitCortex)",
+    viewCreated: (name) => `✓ Vista creata e aperta: ${name}`,
     connected: "Connesso a Revit",
     notConnected: "RevitCortex non attivo",
     nothingToSelect: "Nessun elemento da selezionare",
@@ -109,9 +123,12 @@ const STRINGS: Record<Lang, Strings> = {
     hintSelect: (n, label) => `Seleziona ${n} elementi ${label} in Revit`,
     isolateHint: "Isola gli elementi nella vista attiva (oltre alla selezione)",
     colorHint: "Applica un override colore sulla vista attiva, un colore per ogni valore distinto del campo mappato in 'Color by'",
-    resetHint: "Rimuove tutti gli override grafici sulla vista attiva",
-    createViewHint: "Crea una nuova vista 3D con section box attorno agli elementi (aggiunta al Project Browser; la vista corrente resta invariata)",
+    resetHint: "Rimuove isolamento temporaneo e override grafici applicati da RevitCortex sulla vista attiva",
+    createViewHint: "Crea una nuova vista 3D con section box attorno agli elementi, la attiva e ripristina la selezione",
     noColorColumnHint: "Trascina un campo categorico in 'Color by' per abilitare questo pulsante",
+    errorGeneric: "✗ Azione fallita in Revit",
+    errorTimeout: "✗ Revit non ha risposto",
+    errorNotConnected: "✗ RevitCortex non attivo",
   },
 };
 
@@ -287,10 +304,11 @@ async function checkConnection(): Promise<boolean> {
 // ─── React component ────────────────────────────────────────────────────────
 
 type Feedback =
-  | { kind: "sent"; count: number }
+  | { kind: "sent"; count: number; requested?: number }
   | { kind: "colored"; count: number }
   | { kind: "reset"; count: number }
-  | { kind: "view"; name: string };
+  | { kind: "view"; name: string }
+  | { kind: "error"; message: string };
 
 type BusyKind = "select" | "isolate" | "color" | "reset" | "view" | null;
 
@@ -481,14 +499,14 @@ function SelectionPanel({
       <ActionButton
         variant="primary"
         label={t.selectButton}
-        sublabel={
+        sublabel={connected ? (
           <>
             {activeIds.length} {activeLabel}
             {useHighlighted && filteredIds.length !== highlightedIds.length
               ? ` · ${filteredIds.length} ${t.totals}`
               : ""}
           </>
-        }
+        ) : undefined}
         title={
           canSelect
             ? t.hintSelect(activeIds.length, activeLabel)
@@ -555,9 +573,9 @@ function SelectionPanel({
         <div
           style={{
             fontSize: 11,
-            color: PALETTE.successText,
-            background: PALETTE.successBg,
-            border: `1px solid ${PALETTE.successText}33`,
+            color: feedback.kind === "error" ? PALETTE.errorText : PALETTE.successText,
+            background: feedback.kind === "error" ? PALETTE.errorBg : PALETTE.successBg,
+            border: `1px solid ${(feedback.kind === "error" ? PALETTE.errorText : PALETTE.successText)}33`,
             borderRadius: 2,
             padding: "4px 8px",
             animation: feedbackVisible
@@ -565,10 +583,14 @@ function SelectionPanel({
               : "rc-toast-out 220ms ease-in forwards",
           }}
         >
-          {feedback.kind === "sent" ? t.sent(feedback.count) :
-           feedback.kind === "colored" ? t.colored(feedback.count) :
-           feedback.kind === "reset" ? t.reset(feedback.count) :
-           t.viewCreated(feedback.name)}
+          {feedback.kind === "sent" ?
+              (feedback.requested != null && feedback.requested !== feedback.count
+                ? t.sentPartial(feedback.count, feedback.requested)
+                : t.sent(feedback.count))
+           : feedback.kind === "colored" ? t.colored(feedback.count)
+           : feedback.kind === "reset"   ? (feedback.count > 0 ? t.reset(feedback.count) : t.resetClean)
+           : feedback.kind === "view"    ? t.viewCreated(feedback.name)
+           : /* error */                   feedback.message}
         </div>
       )}
     </div>
@@ -714,13 +736,31 @@ export class RevitCortexSelectionVisual implements IVisual {
     }
   }
 
+  /**
+   * Maps a failed POST result to an error message. status === 0 means the
+   * fetch itself failed (timeout or network); 4xx/5xx is a server-side
+   * decline. We always do a fresh connection check to refresh the dot.
+   */
+  private async failureMessage(r: PostResult): Promise<string> {
+    this.connected = await checkConnection();
+    if (!this.connected) return this.strings.errorNotConnected;
+    if (r.status === 0) return this.strings.errorTimeout;
+    const serverMsg = r.body?.error ? String(r.body.error) : null;
+    return serverMsg ? `✗ ${serverMsg}` : this.strings.errorGeneric;
+  }
+
   private async onSelect(ids: number[], action: "select" | "isolate"): Promise<void> {
     return this.runAction(action === "isolate" ? "isolate" : "select", async () => {
       const r = await post(PBI_SELECT_URL, { elementIds: ids, action });
       if (r.ok && r.body?.success) {
-        this.showFeedback({ kind: "sent", count: ids.length });
+        // Server returns `validated` = ResolvedCount (string). When it's less
+        // than ids.length, some IDs didn't exist in the active doc — surface
+        // the partial outcome to the user instead of pretending it was clean.
+        const resolved = parseInt(r.body.validated ?? `${ids.length}`, 10);
+        const count = Number.isFinite(resolved) ? resolved : ids.length;
+        this.showFeedback({ kind: "sent", count, requested: ids.length });
       } else {
-        this.connected = await checkConnection();
+        this.showFeedback({ kind: "error", message: await this.failureMessage(r) });
       }
     });
   }
@@ -732,7 +772,7 @@ export class RevitCortexSelectionVisual implements IVisual {
         const count = parseInt(r.body.validated ?? `${items.length}`, 10) || items.length;
         this.showFeedback({ kind: "colored", count });
       } else {
-        this.connected = await checkConnection();
+        this.showFeedback({ kind: "error", message: await this.failureMessage(r) });
       }
     });
   }
@@ -744,7 +784,7 @@ export class RevitCortexSelectionVisual implements IVisual {
         const count = parseInt(r.body.validated ?? "0", 10) || 0;
         this.showFeedback({ kind: "reset", count });
       } else {
-        this.connected = await checkConnection();
+        this.showFeedback({ kind: "error", message: await this.failureMessage(r) });
       }
     });
   }
@@ -756,7 +796,7 @@ export class RevitCortexSelectionVisual implements IVisual {
         const name = String(r.body.validated ?? "");
         this.showFeedback({ kind: "view", name });
       } else {
-        this.connected = await checkConnection();
+        this.showFeedback({ kind: "error", message: await this.failureMessage(r) });
       }
     });
   }

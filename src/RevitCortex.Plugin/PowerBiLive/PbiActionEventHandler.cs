@@ -266,25 +266,52 @@ public class PbiActionEventHandler : IExternalEventHandler
     private string? ExecuteResetOverrides(Document doc)
     {
         var view = doc.ActiveView;
+        int overridesCleared = 0;
+        bool isolationCleared = false;
 
-        // Scope: only elements that PBI itself painted on this view, persisted
-        // via ExtensibleStorage across Revit sessions. Manual overrides created
-        // by the user or other add-ins on the same view are intentionally left
+        // First: disable any temporary hide/isolate that may have been applied
+        // by the "Isola" action. DisableTemporaryViewMode throws if no temp mode
+        // is active, so we swallow the exception — that's the expected case
+        // when the user clicks Reset on a non-isolated view.
+        try
+        {
+            using var txIso = new Transaction(doc, "PBI reset temporary isolation");
+            txIso.Start();
+            view.DisableTemporaryViewMode(TemporaryViewMode.TemporaryHideIsolate);
+            txIso.Commit();
+            isolationCleared = true;
+        }
+        catch (Exception ex)
+        {
+            // No temporary isolation active — completely normal, not an error.
+            System.Diagnostics.Trace.WriteLine(
+                $"[PbiActionEventHandler] DisableTemporaryViewMode skipped: {ex.Message}");
+        }
+
+        // Then: clear graphic overrides on PBI-tracked elements only. Manual
+        // overrides created by the user or other add-ins are intentionally left
         // untouched — a previous version that iterated all visible elements
         // could destroy coordination/authoring work and was a footgun.
         var trackedIds = _registry.GetTracked(doc, view.Id);
-        if (trackedIds.Count == 0) return "0";
-
-        using var tx = new Transaction(doc, "PBI reset overrides");
-        tx.Start();
-        var empty = new OverrideGraphicSettings();
-        foreach (var id in trackedIds)
+        if (trackedIds.Count > 0)
         {
-            try { view.SetElementOverrides(id, empty); } catch { /* skip */ }
+            using var tx = new Transaction(doc, "PBI reset overrides");
+            tx.Start();
+            var empty = new OverrideGraphicSettings();
+            foreach (var id in trackedIds)
+            {
+                try { view.SetElementOverrides(id, empty); overridesCleared++; }
+                catch { /* skip */ }
+            }
+            _registry.Clear(doc, view.Id);
+            tx.Commit();
         }
-        _registry.Clear(doc, view.Id);
-        tx.Commit();
-        return trackedIds.Count.ToString();
+
+        // Return a single integer for backward-compat with the visual, but log
+        // both counts for diagnostics. Visual will display "Reset vista".
+        System.Diagnostics.Trace.WriteLine(
+            $"[PbiActionEventHandler] Reset: overrides={overridesCleared}, isolation={isolationCleared}");
+        return overridesCleared.ToString();
     }
 
     private string? ExecuteCreateView(Document doc, UIApplication app, Request req)
@@ -345,9 +372,26 @@ public class PbiActionEventHandler : IExternalEventHandler
                 $"[PbiActionEventHandler] CreateView isolate failed (non-fatal): {ex.Message}");
         }
 
-        // NOTE: intentionally do NOT switch to the new view. The user keeps
-        // their current view; the new 3D view appears in the Project Browser
-        // under "3D Views" and can be opened manually when needed.
+        // Activate the new view so the user lands directly on the selection.
+        // The previous version intentionally kept the current view to avoid
+        // disrupting authoring/markup, but feedback was that "create view"
+        // without "show view" is confusing — the user has to dig into Project
+        // Browser to find what they just created. Switching here is the
+        // expected behaviour for the "from selection" naming. Selection of the
+        // elements is also restored so the user can immediately keep working
+        // with them.
+        try
+        {
+            var uiDoc = new UIDocument(doc);
+            uiDoc.ActiveView = newView;
+            uiDoc.Selection.SetElementIds(validIds);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[PbiActionEventHandler] CreateView activate failed (non-fatal): {ex.Message}");
+        }
+
         return newView.Name;
     }
 
