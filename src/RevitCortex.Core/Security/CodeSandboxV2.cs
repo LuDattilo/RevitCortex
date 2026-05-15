@@ -23,6 +23,10 @@ public static class CodeSandboxV2
         "System.Runtime.InteropServices",
     };
 
+    // Patterns checked against the comments/strings-stripped form of the code.
+    // String literals collapse to whitespace here, which is what we want for namespace
+    // and identifier matching but defeats us when we need to know whether a call has
+    // an argument — see ReflectionWithArgumentPatterns below for those cases.
     private static readonly Regex[] ProhibitedPatterns = new[]
     {
         new Regex(@"\bProcess\s*\.\s*Start\b", RegexOptions.Compiled),
@@ -31,22 +35,27 @@ public static class CodeSandboxV2
         new Regex(@"\bRegistry(Key)?\s*\.\s*(Open|Get|Set|Create|Delete)\b", RegexOptions.Compiled),
         new Regex(@"\bEnvironment\s*\.\s*(Exit|SetEnvironmentVariable)\b", RegexOptions.Compiled),
         new Regex(@"\bAssembly\s*\.\s*(Load|LoadFrom|LoadFile)\b", RegexOptions.Compiled),
-        // Reflection bypasses
+        // Reflection bypasses (no-arg / fixed-form)
         new Regex(@"\bType\s*\.\s*GetType\b", RegexOptions.Compiled),
         new Regex(@"\bActivator\s*\.\s*CreateInstance\b", RegexOptions.Compiled),
         new Regex(@"\bMethodInfo\s*\.\s*Invoke\b", RegexOptions.Compiled),
-        // Reflection bypasses round 2 (discovered 2026-05-15 bypass exploration)
-        // Any .GetType(<non-empty>) on a non-Type identifier — covers Assembly.GetType("..."),
-        // typeof(X).Module.GetType(...), instance.GetType(...). Strings are stripped to spaces
-        // before matching, so we look for a non-empty argument (anything except whitespace-only).
-        new Regex(@"\.\s*GetType\s*\(\s*\S", RegexOptions.Compiled),
-        // typeof(X).GetMethod / GetField / GetProperty / InvokeMember — bypasses Type.GetType guard
+        // typeof(X).<reflection-accessor> — the typeof() makes Type.GetType unnecessary
         new Regex(@"\btypeof\s*\([^)]+\)\s*\.\s*(GetMethod|GetField|GetProperty|GetMember|GetConstructor|InvokeMember)\b", RegexOptions.Compiled),
-        // Direct GetMethod / GetField / GetProperty access on any expression (covers `someType.GetMethod(...)`)
-        // String literals are stripped to spaces before matching, so we look for any non-empty arg.
-        new Regex(@"\.\s*(GetMethod|GetField|GetProperty|GetMember|GetConstructor|InvokeMember)\s*\(\s*\S", RegexOptions.Compiled),
         // dynamic keyword opens late-bound dispatch — bypasses static pattern matching entirely
         new Regex(@"\bdynamic\b", RegexOptions.Compiled),
+    };
+
+    // Patterns checked against the ORIGINAL code (string literals NOT stripped). We need this
+    // to distinguish `obj.GetType()` (harmless zero-arg type check) from `obj.GetType("ns.T")`
+    // (reflection bypass via Assembly.GetType / typeof(X).Module.GetType / instance.GetType).
+    // After stripping, both look like `obj.GetType(...whitespace...)` and we can't tell them apart.
+    private static readonly Regex[] ReflectionWithArgumentPatterns = new[]
+    {
+        // .GetType( <something non-whitespace> ) — covers Assembly.GetType("..."), .GetType(name),
+        // .GetType(ns + "." + cls). Excludes .GetType() (zero-arg, harmless).
+        new Regex(@"\.\s*GetType\s*\(\s*\S[^)]*\)", RegexOptions.Compiled),
+        // .GetMethod( <something non-whitespace> ) etc. — same rationale; excludes zero-arg overloads.
+        new Regex(@"\.\s*(GetMethod|GetField|GetProperty|GetMember|GetConstructor|InvokeMember)\s*\(\s*\S[^)]*\)", RegexOptions.Compiled),
     };
 
     public static CortexResult<object>? Validate(string code)
@@ -65,6 +74,15 @@ public static class CodeSandboxV2
         foreach (var regex in ProhibitedPatterns)
         {
             var match = regex.Match(cleaned);
+            if (match.Success)
+                violations.Add(match.Value);
+        }
+
+        // Reflection-with-argument patterns must match the ORIGINAL code so we can tell
+        // `obj.GetType()` (allowed) from `obj.GetType("System.IO.File")` (blocked).
+        foreach (var regex in ReflectionWithArgumentPatterns)
+        {
+            var match = regex.Match(code);
             if (match.Success)
                 violations.Add(match.Value);
         }
