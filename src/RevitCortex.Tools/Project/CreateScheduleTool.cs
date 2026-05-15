@@ -75,15 +75,27 @@ public class CreateScheduleTool : ICortexTool
                 }
             }
 
-            // Add fields
+            // Add fields. Track both added and skipped so callers know exactly which
+            // requested fields didn't apply (instead of silently dropping them and leaving
+            // the LLM to hallucinate reasons why — see audit log analysis 2026-05-15).
             var addedFields = new List<string>();
+            var skippedFields = new List<object>();
+            List<string>? schedulableNames = null;
             if (fields != null)
             {
                 var schedulableFields = schedule.Definition.GetSchedulableFields();
+                schedulableNames = schedulableFields
+                    .Select(f => f.GetName(doc))
+                    .Where(n => !string.IsNullOrEmpty(n))
+                    .ToList();
                 foreach (var fieldSpec in fields)
                 {
                     var paramName = fieldSpec["parameterName"]?.Value<string>();
-                    if (string.IsNullOrEmpty(paramName)) continue;
+                    if (string.IsNullOrEmpty(paramName))
+                    {
+                        skippedFields.Add(new { parameterName = (string?)null, reason = "EmptyName" });
+                        continue;
+                    }
 
                     var sf = schedulableFields.FirstOrDefault(f =>
                         f.GetName(doc).Equals(paramName, StringComparison.OrdinalIgnoreCase));
@@ -97,6 +109,22 @@ public class CreateScheduleTool : ICortexTool
                         field.IsHidden = isHidden;
                         addedFields.Add(paramName!);
                     }
+                    else
+                    {
+                        // Find up to 3 closest matches (case-insensitive substring) so the
+                        // caller gets actionable hints instead of guessing localization issues.
+                        var hints = schedulableNames
+                            .Where(n => n.IndexOf(paramName!, StringComparison.OrdinalIgnoreCase) >= 0
+                                     || paramName!.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)
+                            .Take(3)
+                            .ToList();
+                        skippedFields.Add(new
+                        {
+                            parameterName = paramName,
+                            reason = "NotSchedulableForCategory",
+                            suggestions = hints
+                        });
+                    }
                 }
             }
 
@@ -108,7 +136,12 @@ public class CreateScheduleTool : ICortexTool
                 scheduleName = schedule.Name,
                 scheduleType,
                 addedFieldCount = addedFields.Count,
-                addedFields
+                addedFields,
+                skippedFieldCount = skippedFields.Count,
+                skippedFields,
+                // Include the full schedulable name list only when at least one field was
+                // skipped — keeps the response compact on the happy path.
+                schedulableFieldNames = skippedFields.Count > 0 ? schedulableNames : null
             });
         }
         catch (Exception ex)
