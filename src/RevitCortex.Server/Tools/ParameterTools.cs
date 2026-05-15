@@ -36,6 +36,8 @@ public static class ParameterTools
         [Description("Text to find (for find_replace operation)")] string? findText = null,
         [Description("Replacement text (for find_replace operation)")] string? replaceText = null,
         [Description("Preview changes without applying. Default: true")] bool? dryRun = true,
+        [Description("If true, include up to `sampleLimit` modified elements in the response. Default false to keep dryRun payloads small — most callers only need the counts.")] bool? includeSample = null,
+        [Description("How many modified elements to include when includeSample=true. Default 100.")] int? sampleLimit = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -48,6 +50,8 @@ public static class ParameterTools
         if (findText != null) p["findText"] = findText;
         if (replaceText != null) p["replaceText"] = replaceText;
         if (dryRun != null) p["dryRun"] = dryRun;
+        if (includeSample != null) p["includeSample"] = includeSample;
+        if (sampleLimit != null) p["sampleLimit"] = sampleLimit;
         var result = await revit.ExecuteAsync("bulk_modify_parameter_values", p, ct);
         return result.ToString();
     }
