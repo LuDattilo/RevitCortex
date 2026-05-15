@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
@@ -20,7 +21,7 @@ public class ListFamilySizesTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Lists families with type and instance counts, sorted by instance count, type count, or name. Useful for identifying bloated/unused families.";
+    public string Description => "Lists families with type/instance counts and, optionally, the family file size in KB (measured by exporting each family to a temp file). Sortable by instanceCount, typeCount, name, or sizeKB. Useful for identifying bloated, unused, or oversized families.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -28,9 +29,12 @@ public class ListFamilySizesTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "No active document in session");
 
-        var limit      = input["limit"]?.Value<int>() ?? 50;
-        var sortBy     = input["sortBy"]?.Value<string>() ?? "instanceCount";
-        var categories = input["categories"]?.ToObject<List<string>>() ?? new List<string>();
+        var limit       = input["limit"]?.Value<int>() ?? 50;
+        var sortBy      = input["sortBy"]?.Value<string>() ?? "instanceCount";
+        var categories  = input["categories"]?.ToObject<List<string>>() ?? new List<string>();
+        // Computing real file size is expensive (one EditFamily + Save per family) so it's opt-in.
+        // Defaulted off to keep the existing fast path intact for most callers.
+        var includeSize = input["includeSize"]?.Value<bool>() ?? false;
 
         try
         {
@@ -86,7 +90,8 @@ public class ListFamilySizesTool : ICortexTool
                 instanceCountByTypeId[typeIdValue] = existing + 1;
             }
 
-            // Build family info
+            // Build family info (size calc deferred so we can apply it only to the limited subset
+            // after sorting — except when sortBy=sizeKB, which forces full computation up front).
             var familyInfos = families.Select(f =>
             {
                 var typeIds = f.GetFamilySymbolIds();
@@ -102,40 +107,70 @@ public class ListFamilySizesTool : ICortexTool
                         instanceCount += count;
                 }
 
-                return new
+                return new FamilyInfo
                 {
 #if REVIT2024_OR_GREATER
-                    familyId = f.Id.Value,
+                    FamilyId = f.Id.Value,
 #else
-                    familyId = (long)f.Id.IntegerValue,
+                    FamilyId = (long)f.Id.IntegerValue,
 #endif
-                    familyName    = f.Name,
-                    category      = f.FamilyCategory?.Name ?? "Unknown",
-                    typeCount     = typeIds.Count,
-                    instanceCount,
-                    isInPlace     = f.IsInPlace,
-                    isEditable    = f.IsEditable
+                    Family        = f,
+                    FamilyName    = f.Name,
+                    Category      = f.FamilyCategory?.Name ?? "Unknown",
+                    TypeCount     = typeIds.Count,
+                    InstanceCount = instanceCount,
+                    IsInPlace     = f.IsInPlace,
+                    IsEditable    = f.IsEditable,
+                    SizeKB        = null // populated below when includeSize=true
                 };
             }).ToList();
 
-            // Sort
-            var sorted = sortBy.ToLowerInvariant() switch
+            var normalizedSort = sortBy.ToLowerInvariant();
+            // Compute sizes BEFORE sorting only when sort needs them, otherwise compute after
+            // the sort-and-limit pass so we touch at most `limit` families instead of all.
+            if (includeSize && normalizedSort == "sizekb")
             {
-                "typecount" => familyInfos.OrderByDescending(f => f.typeCount).ToList(),
-                "name"      => familyInfos.OrderBy(f => f.familyName).ToList(),
-                _           => familyInfos.OrderByDescending(f => f.instanceCount).ToList()
+                foreach (var fi in familyInfos)
+                    fi.SizeKB = TryGetFamilySizeKB(doc, fi.Family);
+            }
+
+            // Sort
+            var sorted = normalizedSort switch
+            {
+                "typecount" => familyInfos.OrderByDescending(f => f.TypeCount).ToList(),
+                "name"      => familyInfos.OrderBy(f => f.FamilyName).ToList(),
+                "sizekb"    => familyInfos.OrderByDescending(f => f.SizeKB ?? -1).ToList(),
+                _           => familyInfos.OrderByDescending(f => f.InstanceCount).ToList()
             };
 
             var limited = sorted.Take(limit).ToList();
 
+            if (includeSize && normalizedSort != "sizekb")
+            {
+                foreach (var fi in limited)
+                    if (fi.SizeKB == null)
+                        fi.SizeKB = TryGetFamilySizeKB(doc, fi.Family);
+            }
+
             return CortexResult<object>.Ok(new
             {
                 totalFamilies  = familyInfos.Count,
-                totalInstances = familyInfos.Sum(f => f.instanceCount),
+                totalInstances = familyInfos.Sum(f => f.InstanceCount),
                 returnedCount  = limited.Count,
                 truncated      = familyInfos.Count > limit,
                 sortedBy       = sortBy,
-                families       = limited
+                sizeMeasured   = includeSize,
+                families       = limited.Select(f => new
+                {
+                    familyId      = f.FamilyId,
+                    familyName    = f.FamilyName,
+                    category      = f.Category,
+                    typeCount     = f.TypeCount,
+                    instanceCount = f.InstanceCount,
+                    isInPlace     = f.IsInPlace,
+                    isEditable    = f.IsEditable,
+                    sizeKB        = f.SizeKB
+                })
             });
         }
         catch (Exception ex)
@@ -143,5 +178,57 @@ public class ListFamilySizesTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
                 $"Failed to list family sizes: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Measure a family's file size by opening its FamilyDocument, saving to a temp file,
+    /// reading the size, and cleaning up. Returns null if the family can't be edited
+    /// (in-place families, system families, or families locked by Revit).
+    /// </summary>
+    private static long? TryGetFamilySizeKB(Document hostDoc, Family family)
+    {
+        if (family == null || !family.IsEditable || family.IsInPlace) return null;
+
+        string? tempPath = null;
+        Document? famDoc = null;
+        try
+        {
+            famDoc = hostDoc.EditFamily(family);
+            if (famDoc == null) return null;
+
+            tempPath = Path.Combine(Path.GetTempPath(),
+                $"rcfam-{Guid.NewGuid():N}.rfa");
+
+            var saveOpts = new SaveAsOptions { OverwriteExistingFile = true };
+            famDoc.SaveAs(tempPath, saveOpts);
+
+            var size = new FileInfo(tempPath).Length;
+            return (long)Math.Round(size / 1024.0);
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            try { famDoc?.Close(false); } catch { /* best-effort cleanup */ }
+            if (tempPath != null && File.Exists(tempPath))
+            {
+                try { File.Delete(tempPath); } catch { /* best-effort cleanup */ }
+            }
+        }
+    }
+
+    private sealed class FamilyInfo
+    {
+        public long FamilyId { get; set; }
+        public Family Family { get; set; } = null!;
+        public string FamilyName { get; set; } = "";
+        public string Category { get; set; } = "";
+        public int TypeCount { get; set; }
+        public int InstanceCount { get; set; }
+        public bool IsInPlace { get; set; }
+        public bool IsEditable { get; set; }
+        public long? SizeKB { get; set; }
     }
 }

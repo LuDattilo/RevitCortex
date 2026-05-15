@@ -35,6 +35,11 @@ public class BulkModifyParameterValuesTool : ICortexTool
         var replaceText = input["replaceText"]?.Value<string>() ?? "";
         var dryRun = input["dryRun"]?.Value<bool>() ?? true;
         var onlyEmpty = input["onlyEmpty"]?.Value<bool>() ?? false;
+        // Sample preview: in dryRun callers almost always want only the counts (CLAUDE.md
+        // documents this explicitly). On a 1000-element bulk a 100-element preview is ~5KB
+        // of wasted MCP tokens. Default off; set true to opt back into the legacy 100-row sample.
+        var includeSample = input["includeSample"]?.Value<bool>() ?? false;
+        var sampleLimit = input["sampleLimit"]?.Value<int>() ?? 100;
 
         if (string.IsNullOrEmpty(parameterName))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "parameterName is required");
@@ -87,12 +92,19 @@ public class BulkModifyParameterValuesTool : ICortexTool
                 ProcessElements(elementList, parameterName!, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped, true);
             }
 
+            // Only emit the sample when the caller asks for it. Counts always go out.
+            object? sample = includeSample
+                ? modified.Take(Math.Max(0, sampleLimit)).ToList()
+                : null;
+
             return CortexResult<object>.Ok(new
             {
                 dryRun,
                 modifiedCount = modified.Count,
                 skippedCount = skipped,
-                modified = modified.Take(100).ToList()
+                sampleIncluded = includeSample,
+                sampleLimit = includeSample ? (int?)sampleLimit : null,
+                modified = sample
             });
         }
         catch (Exception ex)

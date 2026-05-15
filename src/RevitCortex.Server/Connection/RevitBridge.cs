@@ -89,15 +89,23 @@ public sealed class RevitBridge : IDisposable
 
             if (response["error"] != null)
             {
+                // The plugin uses JSON-RPC `error` as a semantic application-failure channel
+                // (CortexResult.Fail). MCP clients render any thrown exception as an opaque
+                // "An error occurred invoking <tool>", hiding code/message/suggestion from the
+                // model. So we surface the structured CortexError as a normal application
+                // payload {"success": false, "error": {...}} that flows through to the LLM.
                 var err = response["error"]!;
-                var message = err["message"]?.ToString() ?? "Unknown Revit error";
-                var ex = new InvalidOperationException(message);
-                // Attach the structured CortexError (code, suggestion, context) so callers
-                // that need typed error info can inspect ex.Data["RevitError"].
-                var data = err["data"];
-                if (data != null)
-                    ex.Data["RevitError"] = data.ToString(Formatting.None);
-                throw ex;
+                var errorPayload = err["data"] is JObject structured
+                    ? (JToken)structured.DeepClone()
+                    : new JObject
+                    {
+                        ["message"] = err["message"]?.ToString() ?? "Unknown Revit error"
+                    };
+                return new JObject
+                {
+                    ["success"] = false,
+                    ["error"] = errorPayload
+                };
             }
 
             return response["result"] ?? JValue.CreateNull();

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/powerbi-desktop-samples/main/item-schemas/common/pbip-1.0.json",
+  "version": "1.0",
+  "artifacts": [
+    {
+      "report": {
+        "path": "./RevitCortexLiveTest.Report"
+      }
+    }
+  ],
+  "settings": {
+    "enableAutoRecovery": true
+  }
+}

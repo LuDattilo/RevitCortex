@@ -75,27 +75,76 @@ public class CreateScheduleTool : ICortexTool
                 }
             }
 
-            // Add fields
+            // Add fields. Track both added and skipped so callers know exactly which
+            // requested fields didn't apply (instead of silently dropping them and leaving
+            // the LLM to hallucinate reasons why — see audit log analysis 2026-05-15).
             var addedFields = new List<string>();
+            var skippedFields = new List<object>();
+            List<string>? schedulableNames = null;
             if (fields != null)
             {
                 var schedulableFields = schedule.Definition.GetSchedulableFields();
+                schedulableNames = schedulableFields
+                    .Select(f => f.GetName(doc))
+                    .Where(n => !string.IsNullOrEmpty(n))
+                    .ToList();
                 foreach (var fieldSpec in fields)
                 {
-                    var paramName = fieldSpec["parameterName"]?.Value<string>();
-                    if (string.IsNullOrEmpty(paramName)) continue;
+                    // Accept either a bare string ("Type") or an object
+                    // ({"parameterName": "Type", "heading": "Wall Type", "isHidden": false}).
+                    // The MCP wrapper currently exposes only `string[]?` so JArray entries arrive
+                    // as JValue, but the plugin-direct path lets callers pass full specs. Both
+                    // must work — the previous fix assumed JObject and crashed on JValue.
+                    string? paramName;
+                    string? heading = null;
+                    bool isHidden = false;
+                    if (fieldSpec is JValue jv && jv.Type == JTokenType.String)
+                    {
+                        paramName = jv.Value<string>();
+                    }
+                    else if (fieldSpec is JObject jo)
+                    {
+                        paramName = jo["parameterName"]?.Value<string>();
+                        heading = jo["heading"]?.Value<string>();
+                        isHidden = jo["isHidden"]?.Value<bool>() ?? false;
+                    }
+                    else
+                    {
+                        skippedFields.Add(new { parameterName = (string?)null, reason = "InvalidSpec" });
+                        continue;
+                    }
+
+                    if (string.IsNullOrEmpty(paramName))
+                    {
+                        skippedFields.Add(new { parameterName = (string?)null, reason = "EmptyName" });
+                        continue;
+                    }
 
                     var sf = schedulableFields.FirstOrDefault(f =>
                         f.GetName(doc).Equals(paramName, StringComparison.OrdinalIgnoreCase));
                     if (sf != null)
                     {
                         var field = schedule.Definition.AddField(sf);
-                        var heading = fieldSpec["heading"]?.Value<string>();
                         if (!string.IsNullOrEmpty(heading))
                             field.ColumnHeading = heading;
-                        var isHidden = fieldSpec["isHidden"]?.Value<bool>() ?? false;
                         field.IsHidden = isHidden;
                         addedFields.Add(paramName!);
+                    }
+                    else
+                    {
+                        // Find up to 3 closest matches (case-insensitive substring) so the
+                        // caller gets actionable hints instead of guessing localization issues.
+                        var hints = schedulableNames
+                            .Where(n => n.IndexOf(paramName!, StringComparison.OrdinalIgnoreCase) >= 0
+                                     || paramName!.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)
+                            .Take(3)
+                            .ToList();
+                        skippedFields.Add(new
+                        {
+                            parameterName = paramName,
+                            reason = "NotSchedulableForCategory",
+                            suggestions = hints
+                        });
                     }
                 }
             }
@@ -108,7 +157,12 @@ public class CreateScheduleTool : ICortexTool
                 scheduleName = schedule.Name,
                 scheduleType,
                 addedFieldCount = addedFields.Count,
-                addedFields
+                addedFields,
+                skippedFieldCount = skippedFields.Count,
+                skippedFields,
+                // Include the full schedulable name list only when at least one field was
+                // skipped — keeps the response compact on the happy path.
+                schedulableFieldNames = skippedFields.Count > 0 ? schedulableNames : null
             });
         }
         catch (Exception ex)
