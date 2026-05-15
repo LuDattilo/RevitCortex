@@ -492,18 +492,20 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "list_family_sizes"), Description("List loaded families with their type and instance counts.")]
+    [McpServerTool(Name = "list_family_sizes"), Description("List loaded families with type/instance counts and, when includeSize=true, the family file size in KB measured by exporting each family to a temp file. Disabled by default because exporting is slow on models with many families.")]
     public static async Task<string> ListFamilySizes(
         RevitConnectionManager revit,
         [Description("Max families returned. Default: 50")] int? limit = null,
-        [Description("Sort by: instanceCount | typeCount | name. Default: instanceCount")] string? sortBy = null,
+        [Description("Sort by: instanceCount | typeCount | name | sizeKB. Default: instanceCount. Note: sizeKB sort requires includeSize=true and forces size measurement on every family (slow on large models).")] string? sortBy = null,
         [Description("Categories to restrict the list")] string[]? categories = null,
+        [Description("If true, measure each returned family's file size in KB. Default false. Cost: ~50-200ms per family (one EditFamily + temp save round-trip).")] bool? includeSize = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (limit != null) p["limit"] = limit;
         if (sortBy != null) p["sortBy"] = sortBy;
         if (categories != null) p["categories"] = new JArray(categories);
+        if (includeSize != null) p["includeSize"] = includeSize;
         var result = await revit.ExecuteAsync("list_family_sizes", p, ct);
         return result.ToString();
     }
