@@ -35,6 +35,18 @@ public static class CodeSandboxV2
         new Regex(@"\bType\s*\.\s*GetType\b", RegexOptions.Compiled),
         new Regex(@"\bActivator\s*\.\s*CreateInstance\b", RegexOptions.Compiled),
         new Regex(@"\bMethodInfo\s*\.\s*Invoke\b", RegexOptions.Compiled),
+        // Reflection bypasses round 2 (discovered 2026-05-15 bypass exploration)
+        // Any .GetType(<non-empty>) on a non-Type identifier — covers Assembly.GetType("..."),
+        // typeof(X).Module.GetType(...), instance.GetType(...). Strings are stripped to spaces
+        // before matching, so we look for a non-empty argument (anything except whitespace-only).
+        new Regex(@"\.\s*GetType\s*\(\s*\S", RegexOptions.Compiled),
+        // typeof(X).GetMethod / GetField / GetProperty / InvokeMember — bypasses Type.GetType guard
+        new Regex(@"\btypeof\s*\([^)]+\)\s*\.\s*(GetMethod|GetField|GetProperty|GetMember|GetConstructor|InvokeMember)\b", RegexOptions.Compiled),
+        // Direct GetMethod / GetField / GetProperty access on any expression (covers `someType.GetMethod(...)`)
+        // String literals are stripped to spaces before matching, so we look for any non-empty arg.
+        new Regex(@"\.\s*(GetMethod|GetField|GetProperty|GetMember|GetConstructor|InvokeMember)\s*\(\s*\S", RegexOptions.Compiled),
+        // dynamic keyword opens late-bound dispatch — bypasses static pattern matching entirely
+        new Regex(@"\bdynamic\b", RegexOptions.Compiled),
     };
 
     public static CortexResult<object>? Validate(string code)
