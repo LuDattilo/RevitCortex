@@ -152,14 +152,18 @@ public static class ProjectTools
     [McpServerTool(Name = "clash_detection"), Description("Detect clashes between two element categories.")]
     public static async Task<string> ClashDetection(
         RevitConnectionManager revit,
-        [Description("First category for clash detection")] string category1,
-        [Description("Second category for clash detection")] string category2,
+        [Description("First category for clash detection (e.g. OST_Walls)")] string categoryA,
+        [Description("Second category for clash detection (e.g. OST_Floors)")] string categoryB,
+        [Description("Maximum number of clash pairs to return. Default: 100. Use higher values on dense models to discover the true clash count; lower for quick checks.")] int maxResults = 100,
+        [Description("Bounding-box intersection tolerance in millimeters. Default: 0 (any overlap). Positive values shrink the test, ignoring tiny grazing intersections.")] double tolerance = 0,
         CancellationToken ct = default)
     {
         var p = new JObject
         {
-            ["category1"] = category1,
-            ["category2"] = category2,
+            ["categoryA"] = categoryA,
+            ["categoryB"] = categoryB,
+            ["maxResults"] = maxResults,
+            ["tolerance"] = tolerance,
         };
         var result = await revit.ExecuteAsync("clash_detection", p, ct);
         return result.ToString();
