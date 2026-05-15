@@ -492,13 +492,13 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "list_family_sizes"), Description("List loaded families with type/instance counts. The includeSize flag is currently a stub (returns sizeKB=null) — measuring real file size via EditFamily destabilized Revit in live testing and is being reworked behind a safety guard.")]
+    [McpServerTool(Name = "list_family_sizes"), Description("List loaded families with type/instance counts and, when includeSize=true, the family file size in KB measured by exporting each family to a temp file. Disabled by default because exporting is slow on models with many families.")]
     public static async Task<string> ListFamilySizes(
         RevitConnectionManager revit,
         [Description("Max families returned. Default: 50")] int? limit = null,
-        [Description("Sort by: instanceCount | typeCount | name | sizeKB. Default: instanceCount. sizeKB sort currently has no real values to sort on (stub).")] string? sortBy = null,
+        [Description("Sort by: instanceCount | typeCount | name | sizeKB. Default: instanceCount. Note: sizeKB sort requires includeSize=true and forces size measurement on every family (slow on large models).")] string? sortBy = null,
         [Description("Categories to restrict the list")] string[]? categories = null,
-        [Description("Reserved for future use. Currently a no-op: sizeKB will be null for every family in the response. The previous EditFamily-based implementation crashed Revit when called from an ExternalEvent.")] bool? includeSize = null,
+        [Description("If true, measure each returned family's file size in KB. Default false. Cost: ~50-200ms per family (one EditFamily + temp save round-trip).")] bool? includeSize = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
