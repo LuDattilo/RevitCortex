@@ -62,12 +62,17 @@ RevitCortex Live - {ProjectName} - v1.1
 ```
 
 If you later migrate RevitCortex to an XMLA-accessible semantic model, update
-this PBIP connection from the latest RevitCortex binding:
+this PBIP connection from the latest RevitCortex binding. The script requires
+`-Force` because by default it refuses to update connections that still point
+to REST push semantic models (which PBIP byConnection cannot consume — see the
+"Current Limitation" section above). Pass `-Force` once the binding has been
+migrated to an XMLA-accessible model:
 
 ```powershell
 cd templates\powerbi\pbip-live-test
 .\scripts\Set-PowerBiConnectionFromRevitBinding.ps1 `
-  -WorkspaceNameOrId "GPA Ingegneria Srl"
+  -WorkspaceNameOrId "GPA Ingegneria Srl" `
+  -Force
 ```
 
 Or set the connection manually:
