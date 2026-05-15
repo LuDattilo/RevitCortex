@@ -181,42 +181,21 @@ public class ListFamilySizesTool : ICortexTool
     }
 
     /// <summary>
-    /// Measure a family's file size by opening its FamilyDocument, saving to a temp file,
-    /// reading the size, and cleaning up. Returns null if the family can't be edited
-    /// (in-place families, system families, or families locked by Revit).
+    /// Family size measurement via EditFamily/SaveAs is UNSAFE in the current implementation:
+    /// during live testing on Snowdon Towers (2026-05-15) calling this from an ExternalEvent
+    /// context crashed Revit somewhere between families. EditFamily can pop modal dialogs
+    /// (workshared "Reload Latest", "Save Changes" on dirty families) that can't be shown
+    /// from a non-UI thread, deadlocking the app.
+    ///
+    /// Returning null for now keeps the API contract intact (`sizeKB` field still present in
+    /// the response when includeSize=true) without the risk. Real implementation will need a
+    /// proper UI-thread dispatch + dirty-state check + workshared safety guards — tracked
+    /// separately.
     /// </summary>
     private static long? TryGetFamilySizeKB(Document hostDoc, Family family)
     {
-        if (family == null || !family.IsEditable || family.IsInPlace) return null;
-
-        string? tempPath = null;
-        Document? famDoc = null;
-        try
-        {
-            famDoc = hostDoc.EditFamily(family);
-            if (famDoc == null) return null;
-
-            tempPath = Path.Combine(Path.GetTempPath(),
-                $"rcfam-{Guid.NewGuid():N}.rfa");
-
-            var saveOpts = new SaveAsOptions { OverwriteExistingFile = true };
-            famDoc.SaveAs(tempPath, saveOpts);
-
-            var size = new FileInfo(tempPath).Length;
-            return (long)Math.Round(size / 1024.0);
-        }
-        catch
-        {
-            return null;
-        }
-        finally
-        {
-            try { famDoc?.Close(false); } catch { /* best-effort cleanup */ }
-            if (tempPath != null && File.Exists(tempPath))
-            {
-                try { File.Delete(tempPath); } catch { /* best-effort cleanup */ }
-            }
-        }
+        // Intentionally a no-op until the safety work lands. See header comment.
+        return null;
     }
 
     private sealed class FamilyInfo

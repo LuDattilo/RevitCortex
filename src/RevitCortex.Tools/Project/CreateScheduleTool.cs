@@ -90,7 +90,30 @@ public class CreateScheduleTool : ICortexTool
                     .ToList();
                 foreach (var fieldSpec in fields)
                 {
-                    var paramName = fieldSpec["parameterName"]?.Value<string>();
+                    // Accept either a bare string ("Type") or an object
+                    // ({"parameterName": "Type", "heading": "Wall Type", "isHidden": false}).
+                    // The MCP wrapper currently exposes only `string[]?` so JArray entries arrive
+                    // as JValue, but the plugin-direct path lets callers pass full specs. Both
+                    // must work — the previous fix assumed JObject and crashed on JValue.
+                    string? paramName;
+                    string? heading = null;
+                    bool isHidden = false;
+                    if (fieldSpec is JValue jv && jv.Type == JTokenType.String)
+                    {
+                        paramName = jv.Value<string>();
+                    }
+                    else if (fieldSpec is JObject jo)
+                    {
+                        paramName = jo["parameterName"]?.Value<string>();
+                        heading = jo["heading"]?.Value<string>();
+                        isHidden = jo["isHidden"]?.Value<bool>() ?? false;
+                    }
+                    else
+                    {
+                        skippedFields.Add(new { parameterName = (string?)null, reason = "InvalidSpec" });
+                        continue;
+                    }
+
                     if (string.IsNullOrEmpty(paramName))
                     {
                         skippedFields.Add(new { parameterName = (string?)null, reason = "EmptyName" });
@@ -102,10 +125,8 @@ public class CreateScheduleTool : ICortexTool
                     if (sf != null)
                     {
                         var field = schedule.Definition.AddField(sf);
-                        var heading = fieldSpec["heading"]?.Value<string>();
                         if (!string.IsNullOrEmpty(heading))
                             field.ColumnHeading = heading;
-                        var isHidden = fieldSpec["isHidden"]?.Value<bool>() ?? false;
                         field.IsHidden = isHidden;
                         addedFields.Add(paramName!);
                     }
