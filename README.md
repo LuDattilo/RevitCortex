@@ -1,19 +1,28 @@
 # RevitCortex
 
-**MCP (Model Context Protocol) server** for Autodesk Revit with 157 tools, typed errors, session state, and dynamic tool discovery. Pure C# — no Node.js required.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Revit](https://img.shields.io/badge/Revit-2023%E2%80%932027-blue)](#supported-revit-versions)
+[![Latest Release](https://img.shields.io/github/v/release/LuDattilo/revitcortex-releases?label=release)](https://github.com/LuDattilo/revitcortex-releases/releases/latest)
 
-RevitCortex lets Claude (or any MCP-compatible LLM) read, create, modify, and analyze Revit models in real time -- from querying elements and parameters to creating views, sheets, schedules, and running full audit workflows.
+**MCP (Model Context Protocol) server** for Autodesk Revit with 173 tools, typed errors, session state, and dynamic tool discovery. Pure C# — no Node.js required.
+
+RevitCortex lets Claude, GPT, Gemini, or **any MCP-compatible LLM** (Claude Desktop, Claude Code, Codex CLI, Opencode, Cursor, Continue, Cline, Gemini CLI, …) read, create, modify, and analyze Revit models in real time — from querying elements and parameters to creating views, sheets, schedules, IFC pipelines, Power BI live integration, and full audit workflows.
 
 ## Features
 
-- **157 MCP tools** across 15 categories: Elements, Views, Sheets, Schedules, Parameters, Materials, Creation, Export, Audit, Workflows, IFC, Links, Journal, Code, and Meta
-- **Pure C# architecture** -- MCP server and Revit plugin both in C#, no Node.js dependency
-- **Typed results** -- every tool returns `CortexResult<T>` with structured error codes, not raw strings
-- **Session state** -- `CortexSession` persists data across tool calls within a session
-- **Dynamic tools** -- tools auto-hide when the active document doesn't support them
-- **Multi-locale** -- detects Revit language (EN, IT, FR, DE) and adapts parameter/category names
-- **Confirmation dialogs** -- destructive operations show a native Revit TaskDialog before executing
-- **Multi-version** -- supports Revit 2023, 2024, 2025, and 2026
+- **173 MCP tools** across 15+ categories: Elements, Views, Sheets, Schedules, Parameters, Materials, Creation, Export, Audit, Workflows, IFC, Links, Power BI, Journal, Code, and Meta
+- **Pure C# architecture** — MCP server and Revit plugin both in C#, no Node.js dependency
+- **Typed results** — every tool returns `CortexResult<T>` with structured error codes, not raw strings
+- **Session state** — `CortexSession` persists data across tool calls within a session
+- **Dynamic tools** — tools auto-hide when the active document doesn't support them
+- **Multi-locale** — detects Revit language (EN, IT, FR, DE) and adapts parameter/category names
+- **Confirmation dialogs** — destructive operations show a native Revit TaskDialog before executing
+- **Multi-version** — supports Revit **2023, 2024, 2025, 2026, and 2027**
+- **Power BI live integration** — push selection/elements/schedules to Power BI datasets, custom visual with cross-filter sync
+- **IFC native reconstruction** — analyze IFC DirectShapes and rebuild them as native Revit elements
+- **Sandboxed code execution** — `send_code_to_revit` validates user code against a namespace block-list
+- **Audit log** — every tool invocation appended to `~/.revitcortex/audit.jsonl`
+- **Read-only mode** — global switch in settings blocks all write tools
 
 ---
 
@@ -30,34 +39,50 @@ RevitCortex lets Claude (or any MCP-compatible LLM) read, create, modify, and an
 - [Settings](#settings)
 - [Building from Source](#building-from-source)
 - [Troubleshooting](#troubleshooting)
+- [Supported Revit Versions](#supported-revit-versions)
+- [Contributing](#contributing)
+- [Security](#security)
 - [License](#license)
 
 ---
 
 ## Prerequisites
 
+### Runtime (end users — install ZIP only)
+
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| **Autodesk Revit** | 2023, 2024, 2025, or 2026 | Any edition (LT not supported) |
-| **.NET SDK** | 8.0+ | For building the MCP server and Revit 2025/2026 plugin |
-| **.NET Framework** | 4.8 | For building Revit 2023/2024 targets (included in Windows 10+) |
-| **Git** | 2.30+ | For cloning the repository |
+| **Autodesk Revit** | 2023, 2024, 2025, 2026, or 2027 | Any edition (LT not supported) |
 | **Windows** | 10 or 11 | Revit is Windows-only |
+| **.NET Desktop Runtime** | 8.0+ (R25/R26), 10.0+ (R27) | R23/R24 use the .NET Framework 4.8 bundled with Windows |
+| **PowerShell** | 5.1+ | Bundled with Windows, used by the installer |
+
+### Build prerequisites (developers — build from source)
+
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| **.NET SDK** | 8.0+ | Builds the MCP server and Revit 2025/2026 plugin |
+| **.NET SDK** | 10.0+ | Required only for Revit 2027 builds |
+| **.NET Framework Targeting Pack** | 4.8 | Builds Revit 2023/2024 plugin |
+| **Git** | 2.30+ | Cloning the repository |
+| **Visual Studio 2022** (optional) | 17.8+ | For C# debugging |
 
 ### MCP Client (one of)
 
-| Client | Notes |
-|--------|-------|
-| **Claude Desktop** | Recommended for end users |
-| **Claude Code** | CLI-based, for developers |
-| Any MCP-compatible client | Must support stdio transport |
+RevitCortex speaks **standard MCP stdio**. Any MCP-compatible client works:
 
-### Optional
-
-| Requirement | Purpose |
-|-------------|---------|
-| **Visual Studio 2022** | For C# debugging and development |
-| **PowerShell 5.1+** | For the deploy script (included in Windows) |
+| Client | Status | Notes |
+|--------|--------|-------|
+| **Claude Desktop** | ✅ Recommended | Anthropic desktop app, edit `claude_desktop_config.json` |
+| **Claude Code** | ✅ Tested | Anthropic CLI for developers |
+| **Codex CLI** | ✅ Tested | OpenAI's local coding CLI (GPT-5) |
+| **Opencode** | ✅ Tested | Open-source TUI ([sst/opencode](https://github.com/sst/opencode)) |
+| **Cursor** | ✅ Supported | IDE — MCP via `.cursor/mcp.json` |
+| **Continue** | ✅ Supported | VS Code / JetBrains extension |
+| **Cline** | ✅ Supported | VS Code extension (formerly Claude Dev) |
+| **Gemini CLI** | ✅ Supported | Google's official CLI ([google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)) |
+| **LM Studio / Ollama** | 🟡 Partial | Only if their MCP bridge is enabled |
+| Any other MCP-compatible client | ✅ | Must support **stdio transport** |
 
 ---
 
@@ -95,14 +120,51 @@ All NuGet packages are restored automatically from nuget.org during build.
 
 ## Installation
 
-### 1. Clone the repository
+There are two ways to install RevitCortex:
+
+- **🟢 End-user install (recommended)** — download the latest ZIP from [revitcortex-releases](https://github.com/LuDattilo/revitcortex-releases/releases/latest) and run the bundled installer. No build tools required.
+- **🟠 From source** — clone the repo and build with `dotnet`. Required only for development, debugging, or custom forks.
+
+---
+
+### Option A — End-user install (pre-built ZIP)
+
+1. Go to the public releases page: **[github.com/LuDattilo/revitcortex-releases/releases/latest](https://github.com/LuDattilo/revitcortex-releases/releases/latest)**
+2. Download **`RevitCortex-vX.Y.Z.zip`** and extract it anywhere (e.g. `Desktop\RevitCortex`).
+3. Make sure **Revit is closed** (the installer cannot replace locked DLLs).
+4. Right-click `install.ps1` → **Run with PowerShell** (or from an admin PowerShell):
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\install.ps1
+   ```
+
+5. The installer:
+   - auto-detects every installed Revit version (2023 → 2027)
+   - deploys the matching plugin DLLs to `C:\ProgramData\Autodesk\Revit\Addins\{version}\RevitCortex\`
+   - installs the MCP server to `%USERPROFILE%\.revitcortex\server\`
+   - (optional) writes the MCP entry into `claude_desktop_config.json` automatically
+
+6. Restart Revit. A **RevitCortex** ribbon tab appears with two buttons:
+
+   | Button | Description |
+   |--------|-------------|
+   | **Cortex Switch** | Start/stop the MCP TCP server (off by default) |
+   | **Settings** | Configure port, log level, and tool visibility |
+
+To uninstall: run `uninstall.ps1` from the same folder.
+
+---
+
+### Option B — Build from source
+
+#### 1. Clone the repository
 
 ```bash
 git clone https://github.com/LuDattilo/RevitCortex.git
 cd RevitCortex
 ```
 
-### 2. Build the C# MCP server
+#### 2. Build the C# MCP server
 
 ```bash
 dotnet build src/RevitCortex.Server/RevitCortex.Server.csproj
@@ -110,54 +172,57 @@ dotnet build src/RevitCortex.Server/RevitCortex.Server.csproj
 
 NuGet packages are restored automatically on first build.
 
-### 3. Build the C# Revit plugin
+#### 3. Build the C# Revit plugin
 
 Pick your Revit version. The build configuration format is `{Debug|Release} R{version_short}`:
 
 ```bash
-# Revit 2025 (most common)
-dotnet build -c "Debug R25" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
-
-# Or for other versions:
 dotnet build -c "Debug R23" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2023
 dotnet build -c "Debug R24" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2024
+dotnet build -c "Debug R25" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2025
 dotnet build -c "Debug R26" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2026
+dotnet build -c "Debug R27" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # Revit 2027 (requires .NET SDK 10+)
 ```
 
-NuGet packages are restored automatically on first build.
-
-### 4. Deploy to Revit
-
-The deploy script publishes the plugin and copies it to the Revit add-ins folder:
+#### 4. Deploy to Revit
 
 ```powershell
 # Default: Revit 2025, Debug
 powershell -ExecutionPolicy Bypass -File deploy.ps1
 
 # Specify version and config
-powershell -ExecutionPolicy Bypass -File deploy.ps1 -RevitVersion 2024
-powershell -ExecutionPolicy Bypass -File deploy.ps1 -RevitVersion 2025 -Config Release
+powershell -ExecutionPolicy Bypass -File deploy.ps1 -RevitVersion 2027 -Config Release
 ```
 
-**What the script does:**
-1. Publishes `RevitCortex.Plugin` and `RevitCortex.Tools` to `publish/R{version}/`
-2. Copies all DLLs to `C:\ProgramData\Autodesk\Revit\Addins\{version}\RevitCortex\`
-3. Copies the `.addin` manifest to `C:\ProgramData\Autodesk\Revit\Addins\{version}\`
-
-### 5. Restart Revit
-
-After deploying, restart Revit. A **RevitCortex** tab appears in the ribbon with three buttons:
-
-| Button | Description |
-|--------|-------------|
-| **Cortex Switch** | Start/stop the MCP TCP server (off by default) |
-| **Settings** | Configure port, log level, and tool visibility |
+The script publishes the plugin, copies DLLs to the Revit add-ins folder, and installs the `.addin` manifest. **Restart Revit** afterwards.
 
 ---
 
 ## Configuration
 
-### MCP Client Setup
+### Where is the MCP server executable?
+
+After the **ZIP installer** runs, the standalone MCP server lives at:
+
+```
+%USERPROFILE%\.revitcortex\server\RevitCortex.Server.exe
+```
+
+After a **from-source** build, use either:
+
+```
+C:\path\to\RevitCortex\src\RevitCortex.Server\bin\Debug\net8.0\RevitCortex.Server.exe
+```
+
+or `dotnet run --project <path-to-RevitCortex.Server>`.
+
+All examples below assume the installer path. Substitute your own if you built from source.
+
+---
+
+### MCP Client Setup — choose your client
+
+> ⚠️ **Common gotcha**: all paths in MCP configs must be **absolute**. Tilde (`~`) and `%USERPROFILE%` are **not expanded** by every client — write the literal path (`C:\Users\<you>\.revitcortex\server\RevitCortex.Server.exe`).
 
 #### Claude Desktop
 
@@ -167,36 +232,142 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 {
   "mcpServers": {
     "revitcortex": {
-      "command": "dotnet",
-      "args": ["run", "--project", "C:/absolute/path/to/RevitCortex/src/RevitCortex.Server"]
+      "command": "C:\\Users\\<you>\\.revitcortex\\server\\RevitCortex.Server.exe"
     }
   }
 }
 ```
 
-#### Claude Code
+Restart Claude Desktop. The installer can write this entry for you automatically.
 
-Add to your project's `.mcp.json` or configure globally with `claude mcp add`:
+#### Claude Code (CLI)
+
+One-liner:
+
+```bash
+claude mcp add revitcortex "C:\Users\<you>\.revitcortex\server\RevitCortex.Server.exe"
+```
+
+Or add to a project's `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "revitcortex": {
-      "command": "dotnet",
-      "args": ["run", "--project", "C:/absolute/path/to/RevitCortex/src/RevitCortex.Server"]
+      "command": "C:\\Users\\<you>\\.revitcortex\\server\\RevitCortex.Server.exe"
     }
   }
 }
 ```
 
-#### Connection Checklist
+#### Codex CLI (OpenAI)
 
-Before using any tool, ensure:
+Edit `%USERPROFILE%\.codex\config.toml`:
+
+```toml
+[mcp_servers.revitcortex]
+command = "C:\\Users\\<you>\\.revitcortex\\server\\RevitCortex.Server.exe"
+```
+
+Then `codex` will discover RevitCortex automatically. Verify with `/mcp` inside Codex.
+
+#### Opencode (sst/opencode)
+
+Edit `%USERPROFILE%\.config\opencode\opencode.json` (or `~/.opencode/opencode.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "revitcortex": {
+      "type": "local",
+      "command": ["C:\\Users\\<you>\\.revitcortex\\server\\RevitCortex.Server.exe"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Restart Opencode. Run `/mcp` to verify the 173 tools are registered.
+
+#### Cursor
+
+Create `.cursor/mcp.json` in your project (or `%USERPROFILE%\.cursor\mcp.json` for global):
+
+```json
+{
+  "mcpServers": {
+    "revitcortex": {
+      "command": "C:\\Users\\<you>\\.revitcortex\\server\\RevitCortex.Server.exe"
+    }
+  }
+}
+```
+
+Reload Cursor → Settings → MCP, you should see RevitCortex listed.
+
+#### Continue (VS Code / JetBrains)
+
+Edit `~\.continue\config.yaml`:
+
+```yaml
+mcpServers:
+  - name: revitcortex
+    command: C:\Users\<you>\.revitcortex\server\RevitCortex.Server.exe
+```
+
+#### Cline (VS Code)
+
+In the Cline sidebar → **MCP Servers** → **Configure MCP Servers** and add:
+
+```json
+{
+  "mcpServers": {
+    "revitcortex": {
+      "command": "C:\\Users\\<you>\\.revitcortex\\server\\RevitCortex.Server.exe",
+      "disabled": false
+    }
+  }
+}
+```
+
+#### Gemini CLI (Google)
+
+Edit `%USERPROFILE%\.gemini\settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "revitcortex": {
+      "command": "C:\\Users\\<you>\\.revitcortex\\server\\RevitCortex.Server.exe"
+    }
+  }
+}
+```
+
+Then in `gemini` run `/mcp list` to confirm registration.
+
+#### Generic stdio MCP client
+
+Any client that supports MCP stdio works:
+
+```
+command: C:\Users\<you>\.revitcortex\server\RevitCortex.Server.exe
+args:    []   (none required)
+env:     (optional) REVITCORTEX_PORT=8080
+```
+
+---
+
+### Connection Checklist
+
+Before invoking any tool, ensure:
 
 1. **Revit is running** with a document open
-2. **Cortex Switch is ON** -- click it in the RevitCortex ribbon tab
-3. The MCP server is running (Claude Desktop/Code starts it automatically)
-4. Default TCP port is **8080** (configurable in Settings)
+2. **Cortex Switch is ON** — click it in the RevitCortex ribbon tab (server is **off by default**)
+3. The MCP server is reachable (your MCP client launches it automatically via stdio)
+4. Default TCP port between MCP server ↔ Plugin is **8080** (configurable in Settings)
+5. If you have a firewall prompt the first time, allow **localhost** access — RevitCortex never exposes anything off-machine
 
 ---
 
@@ -204,7 +375,7 @@ Before using any tool, ensure:
 
 ### Via MCP Client (Claude Desktop / Claude Code)
 
-Once configured, Claude has access to all 157 tools. Examples:
+Once configured, your LLM has access to all 173 tools. Examples:
 
 | Request | Tools Used |
 |---------|-----------|
@@ -605,6 +776,7 @@ dotnet build -c "Debug R23" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
 dotnet build -c "Debug R24" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
 dotnet build -c "Debug R25" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
 dotnet build -c "Debug R26" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
+dotnet build -c "Debug R27" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj   # needs .NET SDK 10+
 ```
 
 ---
@@ -625,9 +797,22 @@ dotnet build -c "Debug R26" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
 
 ### Build errors for specific Revit version
 
-1. Ensure you have the correct .NET SDK installed (8.0+ for R25/R26, Framework 4.8 for R23/R24)
-2. Run `dotnet restore` before building
-3. Check that `nuget.config` points to `https://api.nuget.org/v3/index.json`
+1. Ensure you have the correct .NET SDK installed:
+   - **R23/R24** — .NET Framework 4.8 targeting pack
+   - **R25/R26** — .NET SDK 8.0+
+   - **R27** — .NET SDK 10.0+ (otherwise `NETSDK1045` "framework not supported")
+2. Run `dotnet restore` before building.
+3. Check that `nuget.config` points to `https://api.nuget.org/v3/index.json`.
+
+### MCP client doesn't see RevitCortex tools
+
+1. Run the executable manually to confirm it starts: `& "C:\Users\<you>\.revitcortex\server\RevitCortex.Server.exe"` — it should print MCP handshake lines.
+2. Use **absolute paths** in your MCP config — `~` / `%USERPROFILE%` are not always expanded.
+3. Check the client's MCP log:
+   - Claude Desktop → `%APPDATA%\Claude\logs\mcp*.log`
+   - Codex CLI → `~/.codex/log/`
+   - Opencode → `~/.local/share/opencode/log/` (or `%LOCALAPPDATA%\opencode\log\` on Windows)
+4. Server log: `~/.revitcortex/logs/mcp-server-revitcortex.log` — if you see "No frameworks were found", the publish mode is inconsistent. Re-run the ZIP installer.
 
 ### Revit freezes when executing a tool
 
@@ -644,17 +829,47 @@ dotnet build -c "Debug R26" src/RevitCortex.Plugin/RevitCortex.Plugin.csproj
 |---------|-------------|---------------------|
 | 2023 | net48 | `REVIT2023_OR_GREATER` |
 | 2024 | net48 | `REVIT2023_OR_GREATER`, `REVIT2024_OR_GREATER` |
-| 2025 | net8.0-windows | `REVIT2023_OR_GREATER`, `REVIT2024_OR_GREATER`, `REVIT2025_OR_GREATER` |
-| 2026 | net8.0-windows | `REVIT2023_OR_GREATER`, `REVIT2024_OR_GREATER`, `REVIT2025_OR_GREATER`, `REVIT2026_OR_GREATER` |
+| 2025 | net8.0-windows | `REVIT2023_OR_GREATER` … `REVIT2025_OR_GREATER` |
+| 2026 | net8.0-windows | `REVIT2023_OR_GREATER` … `REVIT2026_OR_GREATER` |
+| 2027 | net10.0-windows | `REVIT2023_OR_GREATER` … `REVIT2027_OR_GREATER` |
 
 API differences (e.g., `ElementId.Value` vs `.IntegerValue`) are handled via `#if` directives.
+
+> Building **R27** locally requires a .NET SDK **≥ 10**. `global.json` pins to SDK 8 with `rollForward: latestMajor`, so SDK 11 preview (or any future SDK) is accepted automatically when SDK 10 is absent.
+
+---
+
+## Contributing
+
+Contributions are welcome — issues, PRs, and ideas.
+
+1. Fork the repo and create a feature branch.
+2. Build **all** target Revit versions before opening a PR (`Debug R23` → `Debug R27`). See [CLAUDE.md](CLAUDE.md) for cross-target gotchas (`record`, `init`, `Range/Index`, etc.).
+3. Run the test suite: `dotnet test -c "Debug R25"`.
+4. Update [tool-schemas.txt](tool-schemas.txt) (`node server/generate-tool-schemas-csharp.mjs`) and any affected docs (`README.md`, `docs/USER_GUIDE.md`, `WORKFLOWS.md`).
+
+For deep AI-assistant context (locale mappings, tool-specific corrections, performance notes) see [CLAUDE.md](CLAUDE.md) and [WORKFLOWS.md](WORKFLOWS.md).
+
+---
+
+## Security
+
+RevitCortex runs **fully on-machine**. The MCP server ↔ Plugin bridge listens only on **localhost** and is **off by default**. See [docs/SECURITY.md](docs/SECURITY.md) for the full threat model, including:
+
+- Namespace block-list enforced by `CodeSandbox` before any `send_code_to_revit` execution.
+- Append-only audit log at `~/.revitcortex/audit.jsonl`.
+- Global `readOnlyMode` switch in `~/.revitcortex/settings.json`.
+
+Found a vulnerability? Email **luigi.dattilo@gpapartners.com** — please do not open a public issue.
 
 ---
 
 ## License
 
-Private -- All rights reserved.
+[MIT](LICENSE) © 2026 Luigi Dattilo
 
 ## Author
 
-**Luigi Dattilo**
+**Luigi Dattilo** — [@LuDattilo](https://github.com/LuDattilo)
+
+Built at [GPA S.r.l.](https://www.gpapartners.com) — engineering & BIM.
