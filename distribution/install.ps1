@@ -169,6 +169,29 @@ if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
 
 Write-Host "  Server installed: $serverExe" -ForegroundColor Green
 
+# AI Skill — install RevitCortex skill to user-level paths
+# Guard on client root (.claude / .codex) existing: if the user doesn't have
+# the client at all we skip (no profile pollution). If the client root exists
+# but skills/ doesn't yet, we create it — first-time skill install must work.
+$skillSrc = Join-Path $PSScriptRoot "ai-skills\revitcortex"
+if (Test-Path $skillSrc) {
+    $skillTargets = @(
+        @{ ClientRoot = (Join-Path $env:USERPROFILE ".claude");  Target = (Join-Path $env:USERPROFILE ".claude\skills\revitcortex");  Name = "Claude Code" },
+        @{ ClientRoot = (Join-Path $env:USERPROFILE ".codex");   Target = (Join-Path $env:USERPROFILE ".codex\skills\revitcortex");   Name = "Codex CLI" }
+    )
+    foreach ($entry in $skillTargets) {
+        if (Test-Path $entry.ClientRoot) {
+            if (-not (Test-Path $entry.Target)) { New-Item -ItemType Directory -Path $entry.Target -Force | Out-Null }
+            Copy-Item "$skillSrc\*" $entry.Target -Recurse -Force
+            Write-Host "  Installed skill -> $($entry.Target)"
+        } else {
+            Write-Host "  Skipped skill install ($($entry.Name) not detected at $($entry.ClientRoot))"
+        }
+    }
+} else {
+    Write-Host "  ai-skills not bundled — skipping skill install"
+}
+
 # --- Step 4: Ensure Git (needed by Claude Code for many workflows) ---
 Write-Host ""
 Write-Host "[4/5] Checking Git..." -ForegroundColor Yellow

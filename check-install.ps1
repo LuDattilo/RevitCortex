@@ -53,3 +53,19 @@ foreach ($ver in $versions) {
 if (-not $anyDup) {
     Write-Host "No shadow installs detected." -ForegroundColor Green
 }
+
+# Skill installation check
+$skillPaths = @(
+    @{ Name = "Claude Code"; Path = (Join-Path $env:USERPROFILE ".claude\skills\revitcortex\SKILL.md") },
+    @{ Name = "Codex CLI";   Path = (Join-Path $env:USERPROFILE ".codex\skills\revitcortex\SKILL.md") }
+)
+$anyFound = $false
+foreach ($entry in $skillPaths) {
+    if (Test-Path $entry.Path) {
+        Write-Host "  OK skill installed for $($entry.Name): $($entry.Path)" -ForegroundColor Green
+        $anyFound = $true
+    }
+}
+if (-not $anyFound) {
+    Write-Host "  ! AI skill not installed in any client (.claude/.codex). Reinstall or copy ai-skills/revitcortex/ manually." -ForegroundColor Yellow
+}
