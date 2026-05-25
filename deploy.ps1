@@ -71,6 +71,24 @@ $AddinSource = Join-Path $RepoRoot "src\RevitCortex.Plugin\RevitCortex.addin"
 Copy-Item $AddinSource $AddInsDir -Force
 
 $dllCount = (Get-ChildItem "$TargetDir\*.dll").Count
+
+# --- AI Skill: keep dev-installed skill in sync with the repo ---
+# Same guard as distribution/install.ps1: only install if client root exists.
+$skillSrc = Join-Path $RepoRoot "ai-skills\revitcortex"
+if (Test-Path $skillSrc) {
+    $skillTargets = @(
+        @{ ClientRoot = (Join-Path $env:USERPROFILE ".claude");  Target = (Join-Path $env:USERPROFILE ".claude\skills\revitcortex");  Name = "Claude Code" },
+        @{ ClientRoot = (Join-Path $env:USERPROFILE ".codex");   Target = (Join-Path $env:USERPROFILE ".codex\skills\revitcortex");   Name = "Codex CLI" }
+    )
+    foreach ($entry in $skillTargets) {
+        if (Test-Path $entry.ClientRoot) {
+            if (-not (Test-Path $entry.Target)) { New-Item -ItemType Directory -Path $entry.Target -Force | Out-Null }
+            Copy-Item "$skillSrc\*" $entry.Target -Recurse -Force
+            Write-Host "Skill synced -> $($entry.Target)" -ForegroundColor Green
+        }
+    }
+}
+
 Write-Host "`n=== Deploy complete ===" -ForegroundColor Green
 Write-Host "$dllCount DLLs deployed to $TargetDir"
 Write-Host ".addin manifest copied to $AddInsDir\RevitCortex.addin"

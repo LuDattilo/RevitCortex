@@ -115,6 +115,22 @@ Write-Host ""
 Write-Host "=== Summary ===" -ForegroundColor Cyan
 $summary | Format-Table -AutoSize
 
+# --- AI Skill: sync once, cross-year ---
+$skillSrc = Join-Path $PSScriptRoot "ai-skills\revitcortex"
+if (Test-Path $skillSrc) {
+    $skillTargets = @(
+        @{ ClientRoot = (Join-Path $env:USERPROFILE ".claude");  Target = (Join-Path $env:USERPROFILE ".claude\skills\revitcortex");  Name = "Claude Code" },
+        @{ ClientRoot = (Join-Path $env:USERPROFILE ".codex");   Target = (Join-Path $env:USERPROFILE ".codex\skills\revitcortex");   Name = "Codex CLI" }
+    )
+    foreach ($entry in $skillTargets) {
+        if (Test-Path $entry.ClientRoot) {
+            if (-not (Test-Path $entry.Target)) { New-Item -ItemType Directory -Path $entry.Target -Force | Out-Null }
+            Copy-Item "$skillSrc\*" $entry.Target -Recurse -Force
+            Write-Host "Skill synced -> $($entry.Target)" -ForegroundColor Green
+        }
+    }
+}
+
 # Reminder about machine-scope
 $staleScopes = @()
 foreach ($year in $Years) {
