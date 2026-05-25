@@ -170,20 +170,22 @@ if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
 Write-Host "  Server installed: $serverExe" -ForegroundColor Green
 
 # AI Skill — install RevitCortex skill to user-level paths
+# Guard on client root (.claude / .codex) existing: if the user doesn't have
+# the client at all we skip (no profile pollution). If the client root exists
+# but skills/ doesn't yet, we create it — first-time skill install must work.
 $skillSrc = Join-Path $PSScriptRoot "ai-skills\revitcortex"
 if (Test-Path $skillSrc) {
     $skillTargets = @(
-        (Join-Path $env:USERPROFILE ".claude\skills\revitcortex"),
-        (Join-Path $env:USERPROFILE ".codex\skills\revitcortex")
+        @{ ClientRoot = (Join-Path $env:USERPROFILE ".claude");  Target = (Join-Path $env:USERPROFILE ".claude\skills\revitcortex");  Name = "Claude Code" },
+        @{ ClientRoot = (Join-Path $env:USERPROFILE ".codex");   Target = (Join-Path $env:USERPROFILE ".codex\skills\revitcortex");   Name = "Codex CLI" }
     )
-    foreach ($target in $skillTargets) {
-        $parent = Split-Path $target -Parent
-        if (Test-Path $parent) {
-            if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target | Out-Null }
-            Copy-Item "$skillSrc\*" $target -Recurse -Force
-            Write-Host "  Installed skill -> $target"
+    foreach ($entry in $skillTargets) {
+        if (Test-Path $entry.ClientRoot) {
+            if (-not (Test-Path $entry.Target)) { New-Item -ItemType Directory -Path $entry.Target -Force | Out-Null }
+            Copy-Item "$skillSrc\*" $entry.Target -Recurse -Force
+            Write-Host "  Installed skill -> $($entry.Target)"
         } else {
-            Write-Host "  Skipped skill install (parent missing): $parent"
+            Write-Host "  Skipped skill install ($($entry.Name) not detected at $($entry.ClientRoot))"
         }
     }
 } else {
