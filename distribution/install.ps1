@@ -169,6 +169,27 @@ if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
 
 Write-Host "  Server installed: $serverExe" -ForegroundColor Green
 
+# AI Skill — install RevitCortex skill to user-level paths
+$skillSrc = Join-Path $PSScriptRoot "ai-skills\revitcortex"
+if (Test-Path $skillSrc) {
+    $skillTargets = @(
+        (Join-Path $env:USERPROFILE ".claude\skills\revitcortex"),
+        (Join-Path $env:USERPROFILE ".codex\skills\revitcortex")
+    )
+    foreach ($target in $skillTargets) {
+        $parent = Split-Path $target -Parent
+        if (Test-Path $parent) {
+            if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target | Out-Null }
+            Copy-Item "$skillSrc\*" $target -Recurse -Force
+            Write-Host "  Installed skill -> $target"
+        } else {
+            Write-Host "  Skipped skill install (parent missing): $parent"
+        }
+    }
+} else {
+    Write-Host "  ai-skills not bundled — skipping skill install"
+}
+
 # --- Step 4: Ensure Git (needed by Claude Code for many workflows) ---
 Write-Host ""
 Write-Host "[4/5] Checking Git..." -ForegroundColor Yellow
