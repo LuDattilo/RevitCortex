@@ -87,6 +87,17 @@ Copy-Item (Join-Path $RepoRoot "distribution\lib\*") $libTarget -Recurse -Force
 # .addin manifest
 Copy-Item (Join-Path $RepoRoot "src\RevitCortex.Plugin\RevitCortex.addin") $ReleaseDir
 
+# AI Skill knowledge base — copy ai-skills/ into release/ai-skills/
+$skillSource = Join-Path $RepoRoot "ai-skills"
+$skillTarget = Join-Path $ReleaseDir "ai-skills"
+if (Test-Path $skillSource) {
+    if (-not (Test-Path $skillTarget)) { New-Item -ItemType Directory -Path $skillTarget | Out-Null }
+    Copy-Item "$skillSource\*" $skillTarget -Recurse -Force
+    Write-Ok "Copied ai-skills/ into release"
+} else {
+    Write-Warn "ai-skills/ not found — skipping skill packaging"
+}
+
 # Config templates
 $templatesTarget = Join-Path $ReleaseDir "config-templates"
 New-Item -ItemType Directory -Path $templatesTarget -Force | Out-Null
