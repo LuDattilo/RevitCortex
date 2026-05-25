@@ -1,1 +1,14 @@
-# TBD — Task 13 (placeholder, popolato in batch successivo)
+# Codex CLI agent metadata for the 'revitcortex' skill.
+# Mirror of SKILL.md frontmatter. Used only when the skill is installed
+# in $CODEX_HOME/skills/. Claude Code reads SKILL.md directly.
+
+name: revitcortex
+description: |
+  Use when working with RevitCortex operations, MCP tool workflows,
+  Revit model automation, or RevitCortex C# development. Routes Codex
+  to focused references for model operations, safe write workflows,
+  send_code_to_revit escalation, IFC, PowerBI, Obsidian, tool development,
+  net48/net8 compatibility, audit/read-only security, and build/test checks.
+
+references_dir: references
+entrypoint: SKILL.md
