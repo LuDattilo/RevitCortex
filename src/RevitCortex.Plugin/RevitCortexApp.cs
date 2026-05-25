@@ -23,6 +23,7 @@ public class RevitCortexApp : IExternalApplication
     private UIApplication? _uiApplication;
     private int _port = 8080;
     private Autodesk.Revit.UI.PushButton? _connectButton;
+    private Autodesk.Revit.UI.PushButton? _stopAutoButton;
     private bool _updateNotificationShown;
     private PbiSelectHttpListener? _pbiSelectListener;
     private PbiActionEventHandler? _pbiActionHandler;
@@ -64,6 +65,7 @@ public class RevitCortexApp : IExternalApplication
     public int Port => _port;
     public UIApplication? UiApplication => _uiApplication;
     public CortexRouter? Router => _router;
+    public CortexSession? Session => _session;
 
     public Result OnStartup(UIControlledApplication application)
     {
@@ -77,7 +79,9 @@ public class RevitCortexApp : IExternalApplication
             // Initialize session, router, and tools
             var store = new SessionStore();
             _session = new CortexSession(store);
-            _session.ConfirmAction = ConfirmationHelper.Confirm;
+            _session.ConfirmAction = (action, count, desc) =>
+                ConfirmationHelper.ConfirmWithSession(action, count, desc, _session);
+            ConfirmationHelper.AutoModeChanged += OnAutoModeChanged;
             var analyzer = new DocumentAnalyzer();
 
             _router = new CortexRouter(_session, analyzer);
@@ -147,6 +151,7 @@ public class RevitCortexApp : IExternalApplication
     {
         try
         {
+            ConfirmationHelper.AutoModeChanged -= OnAutoModeChanged;
             _pbiSelectListener?.Dispose();
             _pbiSelectListener = null;
             _socketService?.Stop();
@@ -265,6 +270,21 @@ public class RevitCortexApp : IExternalApplication
             : "Start RevitCortex server";
     }
 
+    /// <summary>
+    /// Called when Auto mode is activated or deactivated. Updates the ribbon button
+    /// so it is enabled (and visually prominent) only while Auto is active.
+    /// </summary>
+    private void OnAutoModeChanged(bool active)
+    {
+        if (_stopAutoButton == null) return;
+        _stopAutoButton.Enabled = active;
+        _stopAutoButton.Image = IconFactory.CreateStopAutoIcon(16, active);
+        _stopAutoButton.LargeImage = IconFactory.CreateStopAutoIcon(32, active);
+        _stopAutoButton.ToolTip = active
+            ? "Auto mode ON — click to stop and resume confirmation dialogs"
+            : "Auto mode is not active";
+    }
+
     private void CreateRibbonPanel(UIControlledApplication application)
     {
         RibbonPanel panel = application.CreateRibbonPanel("RevitCortex");
@@ -314,6 +334,17 @@ public class RevitCortexApp : IExternalApplication
         supportBtn.Image = IconFactory.CreateSupportIcon(16);
         supportBtn.LargeImage = IconFactory.CreateSupportIcon(32);
         panel.AddItem(supportBtn);
+
+        // Stop Auto Mode button — visible only when Auto mode is active
+        var stopAutoBtn = new PushButtonData(
+            "ID_CORTEX_STOP_AUTO", "Stop\r\nAuto",
+            assemblyLocation, "RevitCortex.Plugin.Commands.StopAutoMode");
+        stopAutoBtn.ToolTip = "Stop Auto mode — resume confirmation dialogs for destructive operations";
+        stopAutoBtn.Image = IconFactory.CreateStopAutoIcon(16);
+        stopAutoBtn.LargeImage = IconFactory.CreateStopAutoIcon(32);
+        _stopAutoButton = panel.AddItem(stopAutoBtn) as Autodesk.Revit.UI.PushButton;
+        if (_stopAutoButton != null)
+            _stopAutoButton.Enabled = false; // hidden/disabled until Auto is activated
     }
 
     private void OnDocumentOpened(object? sender, DocumentOpenedEventArgs args)

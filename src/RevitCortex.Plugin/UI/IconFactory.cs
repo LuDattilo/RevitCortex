@@ -188,6 +188,22 @@ public static class IconFactory
         });
     }
 
+    /// <summary>
+    /// Stop Auto icon: red square (stop symbol) on a dark-red background when active,
+    /// gray when inactive.
+    /// </summary>
+    public static BitmapSource CreateStopAutoIcon(int size, bool isActive = true)
+    {
+        var bg = isActive
+            ? Color.FromRgb(183, 28, 28)   // #B71C1C deep red
+            : InactiveGray;
+        return CreateIconWithDrawing(size, bg, (dc, s) =>
+        {
+            double m = s * 0.28;
+            dc.DrawRectangle(Brushes.White, null, new Rect(m, m, s - 2 * m, s - 2 * m));
+        });
+    }
+
     private static Point PointOnCircle(Point center, double radius, double angle)
     {
         return new Point(

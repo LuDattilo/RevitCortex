@@ -75,6 +75,19 @@ public class CortexSession
     private bool _approveAll;
     private DateTime _approveAllTimestamp;
 
+    /// <summary>
+    /// When true, all subsequent confirmations are auto-approved indefinitely.
+    /// Set by "Auto" in the confirmation dialog. Cleared by the user via the
+    /// ribbon "Stop Auto" button or on document close (Reinitialize).
+    /// Unlike ApproveAll, this has no timeout.
+    /// </summary>
+    public bool AutoMode
+    {
+        get { lock (_approveAllLock) { return _autoMode; } }
+        set { lock (_approveAllLock) { _autoMode = value; } }
+    }
+    private bool _autoMode;
+
     public CortexSession(ISessionStore store)
         : this(store, new ToolResultCache())
     {
@@ -100,11 +113,13 @@ public class CortexSession
         // drop them all on document boundary.
         Cache.InvalidateAll();
         BumpDocumentVersion();
+        AutoMode = false;
     }
 
     /// <summary>
     /// Ask user to confirm a destructive operation. Returns true if confirmed or no callback set.
-    /// If "Yes to All" was previously clicked, auto-approves without showing dialog.
+    /// If "Yes to All" was previously clicked, auto-approves for 120 s.
+    /// If "Auto" mode is active, auto-approves indefinitely until the user clicks Stop Auto.
     /// </summary>
     /// <param name="action">Action verb: "delete", "rename", "replace compound structure", etc.</param>
     /// <param name="elementCount">Number of elements affected.</param>
@@ -112,6 +127,7 @@ public class CortexSession
     public bool RequestConfirmation(string action, int elementCount, string? description = null)
     {
         if (elementCount <= 0) return true;
+        if (AutoMode) return true;
         if (ApproveAll) return true;
 
         var result = ConfirmAction?.Invoke(action, elementCount, description);
@@ -121,14 +137,23 @@ public class CortexSession
             ApproveAll = true;
             return true;
         }
+        if (result == false) return false;
+
+        // Check for Auto sentinel: ConfirmAction returns false with a special
+        // convention would be complex — instead ConfirmationHelper sets AutoMode
+        // directly on the session. Check again after the dialog.
+        if (AutoMode) return true;
+
         return result.Value;
     }
 
     /// <summary>
-    /// Resets the "Approve All" state. Called when a batch operation completes.
+    /// Resets both ApproveAll and AutoMode. Called when a batch operation completes
+    /// or when the user clicks "Stop Auto" in the ribbon.
     /// </summary>
     public void ResetApproveAll()
     {
         ApproveAll = false;
+        AutoMode = false;
     }
 }
