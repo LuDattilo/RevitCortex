@@ -93,9 +93,9 @@ $skillTarget = Join-Path $ReleaseDir "ai-skills"
 if (Test-Path $skillSource) {
     if (-not (Test-Path $skillTarget)) { New-Item -ItemType Directory -Path $skillTarget | Out-Null }
     Copy-Item "$skillSource\*" $skillTarget -Recurse -Force
-    Write-Ok "Copied ai-skills/ into release"
+    Write-Host "  Copied ai-skills/ into release" -ForegroundColor Green
 } else {
-    Write-Warn "ai-skills/ not found — skipping skill packaging"
+    Write-Host "  ai-skills/ not found — skipping skill packaging" -ForegroundColor Yellow
 }
 
 # Config templates
