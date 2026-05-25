@@ -28,6 +28,7 @@ Il problema da risolvere e' la ripetizione di contesto tra sessioni: tool sbagli
 - Ridurre il numero di riletture complete di `AGENTS.md` e `WORKFLOWS.md`.
 - Rendere aggiornabile la knowledge base quando un nuovo workflow viene validato.
 - Separare workflow operativi BIM da workflow di sviluppo RevitCortex.
+- Includere la skill nel pacchetto di distribuzione RevitCortex e installarla insieme al prodotto.
 
 ### 2.2 Obiettivi non funzionali
 
@@ -35,7 +36,7 @@ Il problema da risolvere e' la ripetizione di contesto tra sessioni: tool sbagli
 - Sicurezza: nessuna scorciatoia che bypassi dry-run, conferme o read-only mode.
 - Compatibilita': le istruzioni di sviluppo devono rispettare `Debug R25` e `Debug R24`.
 - Manutenibilita': ogni template deve avere uno scopo chiaro e un proprietario logico.
-- Portabilita': la skill deve poter vivere sia nel repo sia come skill personale installabile.
+- Distribuibilita': la skill deve vivere nel repo, entrare nello ZIP di release e venire installata nei percorsi skill supportati.
 - Tracciabilita': ogni regola importante deve puntare alla fonte originale quando possibile.
 
 ---
@@ -83,7 +84,7 @@ La skill non esegue direttamente operazioni su Revit. La skill decide quale cono
 
 ## 5. Struttura proposta
 
-Per l'MVP, la struttura puo' vivere nel repository sotto una cartella versionabile. In una fase successiva potra' essere installata in `$CODEX_HOME/skills` o nella cartella skill di Claude Code.
+Per l'MVP, la struttura vive nel repository sotto una cartella versionabile e viene inclusa nel pacchetto di distribuzione. L'installer deve copiarla nei percorsi skill supportati per renderla richiamabile automaticamente dall'agente.
 
 La cartella skill deve chiamarsi esattamente come il nome della skill. Per l'MVP il nome raccomandato e' `revitcortex`.
 
@@ -327,24 +328,75 @@ La skill deve rinforzare le protezioni esistenti, non aggirarle.
 
 ---
 
-## 11. Testing e validazione MVP
+## 11. Distribuzione e installazione
+
+La skill fa parte del prodotto RevitCortex. Non deve rimanere un artefatto solo per sviluppatori.
+
+### 11.1 Contenuto release
+
+Lo ZIP di release deve includere:
+
+```
+skills/
+  revitcortex/
+    SKILL.md
+    agents/
+      openai.yaml
+    references/
+      ...
+```
+
+La sorgente resta in `ai-skills/revitcortex/`. Durante il packaging, il contenuto viene copiato in `skills/revitcortex/` dentro la release, accanto a plugin, server e config templates.
+
+### 11.2 Target installazione
+
+L'installer deve installare la skill in questi target quando rilevabili:
+
+| Client | Percorso primario | Fallback |
+|--------|-------------------|----------|
+| Codex | `%CODEX_HOME%\skills\revitcortex` | `%USERPROFILE%\.codex\skills\revitcortex` |
+| Claude Code | `%USERPROFILE%\.claude\skills\revitcortex` | opzionale: skill project-local se supportata |
+
+Se un client non e' presente, l'installer non deve fallire l'installazione principale. Deve solo mostrare un warning sintetico.
+
+### 11.3 Comportamento installer
+
+- Installazione skill abilitata di default.
+- Opzione esplicita per saltare la skill, ad esempio `-SkipAiSkill`, solo per casi amministrati.
+- Copia idempotente: reinstallare la stessa release non deve duplicare file.
+- Pulizia file obsoleti limitata alla cartella target `revitcortex`, mai alla cartella `skills` intera.
+- Nessuna modifica a skill di terze parti.
+- Log installazione con path di destinazione e versione release.
+
+### 11.4 Verifica post-installazione
+
+L'installer o `check-install.ps1` deve verificare:
+
+- `SKILL.md` esiste nel target.
+- `agents/openai.yaml` esiste.
+- La cartella `references/` contiene i template MVP attesi.
+- La descrizione frontmatter contiene trigger per RevitCortex, MCP, Revit operations e C# development.
+
+---
+
+## 12. Testing e validazione MVP
 
 Il valore della skill va misurato con prompt reali, non con demo astratte.
 
-### 11.1 Prompt operativi di test
+### 12.1 Prompt operativi di test
 
 1. "Controlla rapidamente lo stato del modello e dimmi se ci sono warning critici."
 2. "Trova muri con parametro WBS vuoto e prepara aggiornamento massivo."
 3. "Esegui clash rapido tra strutture e muri."
 4. "Esporta dati schedule verso PowerBI e seleziona elementi filtrati."
 
-### 11.2 Prompt sviluppo di test
+### 12.2 Prompt sviluppo di test
 
 1. "Aggiungi un nuovo tool read-only che lista X."
 2. "Aggiungi un tool write con conferma e audit."
 3. "Correggi un errore R24 causato da feature C# moderna."
 
-### 11.3 Metriche
+### 12.3 Metriche
 
 - Numero di template caricati per task.
 - Numero di tool MCP chiamati.
@@ -354,7 +406,7 @@ Il valore della skill va misurato con prompt reali, non con demo astratte.
 
 ---
 
-## 12. Piano MVP consigliato
+## 13. Piano MVP consigliato
 
 ### Fase 1 - Knowledge extraction
 
@@ -366,21 +418,28 @@ Il valore della skill va misurato con prompt reali, non con demo astratte.
 - Creare source map.
 - Generare o aggiornare `agents/openai.yaml` in modo coerente con `SKILL.md`.
 
-### Fase 2 - Trial manuale
+### Fase 2 - Packaging e installer
+
+- Aggiornare lo script di release per includere `skills/revitcortex/`.
+- Aggiornare `deploy.ps1` / installer per copiare la skill nei target Codex e Claude Code.
+- Aggiornare `check-install.ps1` per validare la presenza della skill.
+- Documentare nel log installazione dove e' stata copiata.
+
+### Fase 3 - Trial manuale
 
 - Usare la skill in 3 sessioni reali.
 - Annotare regole mancanti.
 - Correggere template troppo lunghi o troppo vaghi.
 
-### Fase 3 - Hardening
+### Fase 4 - Hardening
 
 - Aggiungere checklist di verifica.
 - Aggiornare `WORKFLOWS.md` quando emergono flussi nuovi.
-- Decidere se installare la skill fuori repo come skill personale.
+- Consolidare il comportamento di update skill nelle release successive.
 
 ---
 
-## 13. Criteri di accettazione
+## 14. Criteri di accettazione
 
 L'MVP e' accettato quando:
 
@@ -391,10 +450,13 @@ L'MVP e' accettato quando:
 - Un task di sviluppo C# ricorda build R25 e R24.
 - `send_code_to_revit` viene trattato come escalation con consenso.
 - La source map permette di capire da dove viene ogni regola.
+- Lo ZIP di release contiene `skills/revitcortex/`.
+- L'installer copia la skill nei target rilevati per Codex e Claude Code.
+- `check-install.ps1` segnala chiaramente se la skill non e' installata.
 
 ---
 
-## 14. Rischi e mitigazioni
+## 15. Rischi e mitigazioni
 
 | Rischio | Mitigazione |
 |--------|-------------|
@@ -404,13 +466,15 @@ L'MVP e' accettato quando:
 | Skill troppo lenta | Router breve e caricamento selettivo |
 | Regole in conflitto | Priorita': user request, AGENTS.md, template, giudizio agente |
 | Falsa sicurezza API | Non promettere copertura completa Revit API |
+| Installer sovrascrive skill non correlate | Limitare operazioni alla sola cartella `revitcortex` |
+| Client AI non installato | Warning non bloccante e log del target saltato |
 
 ---
 
-## 15. Decisione raccomandata
+## 16. Decisione raccomandata
 
-Procedere con un MVP repo-local, senza modifiche al codice RevitCortex.
+Procedere con un MVP repo-local distribuito nel pacchetto RevitCortex, senza modifiche al codice plugin/server RevitCortex.
 
-La prima iterazione deve produrre una skill utilizzabile da Codex/Claude Code come router operativo e developer assistant. Solo dopo 2-3 sessioni reali si decide se espanderla, installarla come skill personale o collegarla al futuro workflow Obsidian.
+La prima iterazione deve produrre una skill utilizzabile da Codex/Claude Code come router operativo e developer assistant, inclusa nello ZIP di release e installata dallo script di installazione. Solo dopo 2-3 sessioni reali si decide se espanderla o collegarla al futuro workflow Obsidian.
 
 Questa direzione conserva il valore principale di RevitCortex MCP e aggiunge memoria selettiva sopra il sistema, evitando di trasformare la documentazione in un blocco enorme da rileggere ogni volta.
