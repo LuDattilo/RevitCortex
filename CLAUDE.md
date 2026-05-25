@@ -1,5 +1,17 @@
 # RevitCortex -- AI Assistant Guide
 
+## AI Skill Router
+
+Per task operativi BIM o di sviluppo C#, la knowledge base è organizzata in `ai-skills/revitcortex/`.
+Il router `ai-skills/revitcortex/SKILL.md` indica quali reference caricare per ogni tipo di richiesta.
+
+Quando questo CLAUDE.md cresce, le regole specifiche dovrebbero migrare nei reference della skill:
+- Workflow BIM → `ai-skills/revitcortex/references/operator_*.md`
+- Pattern sviluppo C# → `ai-skills/revitcortex/references/developer_*.md`
+- Mappa fonti → `ai-skills/revitcortex/references/index_41_Workflow_Source_Map.md`
+
+Questo CLAUDE.md resta la fonte canonica per regole globali e build/release matrix.
+
 Flussi operativi collaudati: vedere WORKFLOWS.md
 
 ## Project Overview
