@@ -2,6 +2,8 @@
 
 > Guida pratica per usare RevitCortex in modo efficiente con Claude.
 
+> 📖 **Cerchi l'elenco completo dei comandi?** Vedi il **[Catalogo Comandi](COMMANDS.md)** — tutti i 175 comandi con un esempio di prompt in linguaggio naturale per ciascuno.
+
 ---
 
 ## Indice
