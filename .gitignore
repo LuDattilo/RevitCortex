@@ -10,6 +10,9 @@ release/
 publish/
 *.zip
 
+# Inno Setup compiled installer output (generated from installer/RevitCortex.iss)
+installer/Output/
+
 # Claude Code local state (keep settings.local.json which is tracked intentionally)
 .claude/scheduled_tasks.lock
 .claude/worktrees/
