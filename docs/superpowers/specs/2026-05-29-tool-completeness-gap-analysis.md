@@ -134,3 +134,11 @@ Per CLAUDE.md, all code must compile on **net48** (R2023/R2024) AND **net8+** (R
 5. **Phase 4 — verify docs + full all-target build + release.**
 
 Phases 0–2 are the 80/20. Per CLAUDE.md: one file at a time, verify build after each file before the next.
+
+## Progress log
+
+- **Phase 0 — DONE** (commit `280597b`): B1–B9 latent bugs implemented. All 5 targets green, 224/1/0 tests.
+- **Phase 1 — DONE** (commit `0e2a949`): H1 unit-aware writes (set_element_parameters + import_from_excel; import_from_powerbi already correct) + clear. Fixed ModifySchedule contract test.
+- **Phase 2 — DONE** (commit `92e163a`): H2 create_view crop+template, H3 manage_links reload_from+remove, H4 create_revision Issued/Visibility/set, H5 ifc_export_basic overrides.
+- **Phase 3 — IN PROGRESS**: MEDIUM gaps by theme. Order: 2e read→write (get_worksets, get_project_info), 2c filters (ai_element_filter, filter_by_parameter_value), 2a edit-existing (create_level, create_grid, duplicate_system_type), 2f geometry accuracy (clash_detection, get_elements_in_spatial_volume), 2g other, 2b associative/loops, 2d annotations. Each tool: one file, build R25+R24, then batch build all 5 + tests + commit per sub-theme.
+  - **Lesson applied** (memory `feedback_plugin_build_masks_tools_errors`): after editing a Tools file, build the Tools csproj or run tests — a green Plugin build can mask a Tools compile error.

@@ -38,6 +38,23 @@ public static class ProjectTools
         return result.ToString();
     }
 
+    [McpServerTool(Name = "manage_worksets"), Description("Create, rename, delete, or set the active workset (workshared models only). To LIST worksets use get_worksets.")]
+    public static async Task<string> ManageWorksets(
+        RevitConnectionManager revit,
+        [Description("Action: create | rename | delete | set_active")] string action,
+        [Description("Workset name (for create; also resolves the target for rename/delete/set_active if worksetId is omitted)")] string? name = null,
+        [Description("Workset id (int) identifying the target for rename/delete/set_active")] int? worksetId = null,
+        [Description("New name (for rename)")] string? newName = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["action"] = action };
+        if (name != null) p["name"] = name;
+        if (worksetId != null) p["worksetId"] = worksetId;
+        if (newName != null) p["newName"] = newName;
+        var result = await revit.ExecuteAsync("manage_worksets", p, ct);
+        return result.ToString();
+    }
+
     [McpServerTool(Name = "load_family"), Description("Load a family into the Revit project.")]
     public static async Task<string> LoadFamily(
         RevitConnectionManager revit,
