@@ -97,9 +97,9 @@ public class ImportFromExcelTool : ICortexTool
                                     param.Set(cellValue);
                                     setCount++;
                                     break;
-                                case StorageType.Double when double.TryParse(cellValue, out var d):
-                                    param.Set(d);
-                                    setCount++;
+                                case StorageType.Double:
+                                    if (SetDoubleFromString(param, cellValue)) setCount++;
+                                    else failed++;
                                     break;
                                 case StorageType.Integer when int.TryParse(cellValue, out var i):
                                     param.Set(i);
@@ -153,5 +153,21 @@ public class ImportFromExcelTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Sets a Double parameter from a cell string. A bare number ("3000") is written as a
+    /// raw internal-units value (backward-compatible with numeric Excel exports); a value
+    /// carrying a unit ("3000 mm", "3 m") is handed to SetValueString for unit-/locale-aware
+    /// parsing so a display value is not silently misread as feet.
+    /// </summary>
+    private static bool SetDoubleFromString(Parameter param, string text)
+    {
+        var trimmed = (text ?? "").Trim();
+        if (trimmed.Length == 0) return false;
+        if (double.TryParse(trimmed, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var raw))
+            return param.Set(raw);
+        return param.SetValueString(trimmed);
     }
 }

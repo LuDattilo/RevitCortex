@@ -232,10 +232,12 @@ namespace RevitCortex.Tests.Server
             Assert.NotNull(description);
             Assert.Contains("set_sorting", description);
             Assert.Contains("clear_sorting", description);
+            Assert.Contains("set_filter", description);
+            Assert.Contains("clear_filter", description);
             Assert.DoesNotContain("set_sort |", description);
 
             AssertDescription(method,
-                "Modify schedule fields, sorting, or rename the schedule. Supported actions: add_field, remove_field, set_sorting, clear_sorting, rename.");
+                "Modify schedule fields, sorting, filters, or rename the schedule. Supported actions: add_field, remove_field, set_sorting, clear_sorting, set_filter, clear_filter, rename.");
         }
     }
 }

@@ -9,10 +9,10 @@ namespace RevitCortex.Server.Tools;
 [McpServerToolType]
 public static class ParameterTools
 {
-    [McpServerTool(Name = "set_element_parameters"), Description("Set parameter values on one or more elements. Pass requests as a JSON-encoded array string. Note: type-level parameters (e.g. structural thickness on floors) cannot be set on instances — identify instance vs type params with get_element_parameters first, then set type params on the type ElementId instead.")]
+    [McpServerTool(Name = "set_element_parameters"), Description("Set parameter values on one or more elements. Pass requests as a JSON-encoded array string. UNITS: a numeric value on a length/area/etc. parameter is written in Revit internal units (feet) — to set a display value, pass a STRING WITH A UNIT (e.g. \"3000 mm\", \"3 m\") and Revit parses it unit- and locale-aware. A null value clears the parameter. Note: type-level parameters (e.g. structural thickness on floors) cannot be set on instances — identify instance vs type params with get_element_parameters first, then set type params on the type ElementId instead.")]
     public static async Task<string> SetElementParameters(
         RevitConnectionManager revit,
-        [Description("JSON-encoded array of set requests — pass as a string. Each item must have: elementId (long), parameterName (string), value (string or number). Example: \"[{\\\"elementId\\\": 123, \\\"parameterName\\\": \\\"Comments\\\", \\\"value\\\": \\\"test\\\"}]\"")] string requests,
+        [Description("JSON-encoded array of set requests — pass as a string. Each item must have: elementId (long), parameterName (string), value (string, number, or null to clear). For lengths/areas pass a unit string like \"3000 mm\" to avoid writing feet. Example: \"[{\\\"elementId\\\": 123, \\\"parameterName\\\": \\\"Comments\\\", \\\"value\\\": \\\"test\\\"}]\"")] string requests,
         CancellationToken ct = default)
     {
         JArray parsed;
