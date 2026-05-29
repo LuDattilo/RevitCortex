@@ -20,7 +20,7 @@ public class SetMaterialPropertiesTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Sets identity, appearance (color, transparency, shininess, smoothness), class, and product information on Revit materials.";
+    public string Description => "Sets identity, appearance (color, transparency, shininess, smoothness), class, product info, and assigns appearance/structural/thermal assets (by id) on Revit materials.";
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
@@ -108,6 +108,14 @@ public class SetMaterialPropertiesTool : ICortexTool
                     SetParamIfPresent(mat, BuiltInParameter.KEYNOTE_PARAM, req, "keynote", changes);
                     SetParamIfPresent(mat, BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS, req, "comments", changes);
 
+                    // Asset assignment by id (appearance / structural / thermal).
+                    AssignAsset(doc, req, "appearanceAssetId", typeof(AppearanceAssetElement),
+                        id => mat.AppearanceAssetId = id, changes);
+                    AssignAsset(doc, req, "structuralAssetId", typeof(PropertySetElement),
+                        id => mat.StructuralAssetId = id, changes);
+                    AssignAsset(doc, req, "thermalAssetId", typeof(PropertySetElement),
+                        id => mat.ThermalAssetId = id, changes);
+
                     results.Add(new { materialId, name = mat.Name, success = true, changedProperties = changes });
                 }
 
@@ -135,6 +143,41 @@ public class SetMaterialPropertiesTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Assigns an asset element to the material by id, after verifying the element exists
+    /// and is of the expected type. A value of 0 or -1 clears the assignment (InvalidElementId).
+    /// </summary>
+    private static void AssignAsset(Document doc, JObject req, string key, Type expectedType,
+        Action<ElementId> setter, List<string> changes)
+    {
+        var idVal = req[key]?.Value<long?>();
+        if (!idVal.HasValue) return;
+
+        try
+        {
+            if (idVal.Value <= 0)
+            {
+                setter(ElementId.InvalidElementId);
+                changes.Add($"{key}=cleared");
+                return;
+            }
+#if REVIT2024_OR_GREATER
+            var assetId = new ElementId(idVal.Value);
+#else
+            var assetId = new ElementId((int)idVal.Value);
+#endif
+            var el = doc.GetElement(assetId);
+            if (el == null || !expectedType.IsInstanceOfType(el))
+            {
+                changes.Add($"{key}=skipped(not a {expectedType.Name})");
+                return;
+            }
+            setter(assetId);
+            changes.Add(key);
+        }
+        catch (Exception ex) { changes.Add($"{key}=failed({ex.Message})"); }
     }
 
     private static void SetIfPresent(JObject req, string key, Action<string> setter)

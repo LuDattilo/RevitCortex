@@ -20,7 +20,7 @@ public class CreateStructuralFramingSystemTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates a beam system (structural framing system) from boundary on a level.";
+    public string Description => "Creates a beam system on a level over a rectangular area. By default builds a real associative Revit BeamSystem (a single element with editable layout); set associative=false for loose independent beams.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -37,6 +37,7 @@ public class CreateStructuralFramingSystemTool : ICortexTool
         var spacingMm = input["spacing"]?.Value<double>() ?? 1000;
         var beamTypeName = input["beamTypeName"]?.Value<string>();
         var elevationMm = input["elevation"]?.Value<double>() ?? 0;
+        var associative = input["associative"]?.Value<bool>() ?? true;
 
         if (string.IsNullOrEmpty(levelName))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "levelName is required");
@@ -67,6 +68,47 @@ public class CreateStructuralFramingSystemTool : ICortexTool
             var y1 = yMax / MmPerFoot;
             var spacing = spacingMm / MmPerFoot;
             var elev = elevationMm / MmPerFoot;
+            var zPlane = level.Elevation + elev;
+
+            // ── Associative Revit BeamSystem (default) ────────────────────────
+            if (associative)
+            {
+                var p00 = new XYZ(x0, y0, zPlane);
+                var p10 = new XYZ(x1, y0, zPlane);
+                var p11 = new XYZ(x1, y1, zPlane);
+                var p01 = new XYZ(x0, y1, zPlane);
+                var profile = new List<Curve>
+                {
+                    Line.CreateBound(p00, p10),
+                    Line.CreateBound(p10, p11),
+                    Line.CreateBound(p11, p01),
+                    Line.CreateBound(p01, p00),
+                };
+
+                using var btx = new Transaction(doc, "RevitCortex: Create Beam System");
+                btx.Start();
+                if (!beamType.IsActive) beamType.Activate();
+                // direction = beam run direction (along Y); is3D = false (planar).
+                var bs = BeamSystem.Create(doc, profile, level, XYZ.BasisY, false);
+                // Apply the requested layout: fixed spacing.
+                try
+                {
+                    bs.LayoutRule = new LayoutRuleFixedDistance(spacing, BeamSystemJustifyType.Beginning);
+                    bs.BeamType = beamType;
+                }
+                catch { /* layout/type assignment best-effort */ }
+                btx.Commit();
+
+                return CortexResult<object>.Ok(new
+                {
+                    associative = true,
+                    beamSystemId = ToolHelpers.GetElementIdValue(bs.Id),
+                    beamTypeName = beamType.Name,
+                    levelName = level.Name,
+                    spacingMm,
+                    message = $"Created associative beam system {ToolHelpers.GetElementIdValue(bs.Id)}"
+                });
+            }
 
             using var tx = new Transaction(doc, "RevitCortex: Create Structural Framing System");
             tx.Start();

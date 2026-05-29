@@ -383,10 +383,10 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "set_material_properties"), Description("Set identity and product info on Revit materials. Pass a JSON array of request objects: [{materialId|materialName, properties:{...}}].")]
+    [McpServerTool(Name = "set_material_properties"), Description("Set identity, appearance, product info, and asset assignments on Revit materials. Each request is a FLAT object keyed by materialId plus any of: name, color (#RRGGBB), transparency, shininess, smoothness, materialClass, materialCategory, description, manufacturer, model, url, cost, mark, keynote, comments, appearanceAssetId, structuralAssetId, thermalAssetId (asset ids: 0/-1 clears).")]
     public static async Task<string> SetMaterialProperties(
         RevitConnectionManager revit,
-        [Description("JSON array of requests: [{materialId|materialName, properties:{key:value, ...}}]")] string requests,
+        [Description("JSON array of flat requests, e.g. [{\"materialId\":123,\"color\":\"#FF0000\",\"appearanceAssetId\":456}]")] string requests,
         [Description("Preview changes without applying. Default: true")] bool? dryRun = null,
         CancellationToken ct = default)
     {

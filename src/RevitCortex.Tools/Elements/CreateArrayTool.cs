@@ -19,7 +19,7 @@ public class CreateArrayTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates a linear or radial array of elements by copying.";
+    public string Description => "Creates a linear or radial array of elements. By default builds a real associative Revit ArrayElement (a group with an editable count); set associative=false for loose independent copies.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -36,6 +36,8 @@ public class CreateArrayTool : ICortexTool
         var count = input["count"]?.Value<int>() ?? 1;
         if (count <= 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "count must be > 0");
+        // Real Revit ArrayElement (default) vs. loose independent copies.
+        var associative = input["associative"]?.Value<bool>() ?? true;
 
         try
         {
@@ -57,6 +59,49 @@ public class CreateArrayTool : ICortexTool
             }
 
             var createdElements = new List<object>();
+
+            // ── Associative Revit ArrayElement (default) ──────────────────────
+            if (associative)
+            {
+                var view = doc.ActiveView;
+                if (view == null)
+                    return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                        "Associative arrays need an active view. Activate a view, or pass associative=false for loose copies.");
+
+                using var atx = new Transaction(doc, "RevitCortex: Create Array (associative)");
+                atx.Start();
+                ElementId arrayId;
+                if (arrayType == "radial")
+                {
+                    var centerX = input["centerX"]?.Value<double>() ?? 0;
+                    var centerY = input["centerY"]?.Value<double>() ?? 0;
+                    var totalAngle = (input["totalAngle"]?.Value<double>() ?? 360) * Math.PI / 180.0;
+                    var center = new XYZ(centerX / MmPerFoot, centerY / MmPerFoot, 0);
+                    var axis = Line.CreateBound(center, center + XYZ.BasisZ * 10);
+                    var ra = RadialArray.Create(doc, view, sourceIds, count, axis, totalAngle, ArrayAnchorMember.Last);
+                    arrayId = ra.Id;
+                }
+                else
+                {
+                    var spacingX = input["spacingX"]?.Value<double>() ?? 0;
+                    var spacingY = input["spacingY"]?.Value<double>() ?? 0;
+                    var spacingZ = input["spacingZ"]?.Value<double>() ?? 0;
+                    // LinearArray translation is the vector from the first to the LAST member.
+                    var totalVec = new XYZ(spacingX / MmPerFoot, spacingY / MmPerFoot, spacingZ / MmPerFoot) * (count - 1);
+                    var la = LinearArray.Create(doc, view, sourceIds, count, totalVec, ArrayAnchorMember.Last);
+                    arrayId = la.Id;
+                }
+                atx.Commit();
+
+                return CortexResult<object>.Ok(new
+                {
+                    arrayType,
+                    associative = true,
+                    count,
+                    arrayElementId = ToolHelpers.GetElementIdValue(arrayId),
+                    message = $"Created associative {arrayType} array of {count} (ArrayElement {ToolHelpers.GetElementIdValue(arrayId)})"
+                });
+            }
 
             using var tx = new Transaction(doc, "RevitCortex: Create Array");
             tx.Start();

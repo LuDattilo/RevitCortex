@@ -167,18 +167,19 @@ public static class CreationTools
         return ToolResponseShaper.Shape("export_room_data", result, compact, summaryOnly: false).ToString();
     }
 
-    [McpServerTool(Name = "create_array"), Description("Create linear or radial arrays of elements. arrayType=linear uses spacingX/Y/Z; arrayType=radial uses centerX/Y and totalAngle.")]
+    [McpServerTool(Name = "create_array"), Description("Create a linear or radial array. Default builds a real associative Revit ArrayElement (editable count); set associative=false for loose copies. linear uses spacingX/Y/Z (mm); radial uses centerX/Y (mm) and totalAngle.")]
     public static async Task<string> CreateArray(
         RevitConnectionManager revit,
         [Description("Element IDs to array")] long[] elementIds,
         [Description("Array type: linear | radial. Default: linear")] string? arrayType = null,
-        [Description("Number of copies. Default: 1")] int? count = null,
-        [Description("Linear spacing X in project units")] double? spacingX = null,
-        [Description("Linear spacing Y in project units")] double? spacingY = null,
-        [Description("Linear spacing Z in project units")] double? spacingZ = null,
-        [Description("Radial center X")] double? centerX = null,
-        [Description("Radial center Y")] double? centerY = null,
+        [Description("Number of members (including original). Default: 1")] int? count = null,
+        [Description("Linear spacing X in mm")] double? spacingX = null,
+        [Description("Linear spacing Y in mm")] double? spacingY = null,
+        [Description("Linear spacing Z in mm")] double? spacingZ = null,
+        [Description("Radial center X in mm")] double? centerX = null,
+        [Description("Radial center Y in mm")] double? centerY = null,
         [Description("Total sweep angle in degrees (radial). Default: 360")] double? totalAngle = null,
+        [Description("Build a real associative ArrayElement. Default: true. false = loose copies")] bool? associative = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -193,6 +194,7 @@ public static class CreationTools
         if (centerX != null) p["centerX"] = centerX;
         if (centerY != null) p["centerY"] = centerY;
         if (totalAngle != null) p["totalAngle"] = totalAngle;
+        if (associative != null) p["associative"] = associative;
         var result = await revit.ExecuteAsync("create_array", p, ct);
         return result.ToString();
     }
@@ -237,7 +239,7 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_structural_framing_system"), Description("Create a beam system on a level covering a rectangular area with uniform spacing.")]
+    [McpServerTool(Name = "create_structural_framing_system"), Description("Create a beam system on a level over a rectangular area. Default builds a real associative Revit BeamSystem (editable layout); set associative=false for loose independent beams.")]
     public static async Task<string> CreateStructuralFramingSystem(
         RevitConnectionManager revit,
         [Description("Level name")] string levelName,
@@ -248,6 +250,7 @@ public static class CreationTools
         [Description("Beam spacing in mm. Default: 1000")] double? spacing = null,
         [Description("Beam type name (optional)")] string? beamTypeName = null,
         [Description("Elevation offset in mm relative to level. Default: 0")] double? elevation = null,
+        [Description("Build a real associative BeamSystem. Default: true. false = loose beams")] bool? associative = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["levelName"] = levelName };
@@ -258,6 +261,7 @@ public static class CreationTools
         if (spacing != null) p["spacing"] = spacing;
         if (beamTypeName != null) p["beamTypeName"] = beamTypeName;
         if (elevation != null) p["elevation"] = elevation;
+        if (associative != null) p["associative"] = associative;
         var result = await revit.ExecuteAsync("create_structural_framing_system", p, ct);
         return result.ToString();
     }
