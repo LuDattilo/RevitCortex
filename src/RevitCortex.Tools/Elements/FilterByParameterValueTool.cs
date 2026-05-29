@@ -42,6 +42,15 @@ public class FilterByParameterValueTool : ICortexTool
         // Multi-condition mode: an array of {parameterName, condition, value, parameterType?}
         // combined with AND (default) or OR. Falls back to the single-parameter inputs.
         var conditionsToken = input["conditions"] as JArray;
+        if (conditionsToken == null && input["conditions"]?.Type == JTokenType.String)
+        {
+            try { conditionsToken = JArray.Parse(input["conditions"]!.Value<string>() ?? "[]"); }
+            catch
+            {
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    "conditions must be a JSON array or a JSON array string");
+            }
+        }
         var logic           = (input["logic"]?.Value<string>() ?? "and").ToLowerInvariant();
 
         var clauses = new List<FilterClause>();

@@ -104,7 +104,7 @@ public class OperateElementTool : ICortexTool
             case "select":
                 // No transaction needed — selection is a UI state
                 uiDoc.Selection.SetElementIds(elementIds);
-                return $"Selected {elementIds.Count} element(s)";
+                return $"Selected {uiDoc.Selection.GetElementIds().Count} element(s)";
 
             case "selectionbox":
                 return DoSelectionBox(doc, uiDoc, elementIds);

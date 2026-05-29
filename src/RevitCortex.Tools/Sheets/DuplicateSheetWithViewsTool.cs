@@ -110,6 +110,7 @@ public class DuplicateSheetWithViewsTool : ICortexTool
 
                 int viewportCount = 0;
                 var newViewportIds = new List<long>();
+                var skippedSchedules = new List<object>();
                 foreach (var vpData in viewportData)
                 {
                     var view = vpData.View!;
@@ -144,7 +145,18 @@ public class DuplicateSheetWithViewsTool : ICortexTool
                 {
                     foreach (var si in scheduleInstances)
                     {
-                        ScheduleSheetInstance.Create(doc, newSheet.Id, si.ScheduleId, si.Point);
+                        try
+                        {
+                            ScheduleSheetInstance.Create(doc, newSheet.Id, si.ScheduleId, si.Point);
+                        }
+                        catch (Exception ex)
+                        {
+                            skippedSchedules.Add(new
+                            {
+                                scheduleId = ToolHelpers.GetElementIdValue(si.ScheduleId),
+                                reason = ex.Message
+                            });
+                        }
                     }
                 }
 
@@ -154,7 +166,9 @@ public class DuplicateSheetWithViewsTool : ICortexTool
                     number = newSheet.SheetNumber,
                     name = newSheet.Name,
                     viewportCount,
-                    viewportIds = newViewportIds
+                    viewportIds = newViewportIds,
+                    skippedScheduleCount = skippedSchedules.Count,
+                    skippedSchedules
                 });
             }
 

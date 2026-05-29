@@ -50,7 +50,7 @@ public class AIElementFilterTool : ICortexTool
         // Invert the whole combined filter (NOT) — e.g. "everything that is NOT a wall".
         var invert             = data["invert"]?.Value<bool>() ?? false;
         // Optional level filter: {levelId} or {levelName} — instances on that level only.
-        var levelFilterToken   = data["levelFilter"] as JObject;
+        var levelFilterToken   = data["levelFilter"];
 
         // Bounding box (coordinates in mm, matching the fork's convention)
         var bbMinToken = data["boundingBoxMin"];
@@ -190,7 +190,7 @@ public class AIElementFilterTool : ICortexTool
         int maxElements = 0,
         string combineWith = "and",
         bool invert = false,
-        JObject? levelFilter = null)
+        JToken? levelFilter = null)
     {
         // Choose base collector (view-constrained or whole-model)
         FilteredElementCollector collector =
@@ -740,22 +740,44 @@ public class AIElementFilterTool : ICortexTool
     }
 
     /// <summary>
-    /// Builds an ElementLevelFilter from {levelId} or {levelName}. Returns null when
-    /// the level cannot be resolved (the caller then simply omits the filter).
+    /// Builds an ElementLevelFilter from {levelId}, {levelName}, a raw id, or a raw
+    /// level name. Returns null when the level cannot be resolved.
     /// </summary>
-    private static ElementFilter? BuildLevelFilter(Document doc, JObject levelFilter)
+    private static ElementFilter? BuildLevelFilter(Document doc, JToken levelFilter)
     {
         Level? level = null;
 
-        var levelIdLong = levelFilter["levelId"]?.Value<long?>();
-        if (levelIdLong.HasValue && levelIdLong.Value > 0)
-            level = doc.GetElement(ToolHelpers.ToElementId(levelIdLong.Value)) as Level;
+        if (levelFilter is JObject levelObject)
+        {
+            var levelIdLong = levelObject["levelId"]?.Value<long?>();
+            if (levelIdLong.HasValue && levelIdLong.Value > 0)
+                level = doc.GetElement(ToolHelpers.ToElementId(levelIdLong.Value)) as Level;
 
-        var levelName = levelFilter["levelName"]?.Value<string>();
-        if (level == null && !string.IsNullOrEmpty(levelName))
-            level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
-                .FirstOrDefault(l => l.Name.Equals(levelName, StringComparison.OrdinalIgnoreCase));
+            var levelName = levelObject["levelName"]?.Value<string>();
+            if (level == null && !string.IsNullOrEmpty(levelName))
+                level = ResolveLevelByName(doc, levelName!);
+        }
+        else if (levelFilter.Type == JTokenType.Integer)
+        {
+            var levelIdLong = levelFilter.Value<long>();
+            if (levelIdLong > 0)
+                level = doc.GetElement(ToolHelpers.ToElementId(levelIdLong)) as Level;
+        }
+        else
+        {
+            var rawLevel = levelFilter.Value<string>();
+            if (long.TryParse(rawLevel, out var levelIdLong) && levelIdLong > 0)
+                level = doc.GetElement(ToolHelpers.ToElementId(levelIdLong)) as Level;
+            if (level == null && !string.IsNullOrWhiteSpace(rawLevel))
+                level = ResolveLevelByName(doc, rawLevel!);
+        }
 
         return level != null ? new ElementLevelFilter(level.Id) : null;
+    }
+
+    private static Level? ResolveLevelByName(Document doc, string levelName)
+    {
+        return new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+            .FirstOrDefault(l => l.Name.Equals(levelName, StringComparison.OrdinalIgnoreCase));
     }
 }

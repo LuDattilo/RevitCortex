@@ -33,8 +33,12 @@ public class DuplicateSheetWithContentTool : ICortexTool
         var keepLegends = input["keepLegends"]?.Value<bool>() ?? true;
         var keepSchedules = input["keepSchedules"]?.Value<bool>() ?? true;
         var copyRevisions = input["copyRevisions"]?.Value<bool>() ?? false;
-        var sheetNumberPrefix = input["sheetNumberPrefix"]?.Value<string>() ?? "";
+        var sheetNumberPrefix = input["sheetNumberPrefix"]?.Value<string>()
+            ?? input["newSheetNumberPrefix"]?.Value<string>()
+            ?? "";
         var sheetNumberSuffix = input["sheetNumberSuffix"]?.Value<string>() ?? "";
+        var newNumber = input["newNumber"]?.Value<string>();
+        var newName = input["newName"]?.Value<string>();
 
         if (sheetId <= 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "sheetId is required");
@@ -81,8 +85,10 @@ public class DuplicateSheetWithContentTool : ICortexTool
             {
                 var newSheet = ViewSheet.Create(doc, titleBlockId);
                 var suffix = copies > 1 ? $"-{i + 1:D2}" : "";
-                newSheet.SheetNumber = $"{sheetNumberPrefix}{sourceSheet.SheetNumber}{sheetNumberSuffix}{suffix}";
-                try { newSheet.Name = sourceSheet.Name; } catch { /* duplicate name */ }
+                newSheet.SheetNumber = !string.IsNullOrWhiteSpace(newNumber)
+                    ? $"{newNumber}{suffix}"
+                    : $"{sheetNumberPrefix}{sourceSheet.SheetNumber}{sheetNumberSuffix}{suffix}";
+                try { newSheet.Name = !string.IsNullOrWhiteSpace(newName) ? newName! : sourceSheet.Name; } catch { /* duplicate name */ }
 
                 if (copyRevisions)
                 {
@@ -126,7 +132,8 @@ public class DuplicateSheetWithContentTool : ICortexTool
                 {
                     foreach (var si in scheduleInstances)
                     {
-                        ScheduleSheetInstance.Create(doc, newSheet.Id, si.ScheduleId, si.Point);
+                        try { ScheduleSheetInstance.Create(doc, newSheet.Id, si.ScheduleId, si.Point); }
+                        catch { /* skip schedules that cannot be placed on sheets */ }
                     }
                 }
 

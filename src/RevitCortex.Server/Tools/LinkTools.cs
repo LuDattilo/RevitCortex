@@ -45,7 +45,7 @@ public static class LinkTools
         [Description("Element ID of the link instance")] long linkInstanceId,
         CancellationToken ct = default)
     {
-        var p = new JObject { ["linkInstanceId"] = linkInstanceId };
+        var p = new JObject { ["instanceId"] = linkInstanceId };
         var result = await revit.ExecuteAsync("get_link_transform", p, ct);
         return result.ToString();
     }

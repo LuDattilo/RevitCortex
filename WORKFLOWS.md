@@ -19,6 +19,20 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 ---
 
+## Fix Mismatch Wrapper/Plugin dopo Bulk Test
+
+**Sequenza:** leggere il report bulk -> mappare ogni errore sul wrapper server e sul tool runtime -> aggiungere regression test sorgente per le chiavi JSON inoltrate -> far fallire i test mirati -> correggere wrapper + alias legacy nel plugin -> rigenerare `tool-schemas.txt` -> build `Debug R25`, `Debug R24`, server e test R26.
+**Parametri chiave:**
+- Per bug di contratto MCP, testare sia la firma pubblica del wrapper sia la chiave realmente inviata al plugin (`JObject`/`JArray`).
+- Quando esistono client o script gia in uso, correggere il wrapper ma accettare anche alias legacy nel tool runtime (`viewId`/`viewIds`, `outputPath`/`filePath`, ecc.).
+- Per tool pesanti o fragili, aggiungere guardrail runtime (`maxViews`, `timeBudgetMs`, contatori `skipped*`) prima di ripetere un bulk test completo.
+- Dopo modifiche alle firme server, rigenerare sempre `tool-schemas.txt`.
+**NON fare:** Non limitarsi al fix nel plugin se lo schema MCP rimane incoerente. Non introdurre feature C# non compatibili net48 senza build R24. Non usare `send_code_to_revit` per validare bug di contratto wrapper/plugin.
+
+**Fonte:** fix post bulk test principale del 2026-05-29
+
+---
+
 ## Controllo Qualita Mattutino
 
 **Sequenza:** `check_model_health` -> `get_warnings` -> (opzionale) `clash_detection`

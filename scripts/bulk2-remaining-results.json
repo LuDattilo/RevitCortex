@@ -1,0 +1,128 @@
+[
+  {
+    "tool": "create_preset_schedule",
+    "status": "ERR",
+    "ms": 82,
+    "note": "list presets?",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":400,\"message\":\"Unknown preset: \",\"data\":{\"code\":\"InvalidInput\",\"message\":\"Unknown preset: \",\"suggestion\":\"Use: door_by_room, window_by_room, room_finish, material_takeoff, sheet_list, view_list\"}}}"
+  },
+  {
+    "tool": "get_schedule_data",
+    "status": "OK",
+    "ms": 78,
+    "note": "scheduleId=2667259",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"scheduleName\":\"RC_BULK2_SD_05292895\",\"columnHeaders\":[],\"rows\":[[],[],[],[],[]],\"fieldCount\":0,\"rowCount\":1128,\"returnedRows\":5,\"availableFields\":[{\"name\":\"Count\",\"fieldType\":\"Count\",\"parameterId\":-1152353},{\"name\":\"Type\",\"fieldType\":\"Instance\",\"parameterId\":"
+  },
+  {
+    "tool": "modify_schedule",
+    "status": "OK",
+    "ms": 1710,
+    "note": "set_filter (Phase0)",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"error\":\"Field 'Family and Type' not present in schedule. Add it first with add_field.\"}}"
+  },
+  {
+    "tool": "export_schedule",
+    "status": "OK",
+    "ms": 115,
+    "note": "export CSV",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"scheduleName\":\"RC_BULK2_SD_05292895\",\"rowCount\":1128,\"columnCount\":0,\"data\":[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]"
+  },
+  {
+    "tool": "duplicate_schedule",
+    "status": "OK",
+    "ms": 56,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"originalName\":\"RC_BULK2_SD_05292895\",\"newName\":\"RC_BULK2_SDUP_05292895\",\"newScheduleId\":2667266}}"
+  },
+  {
+    "tool": "export_elements_data",
+    "status": "OK",
+    "ms": 120,
+    "note": "real csv",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"totalCount\":17859,\"filteredCount\":17859,\"exportedCount\":5,\"truncated\":true,\"categoriesUsed\":[\"All\"],\"outputFormat\":\"csv\",\"columns\":[\"ElementId\",\"Category\",\"Name\",\"Behavior\",\"Class\",\"Color\",\"Comments\",\"Cost\",\"Description\",\"Design Option\",\"Edited by\",\"Export to"
+  },
+  {
+    "tool": "export_room_data",
+    "status": "OK",
+    "ms": 26,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"roomCount\":10,\"rooms\":[{\"id\":826376,\"name\":\"Spazio-Stair S1\",\"number\":\"S1\",\"level\":\"L1 - Block 35\",\"department\":\"\",\"areaSqM\":17.15,\"volumeCuM\":450.0,\"perimeterMm\":18542.0},{\"id\":826593,\"name\":\"Spazio-Stair S3\",\"number\":\"S3\",\"level\":\"L2\",\"department\":\"\",\"areaS"
+  },
+  {
+    "tool": "export_to_excel",
+    "status": "OK",
+    "ms": 527,
+    "note": "real xlsx",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"filePath\":\"C:\\\\Users\\\\luigi.dattilo\\\\Desktop\\\\RevitExport_20260529_145513.xlsx\",\"elementCount\":144,\"instanceParameterCount\":69,\"typeParameterCount\":0}}"
+  },
+  {
+    "tool": "export_shared_parameter_file",
+    "status": "OK",
+    "ms": 12,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"sourceFile\":\"C:\\\\Users\\\\luigi.dattilo\\\\Desktop\\\\RevitCortex_SharedParams.txt\",\"groupCount\":0,\"groups\":[]}}"
+  },
+  {
+    "tool": "batch_export",
+    "status": "ERR",
+    "ms": 14,
+    "note": "PDF empty-set (Phase0) — expect graceful",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":400,\"message\":\"sheetIds or viewIds required\",\"data\":{\"code\":\"InvalidInput\",\"message\":\"sheetIds or viewIds required\"}}}"
+  },
+  {
+    "tool": "ifc_validate_request",
+    "status": "ERR",
+    "ms": 4,
+    "note": "validate",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":400,\"message\":\"Unsupported extension: .rvt\",\"data\":{\"code\":\"InvalidInput\",\"message\":\"Unsupported extension: .rvt\",\"suggestion\":\"Supported extensions: .ifc, .ifczip, .ifcxml\"}}}"
+  },
+  {
+    "tool": "ifc_get_export_configuration",
+    "status": "ERR",
+    "ms": 6,
+    "note": "get config",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":400,\"message\":\"Configuration 'IFC 2x3 Coordination View 2.0' not found\",\"data\":{\"code\":\"InvalidInput\",\"message\":\"Configuration 'IFC 2x3 Coordination View 2.0' not found\",\"suggestion\":\"Available: IFC4 Reference View, IFC4 Design Transfer View, IFC2x3 Coor"
+  },
+  {
+    "tool": "workflow_model_audit",
+    "status": "OK",
+    "ms": 85,
+    "note": "composite audit",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"healthScore\":85.0,\"grade\":\"B\",\"statistics\":{\"elementCount\":38517,\"viewCount\":390,\"sheetCount\":60,\"familyCount\":286},\"warningCount\":50,\"warnings\":[{\"description\":\"Highlighted walls overlap. One of them may be ignored when Revit finds room boundaries. Use Cut G"
+  },
+  {
+    "tool": "get_linked_elements",
+    "status": "OK",
+    "ms": 28,
+    "note": "linked elems",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Found 6 linked model(s)\",\"linkCount\":6,\"links\":[{\"linkName\":\"Snowdon Towers Sample Facades.rvt : 16 : location <Not Shared>\",\"linkId\":2403932,\"documentTitle\":\"Snowdon Towers Sample Facades\",\"elementCount\":5,\"elements\":[{\"elementId\":593193,\"category\""
+  },
+  {
+    "tool": "get_link_transform",
+    "status": "ERR",
+    "ms": 4,
+    "note": "transform",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":400,\"message\":\"instanceId is required\",\"data\":{\"code\":\"InvalidInput\",\"message\":\"instanceId is required\"}}}"
+  },
+  {
+    "tool": "save_selection",
+    "status": "OK",
+    "ms": 16,
+    "note": "real save",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"selectionName\":\"RC_BULK2_SEL_05292895\",\"elementCount\":1,\"overwritten\":false}}"
+  },
+  {
+    "tool": "load_selection",
+    "status": "OK",
+    "ms": 38,
+    "note": "list",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"selectionCount\":2,\"selections\":[{\"name\":\"RC_MAIN_SELECTION_0529143149\",\"id\":2667142,\"elementCount\":2},{\"name\":\"RC_BULK2_SEL_05292895\",\"id\":2667273,\"elementCount\":1}]}}"
+  },
+  {
+    "tool": "lines_per_view_count",
+    "status": "ERR",
+    "ms": 120013,
+    "note": "ISOLATED heavy probe",
+    "snippet": "{\"error\":{\"transport\":\"Exception calling \\\"ReadLine\\\" with \\\"0\\\" argument(s): \\\"Unable to read data from the transport connection: Impossibile stabilire la connessione. Risposta non corretta della parte connessa dopo l'intervallo di tempo oppure mancata risposta dall'host collegato..\\\"\"}}"
+  }
+]

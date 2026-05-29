@@ -7,6 +7,7 @@ public class DocumentCapabilities
     public static readonly IReadOnlyCollection<string> KnownDynamicToolNames = new[]
     {
         "get_worksets",
+        "manage_worksets",
         "set_element_workset",
         "get_phases",
         "set_element_phase",

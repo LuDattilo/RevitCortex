@@ -43,6 +43,7 @@ public class DocumentAnalyzer : IDocumentAnalyzer
         if (caps.HasWorksets)
         {
             caps.EnableTool("get_worksets");
+            caps.EnableTool("manage_worksets");
             caps.EnableTool("set_element_workset");
         }
 

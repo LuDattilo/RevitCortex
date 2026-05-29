@@ -55,7 +55,7 @@ public static class ViewTools
         [Description("Duplicate option: Duplicate, AsDependent, WithDetailing")] string? duplicateOption = "Duplicate",
         CancellationToken ct = default)
     {
-        var p = new JObject { ["viewId"] = viewId };
+        var p = new JObject { ["viewIds"] = new JArray(viewId) };
         if (duplicateOption != null) p["duplicateOption"] = duplicateOption;
         var result = await revit.ExecuteAsync("duplicate_view", p, ct);
         return result.ToString();
@@ -207,7 +207,7 @@ public static class ViewTools
         var p = new JObject
         {
             ["name"] = name,
-            ["category"] = category,
+            ["categoryName"] = category,
         };
         if (fields != null) p["fields"] = new JArray(fields);
         var result = await revit.ExecuteAsync("create_schedule", p, ct);
@@ -405,11 +405,25 @@ public static class ViewTools
         [Description("Element ID of the sheet to duplicate")] long sheetId,
         [Description("New sheet number")] string? newNumber = null,
         [Description("New sheet name")] string? newName = null,
+        [Description("Number of copies. Default: 1")] int? copies = null,
+        [Description("Duplicate placed views as well. Default: true")] bool? duplicateViews = null,
+        [Description("Keep legends on the new sheets. Default: true")] bool? keepLegends = null,
+        [Description("Keep schedules on the new sheets. Default: true")] bool? keepSchedules = null,
+        [Description("Copy source sheet revisions. Default: false")] bool? copyRevisions = null,
+        [Description("Prefix applied to generated sheet numbers")] string? sheetNumberPrefix = null,
+        [Description("Suffix applied to generated sheet numbers")] string? sheetNumberSuffix = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["sheetId"] = sheetId };
         if (newNumber != null) p["newNumber"] = newNumber;
         if (newName != null) p["newName"] = newName;
+        if (copies != null) p["copies"] = copies;
+        if (duplicateViews != null) p["duplicateViews"] = duplicateViews;
+        if (keepLegends != null) p["keepLegends"] = keepLegends;
+        if (keepSchedules != null) p["keepSchedules"] = keepSchedules;
+        if (copyRevisions != null) p["copyRevisions"] = copyRevisions;
+        if (sheetNumberPrefix != null) p["sheetNumberPrefix"] = sheetNumberPrefix;
+        if (sheetNumberSuffix != null) p["sheetNumberSuffix"] = sheetNumberSuffix;
         var result = await revit.ExecuteAsync("duplicate_sheet_with_content", p, ct);
         return result.ToString();
     }

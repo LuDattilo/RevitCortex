@@ -143,13 +143,27 @@ public static class CreationTools
     [McpServerTool(Name = "export_to_excel"), Description("Export element data from a Revit category to an Excel file.")]
     public static async Task<string> ExportToExcel(
         RevitConnectionManager revit,
-        [Description("Category to export (e.g. Walls, Rooms)")] string? category = null,
-        [Description("Output file path for the Excel file")] string? outputPath = null,
+        [Description("Categories to export (OST_* codes or display names)")] string[]? categories = null,
+        [Description("Legacy single category alias; used only when categories is omitted")] string? category = null,
+        [Description("Specific parameter names to export")] string[]? parameterNames = null,
+        [Description("Include type parameters. Default: false")] bool? includeTypeParameters = null,
+        [Description("Include element id column. Default: true")] bool? includeElementId = null,
+        [Description("Output file path for the Excel file")] string? filePath = null,
+        [Description("Legacy output path alias; used only when filePath is omitted")] string? outputPath = null,
+        [Description("Worksheet name. Default: Export")] string? sheetName = null,
+        [Description("Maximum elements to export. Default: 10000")] int? maxElements = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
-        if (category != null) p["category"] = category;
-        if (outputPath != null) p["outputPath"] = outputPath;
+        if (categories != null) p["categories"] = new JArray(categories);
+        else if (category != null) p["categories"] = new JArray(category);
+        if (parameterNames != null) p["parameterNames"] = new JArray(parameterNames);
+        if (includeTypeParameters != null) p["includeTypeParameters"] = includeTypeParameters;
+        if (includeElementId != null) p["includeElementId"] = includeElementId;
+        if (filePath != null) p["filePath"] = filePath;
+        else if (outputPath != null) p["filePath"] = outputPath;
+        if (sheetName != null) p["sheetName"] = sheetName;
+        if (maxElements != null) p["maxElements"] = maxElements;
         var result = await revit.ExecuteAsync("export_to_excel", p, ct);
         return result.ToString();
     }

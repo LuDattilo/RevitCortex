@@ -519,13 +519,15 @@ public static class ProjectTools
         return ToolResponseShaper.Shape("get_shared_parameters", result, compact, summaryOnly: false).ToString();
     }
 
-    [McpServerTool(Name = "lines_per_view_count"), Description("Count detail and/or model lines per view for performance auditing. Always set threshold >= 20 on large models; the tool has an automatic 300-view cap.")]
+    [McpServerTool(Name = "lines_per_view_count"), Description("Count detail and/or model lines per view for performance auditing. Always set threshold >= 20 on large models; defaults to a guarded 100-view scan with a time budget.")]
     public static async Task<string> LinesPerViewCount(
         RevitConnectionManager revit,
         [Description("Only report views at or above this line count. Default: 0")] int? threshold = null,
         [Description("Count detail lines. Default: true")] bool? includeDetailLines = null,
         [Description("Count model lines. Default: true")] bool? includeModelLines = null,
         [Description("Max views returned. Default: 200")] int? limit = null,
+        [Description("Max views scanned before capping. Default: 100, hard cap: 300")] int? maxViews = null,
+        [Description("Time budget in milliseconds before returning partial results. Default: 15000")] int? timeBudgetMs = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
@@ -533,6 +535,8 @@ public static class ProjectTools
         if (includeDetailLines != null) p["includeDetailLines"] = includeDetailLines;
         if (includeModelLines != null) p["includeModelLines"] = includeModelLines;
         if (limit != null) p["limit"] = limit;
+        if (maxViews != null) p["maxViews"] = maxViews;
+        if (timeBudgetMs != null) p["timeBudgetMs"] = timeBudgetMs;
         var result = await revit.ExecuteAsync("lines_per_view_count", p, ct);
         return result.ToString();
     }

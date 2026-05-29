@@ -48,4 +48,10 @@ public class DocumentCapabilitiesTests
         caps.EnableTool("b");
         Assert.Equal(2, caps.EnabledTools.Count);
     }
+
+    [Fact]
+    public void KnownDynamicTools_IncludesManageWorksets()
+    {
+        Assert.Contains("manage_worksets", DocumentCapabilities.KnownDynamicToolNames);
+    }
 }

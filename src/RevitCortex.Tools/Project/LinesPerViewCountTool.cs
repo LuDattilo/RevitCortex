@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
@@ -31,6 +32,8 @@ public class LinesPerViewCountTool : ICortexTool
         var includeDetailLines = input["includeDetailLines"]?.Value<bool>() ?? true;
         var includeModelLines  = input["includeModelLines"]?.Value<bool>() ?? true;
         var limit              = input["limit"]?.Value<int>() ?? 200;
+        var maxViews           = input["maxViews"]?.Value<int>() ?? 100;
+        var timeBudgetMs       = input["timeBudgetMs"]?.Value<int>() ?? 15000;
 
         try
         {
@@ -41,65 +44,54 @@ public class LinesPerViewCountTool : ICortexTool
                 .Where(v => !v.IsTemplate && v.CanBePrinted)
                 .ToList();
 
-            // Safety cap: prevent timeout on very large models
-            const int maxViewScan = 300;
+            // Safety cap: prevent timeout on very large models. Keep the hard
+            // ceiling at 300 for compatibility, but default to a smaller scan
+            // because per-view Revit collectors can be expensive on sheet-heavy
+            // models.
+            const int hardMaxViewScan = 300;
+            if (maxViews <= 0) maxViews = 100;
+            maxViews = Math.Min(maxViews, hardMaxViewScan);
+            timeBudgetMs = Math.Max(1000, timeBudgetMs);
+
             bool capped = false;
-            if (views.Count > maxViewScan && threshold == 0)
+            if (views.Count > hardMaxViewScan && threshold == 0)
             {
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Model has {views.Count} views. A full scan (threshold=0) would likely time out.",
                     suggestion: $"Set threshold >= 1 to filter results, or limit the scan scope. " +
                                 $"Recommended: threshold >= 50 for models with 300+ views.");
             }
-            if (views.Count > maxViewScan)
+            if (views.Count > maxViews)
             {
-                views = views.Take(maxViewScan).ToList();
+                views = views.Take(maxViews).ToList();
                 capped = true;
             }
 
             var viewStats = new List<(int total, object data)>();
             int totalLines = 0;
             int skippedViews = 0;
+            bool timedOut = false;
 
-            // Determine which categories to scan (combine into one filter if both)
-            bool scanBoth = includeDetailLines && includeModelLines;
+            var detailLineCounts = includeDetailLines
+                ? CountDetailLinesByOwnerView(doc)
+                : new Dictionary<ElementId, int>();
 
+            var stopwatch = Stopwatch.StartNew();
             foreach (var view in views)
             {
+                if (stopwatch.ElapsedMilliseconds > timeBudgetMs)
+                {
+                    timedOut = true;
+                    break;
+                }
+
                 try
                 {
-                    int detailLineCount = 0;
+                    int detailLineCount;
+                    detailLineCounts.TryGetValue(view.Id, out detailLineCount);
                     int modelLineCount = 0;
 
-                    if (scanBoth)
-                    {
-                        // Single collector with multi-category filter (faster than two separate collectors)
-                        var catFilter = new LogicalOrFilter(
-                            new ElementCategoryFilter(BuiltInCategory.OST_Lines),
-                            new ElementCategoryFilter(BuiltInCategory.OST_GenericLines));
-
-                        var allLines = new FilteredElementCollector(doc, view.Id)
-                            .WherePasses(catFilter)
-                            .WhereElementIsNotElementType();
-
-                        foreach (var lineElem in allLines)
-                        {
-                            if (lineElem.Category == null) continue;
-                            var bicId = lineElem.Category.BuiltInCategory;
-                            if (bicId == BuiltInCategory.OST_Lines)
-                                detailLineCount++;
-                            else
-                                modelLineCount++;
-                        }
-                    }
-                    else if (includeDetailLines)
-                    {
-                        detailLineCount = new FilteredElementCollector(doc, view.Id)
-                            .OfCategory(BuiltInCategory.OST_Lines)
-                            .WhereElementIsNotElementType()
-                            .GetElementCount();
-                    }
-                    else if (includeModelLines)
+                    if (includeModelLines)
                     {
                         modelLineCount = new FilteredElementCollector(doc, view.Id)
                             .OfCategory(BuiltInCategory.OST_GenericLines)
@@ -148,6 +140,9 @@ public class LinesPerViewCountTool : ICortexTool
                 returnedCount       = limited.Count,
                 truncated           = sorted.Count > limit,
                 capped,
+                maxViews,
+                timedOut,
+                timeBudgetMs,
                 threshold,
                 skippedViews,
                 views = limited
@@ -158,5 +153,25 @@ public class LinesPerViewCountTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
                 $"Failed to count lines per view: {ex.Message}");
         }
+    }
+
+    private static Dictionary<ElementId, int> CountDetailLinesByOwnerView(Document doc)
+    {
+        var counts = new Dictionary<ElementId, int>();
+        var detailLines = new FilteredElementCollector(doc)
+            .OfCategory(BuiltInCategory.OST_Lines)
+            .WhereElementIsNotElementType();
+
+        foreach (var line in detailLines)
+        {
+            var ownerViewId = line.OwnerViewId;
+            if (ownerViewId == ElementId.InvalidElementId) continue;
+
+            int current;
+            counts.TryGetValue(ownerViewId, out current);
+            counts[ownerViewId] = current + 1;
+        }
+
+        return counts;
     }
 }

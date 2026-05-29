@@ -87,7 +87,8 @@ public class IfcExportWithConfigurationTool : ICortexTool, ICommandTimeoutTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Output directory does not exist: {outputDirectory}");
 
-        var fileName = input["fileName"]?.Value<string>() ?? "";
+        var requestedFileName = input["fileName"]?.Value<string>() ?? "";
+        var fileName = NormalizeIfcFileName(requestedFileName, doc!.Title);
         var configName = input["configurationName"]?.Value<string>();
         if (string.IsNullOrWhiteSpace(configName))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
@@ -144,8 +145,7 @@ public class IfcExportWithConfigurationTool : ICortexTool, ICommandTimeoutTool
             var exportResult = doc!.Export(outputDirectory, fileName, options);
             tx.Commit();
 
-            var actualFileName = string.IsNullOrEmpty(fileName) ? doc.Title : fileName;
-            var outputPath = Path.Combine(outputDirectory, actualFileName + ".ifc");
+            var outputPath = Path.Combine(outputDirectory, fileName + ".ifc");
 
             if (!exportResult)
                 return CortexResult<object>.Fail(CortexErrorCode.Unknown,
@@ -163,7 +163,7 @@ public class IfcExportWithConfigurationTool : ICortexTool, ICommandTimeoutTool
             {
                 configurationName = configName,
                 outputDirectory,
-                fileName = actualFileName + ".ifc",
+                fileName = fileName + ".ifc",
                 outputPath,
                 fileSizeBytes = fileInfo.Length,
                 fileVersion = fileVersion.ToString(),
@@ -175,5 +175,15 @@ public class IfcExportWithConfigurationTool : ICortexTool, ICommandTimeoutTool
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
                 $"IFC export failed: {ex.Message}");
         }
+    }
+
+    private static string NormalizeIfcFileName(string fileName, string documentTitle)
+    {
+        var effectiveName = string.IsNullOrWhiteSpace(fileName) ? documentTitle : fileName.Trim();
+        var extension = Path.GetExtension(effectiveName);
+        if (extension.Equals(".ifc", StringComparison.OrdinalIgnoreCase))
+            effectiveName = Path.GetFileNameWithoutExtension(effectiveName);
+
+        return effectiveName;
     }
 }

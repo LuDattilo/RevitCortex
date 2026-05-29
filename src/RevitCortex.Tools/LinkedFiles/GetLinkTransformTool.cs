@@ -26,7 +26,9 @@ public class GetLinkTransformTool : ICortexTool
         if (doc == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
 
-        var instanceId = input["instanceId"]?.Value<long>() ?? 0;
+        var instanceId = input["instanceId"]?.Value<long?>()
+            ?? input["linkInstanceId"]?.Value<long?>()
+            ?? 0;
         if (instanceId <= 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "instanceId is required");
 

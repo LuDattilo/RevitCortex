@@ -1,0 +1,170 @@
+[
+  {
+    "tool": "set_element_parameters",
+    "status": "OK",
+    "ms": 2372,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Set 1/1 parameters successfully\",\"successCount\":1,\"failCount\":0,\"results\":[{\"elementId\":619340,\"parameterName\":\"Comments\",\"success\":true,\"message\":\"Parameter set successfully\"}]}}"
+  },
+  {
+    "tool": "bulk_modify_parameter_values",
+    "status": "OK",
+    "ms": 84,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"dryRun\":true,\"modifiedCount\":1132,\"skippedCount\":0,\"sampleIncluded\":false,\"sampleLimit\":null,\"modified\":null}}"
+  },
+  {
+    "tool": "clear_parameter_values",
+    "status": "OK",
+    "ms": 424,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"dryRun\":true,\"clearedCount\":10234,\"skippedCount\":28223,\"cleared\":[{\"id\":18435,\"oldValue\":\"\"},{\"id\":18436,\"oldValue\":\"\"},{\"id\":18437,\"oldValue\":\"\"},{\"id\":18438,\"oldValue\":\"\"},{\"id\":18439,\"oldValue\":\"\"},{\"id\":18935,\"oldValue\":\"\"},{\"id\":18939,\"oldValue\":\"\"},{\"id\":18940,\"oldValue\":\""
+  },
+  {
+    "tool": "purge_unused",
+    "status": "OK",
+    "ms": 203,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"dryRun\":true,\"unusedTypeCount\":423,\"unusedMaterialCount\":81,\"unusedViewTemplateCount\":20,\"unusedFilterCount\":2,\"unusedTypes\":[{\"id\":28601,\"name\":\"2.5\\\" Circular\",\"category\":\"Curtain Wall Mullions\"},{\"id\":28603,\"name\":\"1.5\\\" x 2.5\\\" rectangular\",\"category\":\"Curtain Wall Mullions\""
+  },
+  {
+    "tool": "set_compound_structure",
+    "status": "ERR",
+    "ms": 40,
+    "note": "dryRun (typeId placeholder)",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":100,\"message\":\"System family type not found. Provide typeId or typeName+category.\",\"data\":{\"code\":\"ElementNotFound\",\"message\":\"System family type not found. Provide typeId or typeName+category.\",\"suggestion\":\"Use get_compound_structure to find the type first\"}}}"
+  },
+  {
+    "tool": "set_material_properties",
+    "status": "OK",
+    "ms": 10,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"dryRun\":true,\"modifiedCount\":0,\"results\":[{\"materialId\":0,\"success\":false,\"reason\":\"Material not found\",\"changedProperties\":null}]}}"
+  },
+  {
+    "tool": "batch_rename",
+    "status": "ERR",
+    "ms": 5,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":400,\"message\":\"elementIds or targetCategory required\",\"data\":{\"code\":\"InvalidInput\",\"message\":\"elementIds or targetCategory required\"}}}"
+  },
+  {
+    "tool": "rename_views",
+    "status": "ERR",
+    "ms": 18,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":900,\"message\":\"Failed: The value cannot be an empty string. (Parameter 'oldValue')\",\"data\":{\"code\":\"Unknown\",\"message\":\"Failed: The value cannot be an empty string. (Parameter 'oldValue')\"}}}"
+  },
+  {
+    "tool": "rename_families",
+    "status": "OK",
+    "ms": 26,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"dryRun\":true,\"renamedCount\":0,\"results\":[]}}"
+  },
+  {
+    "tool": "wipe_empty_tags",
+    "status": "OK",
+    "ms": 57,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"dryRun\":true,\"emptyTagCount\":1039,\"emptyTags\":[{\"id\":1265863,\"reason\":\"Empty tag text\",\"viewName\":\"WV_L1 - Dimensions Large Scale\"},{\"id\":1265864,\"reason\":\"Empty tag text\",\"viewName\":\"WV_L1 - Dimensions Large Scale\"},{\"id\":1265865,\"reason\":\"Empty tag text\",\"viewName\":\"WV_L1 - Di"
+  },
+  {
+    "tool": "renumber_elements",
+    "status": "ERR",
+    "ms": 7,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":400,\"message\":\"Provide elementIds or targetCategory (Rooms|Doors|Windows|Parking)\",\"data\":{\"code\":\"InvalidInput\",\"message\":\"Provide elementIds or targetCategory (Rooms|Doors|Windows|Parking)\",\"suggestion\":\"Example: {\\\"targetCategory\\\": \\\"Rooms\\\", \\\"startNumber\\\": 1, \\\"dryRu"
+  },
+  {
+    "tool": "match_element_properties",
+    "status": "ERR",
+    "ms": 6,
+    "note": "dryRun",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":400,\"message\":\"sourceElementId is required\",\"data\":{\"code\":\"InvalidInput\",\"message\":\"sourceElementId is required\",\"suggestion\":\"Provide the element ID of the source element, e.g. {\\\"sourceElementId\\\": 123456}\"}}}"
+  },
+  {
+    "tool": "create_level",
+    "status": "OK",
+    "ms": 25,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"levelId\":2667190,\"name\":\"RC_BULK2_LVL_05294345\",\"elevationMm\":88000.0,\"isBuildingStory\":true,\"floorPlanId\":null,\"ceilingPlanId\":null,\"warnings\":[]}}"
+  },
+  {
+    "tool": "create_grid",
+    "status": "OK",
+    "ms": 61,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"createdCount\":1,\"grids\":[{\"id\":2667191,\"axis\":\"X\",\"name\":\"142903\",\"requestedLabel\":\"A\",\"position\":0.0}],\"warnings\":[\"Grid label 'A' already exists, auto-assigned '142903'.\"]}}"
+  },
+  {
+    "tool": "create_sheet",
+    "status": "OK",
+    "ms": 118,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"sheetId\":2667192,\"sheetNumber\":\"RCCT-0529143720-RCM-0529142903\",\"sheetName\":\"Unnamed\"}}"
+  },
+  {
+    "tool": "create_revision",
+    "status": "OK",
+    "ms": 359,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"action\":\"create\",\"revisionId\":2667206,\"date\":\"Date 6\",\"description\":\"RC_BULK2 rev 05294345\",\"issued\":false,\"visibility\":\"CloudAndTagVisible\"}}"
+  },
+  {
+    "tool": "create_view",
+    "status": "OK",
+    "ms": 273,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"viewId\":2667207,\"viewName\":\"RC_BULK2_FP_05294345\",\"viewType\":\"FloorPlan\",\"scale\":100}}"
+  },
+  {
+    "tool": "create_view",
+    "status": "OK",
+    "ms": 169,
+    "note": "real (drafting — was a Phase0 bug)",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"viewId\":2667217,\"viewName\":\"RC_BULK2_DRAFT_05294345\",\"viewType\":\"DraftingView\",\"scale\":100}}"
+  },
+  {
+    "tool": "create_schedule",
+    "status": "OK",
+    "ms": 147,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"scheduleId\":2667224,\"scheduleName\":\"RC_BULK2_SCHED_05294345\",\"scheduleType\":\"regular\",\"addedFieldCount\":2,\"addedFields\":[\"Family and Type\",\"Count\"],\"skippedFieldCount\":0,\"skippedFields\":[],\"schedulableFieldNames\":null}}"
+  },
+  {
+    "tool": "create_text_note",
+    "status": "OK",
+    "ms": 95,
+    "note": "real (rotation+leader — Phase3e)",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"createdCount\":1,\"createdTextNoteIds\":[2667231],\"warnings\":[]}}"
+  },
+  {
+    "tool": "duplicate_system_type",
+    "status": "ERR",
+    "ms": 58,
+    "note": "real",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":100,\"message\":\"Type 'Generic - 200mm' not found in category Walls\",\"data\":{\"code\":\"ElementNotFound\",\"message\":\"Type 'Generic - 200mm' not found in category Walls\",\"suggestion\":\"Use get_available_family_types to list available types\"}}}"
+  },
+  {
+    "tool": "create_array",
+    "status": "OK",
+    "ms": 3615,
+    "note": "real (associative ArrayElement — Phase4e)",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"arrayType\":\"linear\",\"associative\":true,\"count\":3,\"arrayElementId\":2667238,\"message\":\"Created associative linear array of 3 (ArrayElement 2667238)\"}}"
+  },
+  {
+    "tool": "set_project_info",
+    "status": "OK",
+    "ms": 206,
+    "note": "confirm-gated",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Updated 1 field(s)\",\"changedFields\":[\"status\"]}}"
+  },
+  {
+    "tool": "manage_worksets",
+    "status": "ERR",
+    "ms": 2,
+    "note": "confirm-gated",
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"error\":{\"code\":400,\"message\":\"Tool 'manage_worksets' is not available for this document\",\"data\":{\"code\":\"InvalidInput\",\"message\":\"Tool 'manage_worksets' is not available for this document\",\"suggestion\":\"This tool requires specific document features (e.g., worksets, phases)\"}}}"
+  }
+]

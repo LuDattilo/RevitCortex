@@ -1,0 +1,314 @@
+[
+  {
+    "tool": "say_hello",
+    "status": "OK",
+    "ms": 82,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Hello from RevitCortex!\",\"locale\":\"en\",\"toolCount\":\"RevitCortex is running\"}}"
+  },
+  {
+    "tool": "get_cache_stats",
+    "status": "OK",
+    "ms": 10,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"entryCount\":3,\"estimatedBytes\":1291,\"totalHits\":1,\"totalMisses\":16,\"overallHitRate\":0.058823529411764705,\"documentVersion\":28,\"perTool\":[{\"tool\":\"get_project_info\",\"hits\":1,\"misses\":5,\"entries\":1,\"hitRate\":0.16666666666666666},{\"tool\":\"get_phases\",\"hits\":0,\"m"
+  },
+  {
+    "tool": "clear_cache",
+    "status": "OK",
+    "ms": 8,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"cleared\":3,\"message\":\"Cleared 3 cache entries.\"}}"
+  },
+  {
+    "tool": "get_project_info",
+    "status": "OK",
+    "ms": 7,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"projectName\":\"Snowdon Towers\",\"projectNumber\":\"7765328-33-A\",\"projectAddress\":\"43 Market ST\\r\\nBrownsville, PA 15417\",\"buildingName\":\"Snowdon Towers\",\"author\":\"Autodesk\",\"organizationName\":\"Brownsville, PA\",\"organizationDescription\":\"\",\"issueDate\":\"6/1/2023\","
+  },
+  {
+    "tool": "get_current_view_info",
+    "status": "OK",
+    "ms": 7,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"id\":850623,\"uniqueId\":\"487309ac-3af1-4fab-a7bb-9b30a3910b36-000cfabf\",\"name\":\"Cover\",\"viewType\":\"DrawingSheet\",\"isTemplate\":false,\"scale\":1,\"detailLevel\":\"Undefined\"}}"
+  },
+  {
+    "tool": "check_model_health",
+    "status": "OK",
+    "ms": 138,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"healthScore\":80.0,\"grade\":\"B\",\"warningCount\":49,\"inPlaceFamilyCount\":2,\"unusedFamilyCount\":76,\"cadImportCount\":0,\"unplacedRoomCount\":0,\"unplacedViewCount\":205,\"issues\":[{\"issue\":\"49 warnings\",\"severity\":\"low\",\"recommendation\":\"Review and resolve warnings\"},{\""
+  },
+  {
+    "tool": "analyze_model_statistics",
+    "status": "OK",
+    "ms": 1696,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"totalElements\":38457,\"totalTypes\":1878,\"totalFamilies\":286,\"totalViews\":383,\"totalViewTemplates\":45,\"totalSheets\":59,\"totalWarnings\":49,\"categoryBreakdown\":[{\"category\":\"<Sketch>\",\"count\":3215},{\"category\":\"Analytical Surfaces\",\"count\":3041},{\"category\":\"Supp"
+  },
+  {
+    "tool": "get_warnings",
+    "status": "OK",
+    "ms": 6,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"totalWarnings\":49,\"returnedWarnings\":10,\"severityCounts\":{\"Error\":0,\"Warning\":10},\"warnings\":[{\"severity\":\"Warning\",\"description\":\"Thickness of this Roof may be slightly inaccurate due to extreme Shape Editing. Dimensions to this element in sections and detai"
+  },
+  {
+    "tool": "get_phases",
+    "status": "OK",
+    "ms": 11,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"phases\":[{\"id\":2287613,\"name\":\"Legends\"},{\"id\":32440,\"name\":\"Existing\"},{\"id\":118390,\"name\":\"New Construction\"}],\"phaseFilters\":[{\"id\":22793,\"name\":\"Show Previous Phase\"},{\"id\":22794,\"name\":\"Show Previous + New\"},{\"id\":22795,\"name\":\"Show Previous + Demo\"},{\"i"
+  },
+  {
+    "tool": "get_worksets",
+    "status": "OK",
+    "ms": 5,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Retrieved 2 workset(s)\",\"worksetCount\":2,\"worksets\":[{\"id\":0,\"name\":\"Workset1\",\"kind\":\"UserWorkset\",\"isOpen\":true,\"isEditable\":false,\"owner\":\"\",\"isDefaultWorkset\":true,\"isVisibleByDefault\":true},{\"id\":183,\"name\":\"Shared Levels and Grids\",\"kind\":\"Use"
+  },
+  {
+    "tool": "get_selected_elements",
+    "status": "OK",
+    "ms": 4,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"No elements are currently selected\",\"selectedCount\":0,\"elements\":[]}}"
+  },
+  {
+    "tool": "ai_element_filter",
+    "status": "OK",
+    "ms": 24,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Found 1132 element(s), returning 3 (limited to 3 of 1132 matches)\",\"totalCount\":1132,\"returnedCount\":3,\"elements\":[{\"elementId\":619340,\"uniqueId\":\"50f92000-82f8-4258-b6a8-bb42c01b00a0-0009734c\",\"name\":\"MUR-EST-FCL_MTL_346mm_DueLati_08\",\"familyName\":"
+  },
+  {
+    "tool": "ai_element_filter",
+    "status": "OK",
+    "ms": 48,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Found 37325 element(s), returning 3 (limited to 3 of 37325 matches)\",\"totalCount\":37325,\"returnedCount\":3,\"elements\":[{\"elementId\":17,\"uniqueId\":\"d3516a40-06bf-11d4-91b5-0000863f27ad-00000011\",\"name\":\"\",\"category\":null,\"builtInCategory\":null,\"boundi"
+  },
+  {
+    "tool": "ai_element_filter",
+    "status": "OK",
+    "ms": 31,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Found 12 element(s), returning 3 (limited to 3 of 12 matches)\",\"totalCount\":12,\"returnedCount\":3,\"elements\":[{\"elementId\":678093,\"uniqueId\":\"717ca888-caa1-4d79-a802-1815f215117a-000a58cd\",\"name\":\"POR-ASB-914x2134mm_02\",\"familyName\":\"POR-Door-Passage"
+  },
+  {
+    "tool": "export_elements_data",
+    "status": "OK",
+    "ms": 111,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"totalCount\":17853,\"filteredCount\":17853,\"exportedCount\":3,\"truncated\":true,\"categoriesUsed\":[\"All\"],\"outputFormat\":\"json\",\"columns\":[\"ElementId\",\"Category\",\"Name\",\"Color\",\"Comments\",\"Cost\",\"Description\",\"Design Option\",\"Edited by\",\"Export to IFC\",\"Export to I"
+  },
+  {
+    "tool": "filter_by_parameter_value",
+    "status": "OK",
+    "ms": 611,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"matchCount\":1172,\"totalScanned\":38457,\"logic\":null,\"conditions\":[{\"ParameterName\":\"Type Name\",\"Condition\":\"contains\",\"Value\":\"MUR\"}],\"elements\":[{\"elementId\":619340,\"category\":\"Walls\",\"familyName\":\"\",\"typeName\":\"MUR-EST-FCL_MTL_346mm_DueLati_08\",\"matchedValue"
+  },
+  {
+    "tool": "filter_by_parameter_value",
+    "status": "OK",
+    "ms": 113,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"matchCount\":3,\"totalScanned\":1132,\"logic\":\"or\",\"conditions\":[{\"ParameterName\":\"Mark\",\"Condition\":\"is_not_empty\",\"Value\":\"\"},{\"ParameterName\":\"Comments\",\"Condition\":\"contains\",\"Value\":\"x\"}],\"elements\":[{\"elementId\":619340,\"category\":\"Walls\",\"familyName\":\"\",\"ty"
+  },
+  {
+    "tool": "get_current_view_elements",
+    "status": "OK",
+    "ms": 7,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"viewId\":850623,\"viewName\":\"Cover\",\"totalElementsInView\":25,\"filteredElementCount\":14,\"truncated\":true,\"elements\":[{\"id\":850628,\"uniqueId\":\"487309ac-3af1-4fab-a7bb-9b30a3910b36-000cfac4\",\"name\":\"E1 30 x 42 Cover_Snowdon\",\"category\":\"Title Blocks\",\"typeName\":\"E"
+  },
+  {
+    "tool": "get_elements_in_spatial_volume",
+    "status": "OK",
+    "ms": 22,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Found 22 element(s) across 1 volume(s)\",\"totalElements\":22,\"volumeCount\":1,\"categoryFilter\":[\"OST_Walls\"],\"volumes\":[{\"volumeType\":\"custom\",\"volumeId\":0,\"volumeName\":\"Custom Bounding Box\",\"elementCount\":5,\"totalElementCount\":22,\"truncated\":true,\"ele"
+  },
+  {
+    "tool": "get_room_openings",
+    "status": "OK",
+    "ms": 717,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"totalRooms\":54,\"totalDoors\":183,\"totalWindows\":106,\"rooms\":[{\"roomId\":826376,\"roomName\":\"Spazio-Stair S1\",\"roomNumber\":\"S1\",\"level\":\"L1 - Block 35\",\"area\":17.15,\"roomParameters\":null,\"doorCount\":6,\"doors\":[{\"elementId\":631418,\"familyName\":\"POR-Door-Passage-Si"
+  },
+  {
+    "tool": "find_untagged_elements",
+    "status": "OK",
+    "ms": 5,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"viewId\":850623,\"viewName\":\"Cover\",\"totalElementsChecked\":0,\"untaggedCount\":0,\"truncated\":false,\"untaggedElements\":[]}}"
+  },
+  {
+    "tool": "find_undimensioned_elements",
+    "status": "OK",
+    "ms": 4,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"viewId\":850623,\"viewName\":\"Cover\",\"totalElementsChecked\":0,\"undimensionedCount\":0,\"truncated\":false,\"undimensionedElements\":[]}}"
+  },
+  {
+    "tool": "measure_between_elements",
+    "status": "OK",
+    "ms": 7,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Distance: 1000'0 mm (1'000 m)\",\"distance\":1000.0,\"distanceMeters\":1.0,\"deltaX\":1000.0,\"deltaY\":0.0,\"deltaZ\":0.0,\"point1\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"point2\":{\"x\":1000.0,\"y\":0.0,\"z\":0.0},\"measureType\":\"center_to_center\"}}"
+  },
+  {
+    "tool": "audit_families",
+    "status": "OK",
+    "ms": 74,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"summary\":{\"totalFamilies\":10,\"loadableCount\":10,\"systemCount\":0,\"unusedCount\":0,\"inPlaceCount\":0,\"totalInstances\":144,\"byCategory\":[{\"category\":\"Doors\",\"familyCount\":10,\"instanceCount\":144}]},\"includeSystemFamilies\":false,\"families\":[{\"id\":2159935,\"name\":\"POR"
+  },
+  {
+    "tool": "get_available_family_types",
+    "status": "OK",
+    "ms": 77,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":[{\"familyTypeId\":387954,\"uniqueId\":\"f7edc243-24da-4675-ac4a-c3ac9c939f35-0005eb72\",\"familyName\":\"POR-Door-Passage-Single-Flush\",\"typeName\":\"POR-ASB-762x2032mm_01\",\"category\":\"Doors\"},{\"familyTypeId\":387956,\"uniqueId\":\"f7edc243-24da-4675-ac4a-c3ac9c939f35-0005eb"
+  },
+  {
+    "tool": "list_family_sizes",
+    "status": "OK",
+    "ms": 36,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"totalFamilies\":286,\"totalInstances\":7604,\"returnedCount\":50,\"truncated\":true,\"sortedBy\":\"instanceCount\",\"sizeMeasured\":false,\"families\":[{\"familyId\":1868529,\"familyName\":\"Support - Steel Bar\",\"category\":\"Supports\",\"typeCount\":1,\"instanceCount\":2406,\"isInPlace"
+  },
+  {
+    "tool": "clash_detection",
+    "status": "OK",
+    "ms": 34,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"setACount\":1132,\"setBCount\":192,\"method\":\"solid_geometry\",\"clashCount\":5,\"clashes\":[{\"elementIdA\":619550,\"elementIdB\":2101367,\"categoryA\":\"Walls\",\"categoryB\":\"Floors\",\"nameA\":\"MUR-EST-FCL_MTL_321mm_Alley_07\",\"nameB\":\"SOL-STR-CLC_NucleoTecnico_11\"},{\"elementId"
+  },
+  {
+    "tool": "get_materials",
+    "status": "OK",
+    "ms": 16,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"materialCount\":222,\"materials\":[{\"id\":18435,\"name\":\"Default\",\"materialClass\":\"Miscellaneous\",\"materialCategory\":\"Miscellaneous\",\"color\":\"#C0C0C0\",\"transparency\":0,\"shininess\":0,\"smoothness\":50,\"hasAppearanceAsset\":true,\"hasStructuralAsset\":false,\"hasThermalAs"
+  },
+  {
+    "tool": "get_material_quantities",
+    "status": "OK",
+    "ms": 995,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"totalMaterials\":50,\"totalCount\":141,\"truncated\":true,\"totalArea\":709686.3535,\"totalVolume\":159292.2072,\"materials\":[{\"materialId\":18939,\"materialName\":\"Concrete, Cast-in-Place gray\",\"materialClass\":\"Concrete\",\"area\":48609.5069,\"volume\":45180.1093,\"elementCoun"
+  },
+  {
+    "tool": "get_shared_parameters",
+    "status": "OK",
+    "ms": 107,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"parameterCount\":94,\"parameters\":[{\"name\":\"Occupant\",\"isShared\":false,\"guid\":\"\",\"isInstance\":true,\"parameterType\":\"autodesk.spec:spec.string-2.0.0\",\"parameterGroup\":\"autodesk.parameter.group:identityData-1.0.0\",\"categories\":[\"Rooms\"]},{\"name\":\"Material\",\"isSha"
+  },
+  {
+    "tool": "manage_global_parameters",
+    "status": "OK",
+    "ms": 52,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"parameterCount\":13,\"parameters\":[{\"elementId\":938059,\"name\":\"Windows_North Elevation Inset\",\"formula\":\"\",\"valueType\":\"double\",\"value\":\"0'666667\"},{\"elementId\":1071273,\"name\":\"Balustrade_Block 37_Module 24\",\"formula\":\"0'  1\\\" * 24\",\"valueType\":\"double\",\"value\""
+  },
+  {
+    "tool": "manage_project_parameters",
+    "status": "OK",
+    "ms": 5,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"parameterCount\":94,\"parameters\":[{\"name\":\"Occupant\",\"isShared\":false,\"guid\":\"\",\"isInstance\":true,\"parameterType\":\"autodesk.spec:spec.string-2.0.0\",\"parameterGroup\":\"autodesk.parameter.group:identityData-1.0.0\",\"categories\":[\"Rooms\"]},{\"name\":\"Material\",\"isSha"
+  },
+  {
+    "tool": "manage_project_units",
+    "status": "OK",
+    "ms": 14,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"specCount\":11,\"specs\":[{\"specType\":\"length\",\"displayUnit\":\"Feet and fractional inches\",\"unitTypeId\":\"autodesk.unit.unit:feetFractionalInches-1.0.0\",\"accuracy\":0.0026041666666666665},{\"specType\":\"area\",\"displayUnit\":\"Square feet\",\"unitTypeId\":\"autodesk.unit.un"
+  },
+  {
+    "tool": "list_schedulable_fields",
+    "status": "OK",
+    "ms": 2101,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"category\":\"OST_Rooms\",\"scheduleType\":\"regular\",\"fieldCount\":170,\"fields\":[{\"name\":\"Area\",\"fieldType\":\"ViewBased\",\"parameterId\":-1006902},{\"name\":\"Author\",\"fieldType\":\"ProjectInfo\",\"parameterId\":-1019005},{\"name\":\"Base Finish\",\"fieldType\":\"Instance\",\"parameter"
+  },
+  {
+    "tool": "manage_view_templates",
+    "status": "OK",
+    "ms": 131,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"templateCount\":45,\"templates\":[{\"id\":29485,\"name\":\"Architectural Plan\",\"viewType\":\"FloorPlan\"},{\"id\":29499,\"name\":\"Structural Framing Plan\",\"viewType\":\"FloorPlan\"},{\"id\":30275,\"name\":\"Site Plan\",\"viewType\":\"FloorPlan\"},{\"id\":31731,\"name\":\"Structural Framing E"
+  },
+  {
+    "tool": "apply_view_template",
+    "status": "OK",
+    "ms": 13,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"templateCount\":45,\"templates\":[{\"id\":29485,\"name\":\"Architectural Plan\",\"viewType\":\"FloorPlan\"},{\"id\":29499,\"name\":\"Structural Framing Plan\",\"viewType\":\"FloorPlan\"},{\"id\":30275,\"name\":\"Site Plan\",\"viewType\":\"FloorPlan\"},{\"id\":31731,\"name\":\"Structural Framing E"
+  },
+  {
+    "tool": "manage_phase_filters",
+    "status": "OK",
+    "ms": 12,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"action\":\"list\",\"filterCount\":8,\"filters\":[{\"id\":2287719,\"name\":\"Legends\",\"presentations\":{\"New\":\"DontShow\",\"Existing\":\"DontShow\",\"Demolished\":\"DontShow\",\"Temporary\":\"ShowByCategory\"}},{\"id\":22797,\"name\":\"Show All\",\"presentations\":{\"New\":\"ShowByCategory\",\"Exis"
+  },
+  {
+    "tool": "manage_unplaced_views",
+    "status": "OK",
+    "ms": 20,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"action\":\"list\",\"unplacedViewCount\":205,\"views\":[{\"id\":445958,\"name\":\"Text and Dimensions\",\"viewType\":\"Legend\"},{\"id\":510933,\"name\":\"Door Schedule\",\"viewType\":\"Schedule\"},{\"id\":510937,\"name\":\"Room Finish Schedule\",\"viewType\":\"Schedule\"},{\"id\":510941,\"name\":\"Wi"
+  },
+  {
+    "tool": "manage_additional_settings",
+    "status": "OK",
+    "ms": 5,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"styleCount\":29,\"lineStyles\":[{\"id\":-2001033,\"name\":\"<Area Based Load Boundary>\",\"lineWeight\":1,\"linePattern\":\"Solid\",\"color\":\"#000000\"},{\"id\":-2000079,\"name\":\"<Area Boundary>\",\"lineWeight\":6,\"linePattern\":\"Solid\",\"color\":\"#8000FF\"},{\"id\":-2000065,\"name\":\"<Axi"
+  },
+  {
+    "tool": "create_view_filter",
+    "status": "OK",
+    "ms": 13,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"filterCount\":56,\"filters\":[{\"id\":149962,\"name\":\"Interior\",\"categoryCount\":5},{\"id\":613325,\"name\":\"Elements to Hide - Levels\",\"categoryCount\":1},{\"id\":613365,\"name\":\"Levels - Primary\",\"categoryCount\":1},{\"id\":631941,\"name\":\"_Phase Starter\",\"categoryCount\":146}"
+  },
+  {
+    "tool": "create_revision",
+    "status": "OK",
+    "ms": 11,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"revisionCount\":5,\"revisions\":[{\"id\":75715,\"sequenceNumber\":1,\"date\":\"5/1/2023\",\"description\":\"Schematic Design\",\"issuedBy\":\"\",\"issuedTo\":\"\"},{\"id\":2278642,\"sequenceNumber\":2,\"date\":\"6/1/2023\",\"description\":\"Not For Construction\",\"issuedBy\":\"\",\"issuedTo\":\"\"},{"
+  },
+  {
+    "tool": "manage_links",
+    "status": "OK",
+    "ms": 20,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"linkCount\":6,\"links\":[{\"id\":2403932,\"typeId\":2403931,\"name\":\"Snowdon Towers Sample Facades.rvt : 16 : location <Not Shared>\",\"linkType\":\"Revit\",\"isLoaded\":true,\"path\":\"Autodesk.Revit.DB.FilePath\"},{\"id\":2409046,\"typeId\":2409045,\"name\":\"Snowdon Towers Sample S"
+  },
+  {
+    "tool": "get_linked_file_instances",
+    "status": "OK",
+    "ms": 23,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"Found 6 linked file type(s) with 6 instance(s)\",\"typeCount\":6,\"totalInstances\":6,\"linkedFiles\":[{\"typeId\":2403931,\"typeName\":\"Snowdon Towers Sample Facades.rvt\",\"isLoaded\":true,\"path\":\"C:\\\\Program Files\\\\Autodesk\\\\Revit 2025\\\\Samples\\\\Snowdon Towers"
+  },
+  {
+    "tool": "get_coordination_models",
+    "status": "OK",
+    "ms": 7,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"apiAvailable\":false,\"modelCount\":0,\"totalInstances\":0,\"models\":[],\"message\":\"Coordination Model API is not available for this Revit target.\"}}"
+  },
+  {
+    "tool": "get_selected_linked_elements",
+    "status": "OK",
+    "ms": 4,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"No elements selected. Ask the user to select one or more linked file instances.\",\"selectedLinkCount\":0,\"links\":[]}}"
+  },
+  {
+    "tool": "ifc_get_capabilities",
+    "status": "OK",
+    "ms": 7,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"supportedExportVersions\":[\"IFCBCA\",\"IFC2x2\",\"IFC2x3\",\"IFCCOBIE\",\"IFC2x3CV2\",\"IFC4\",\"IFC2x3FM\",\"IFC4RV\",\"IFC4DTV\",\"IFC2x3BFM\",\"IFC4x3\",\"IFCSG\"],\"supportedImportActions\":[\"open\",\"link\"],\"supportedImportIntents\":[\"reference\",\"parametric\"],\"revitIfcAddinInstalled"
+  },
+  {
+    "tool": "ifc_list_export_configurations",
+    "status": "OK",
+    "ms": 5,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"count\":5,\"configurations\":[{\"name\":\"IFC4 Reference View\",\"ifcVersion\":\"IFC4RV\",\"description\":\"IFC4 Reference View — lightweight geometry for coordination and reference\"},{\"name\":\"IFC4 Design Transfer View\",\"ifcVersion\":\"IFC4DTV\",\"description\":\"IFC4 Design Tra"
+  },
+  {
+    "tool": "ifc_analyze_rebuildability",
+    "status": "OK",
+    "ms": 17,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"message\":\"No IFC DirectShape elements found\",\"totalAnalyzed\":0,\"results\":[]}}"
+  },
+  {
+    "tool": "ifc_list_rebuild_candidates",
+    "status": "OK",
+    "ms": 12,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"count\":0,\"minConfidence\":0.5,\"source\":\"fresh_scan\",\"candidates\":[]}}"
+  },
+  {
+    "tool": "pbi_check_auth",
+    "status": "OK",
+    "ms": 12,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"signedIn\":true,\"signedJustNow\":false,\"username\":\"luigi.dattilo-co@gpapartners.com\",\"tenantId\":\"53372e72-8a4d-4a86-8745-257d91a1aafc\",\"tokenExpiresOn\":\"2026-05-29T13:46:53.0000000+00:00\",\"tokenLifetimeMinutes\":55,\"clientId\":\"05d231e9-d720-4c54-8ecd-93a85dbef40"
+  },
+  {
+    "tool": "pbi_list_workspaces",
+    "status": "OK",
+    "ms": 406,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"signedInAs\":\"luigi.dattilo-co@gpapartners.com\",\"workspaceCount\":4,\"workspaces\":[{\"id\":\"526217ad-dbd7-446b-8263-96ab8d6729d1\",\"name\":\"GPA BIM\",\"type\":\"Workspace\",\"state\":\"\",\"premium\":false},{\"id\":\"2f5b93d5-adf5-40e3-9c49-c292ab87732b\",\"name\":\"24HBS\",\"type\":\"Wo"
+  },
+  {
+    "tool": "load_selection",
+    "status": "OK",
+    "ms": 12,
+    "snippet": "{\"jsonrpc\":\"2.0\",\"id\":\"bulk2\",\"result\":{\"selectionCount\":1,\"selections\":[{\"name\":\"RC_MAIN_SELECTION_0529143149\",\"id\":2667142,\"elementCount\":2}]}}"
+  }
+]

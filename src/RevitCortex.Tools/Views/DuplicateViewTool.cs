@@ -27,6 +27,9 @@ public class DuplicateViewTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
 
         var viewIds = input["viewIds"]?.ToObject<List<long>>() ?? new List<long>();
+        var legacyViewId = input["viewId"]?.Value<long?>() ?? 0;
+        if (viewIds.Count == 0 && legacyViewId > 0)
+            viewIds.Add(legacyViewId);
         if (viewIds.Count == 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "viewIds array is required");
 

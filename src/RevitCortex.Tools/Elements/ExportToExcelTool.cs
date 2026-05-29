@@ -29,10 +29,14 @@ public class ExportToExcelTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
 
         var categories = input["categories"]?.ToObject<List<string>>() ?? new List<string>();
+        var legacyCategory = input["category"]?.Value<string>();
+        if (categories.Count == 0 && !string.IsNullOrWhiteSpace(legacyCategory))
+            categories.Add(legacyCategory!);
         var parameterNames = input["parameterNames"]?.ToObject<List<string>>() ?? new List<string>();
         var includeTypeParams = input["includeTypeParameters"]?.Value<bool>() ?? false;
         var includeElementId = input["includeElementId"]?.Value<bool>() ?? true;
-        var filePath = input["filePath"]?.Value<string>();
+        var filePath = input["filePath"]?.Value<string>()
+            ?? input["outputPath"]?.Value<string>();
         var sheetName = input["sheetName"]?.Value<string>() ?? "Export";
         var maxElements = input["maxElements"]?.Value<int>() ?? 10000;
 

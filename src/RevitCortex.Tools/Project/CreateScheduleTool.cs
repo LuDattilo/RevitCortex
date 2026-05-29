@@ -26,7 +26,9 @@ public class CreateScheduleTool : ICortexTool
         if (doc == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
 
-        var categoryName = input["categoryName"]?.Value<string>() ?? "";
+        var categoryName = input["categoryName"]?.Value<string>()
+            ?? input["category"]?.Value<string>()
+            ?? "";
         var scheduleName = input["name"]?.Value<string>() ?? "New Schedule";
         var scheduleType = input["scheduleType"]?.Value<string>() ?? "regular";
         var fields = input["fields"] as JArray;

@@ -131,7 +131,9 @@ public class GetScheduleDataTool : ICortexTool
 
         return CortexResult<object>.Ok(new
         {
+            scheduleId,
             scheduleName    = schedule.Name,
+            headers,
             columnHeaders   = headers,
             rows,
             fieldCount      = headers.Count,
