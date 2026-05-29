@@ -35,7 +35,7 @@ public static class ConfirmationHelper
         dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Yes to All",
             "Approve this and all remaining operations without asking again (2 min)");
         dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Auto",
-            "Approve all operations automatically — stop at any time via the ribbon button");
+            "Approve all operations automatically — a floating window lets you stop at any time");
         dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, "No",
             "Cancel this operation");
 
@@ -76,7 +76,7 @@ public static class ConfirmationHelper
         dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Yes to All",
             "Approve this and all remaining operations without asking again (2 min)");
         dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Auto",
-            "Approve all operations automatically — stop at any time via the ribbon button");
+            "Approve all operations automatically — a floating window lets you stop at any time");
         dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, "No",
             "Cancel this operation");
 

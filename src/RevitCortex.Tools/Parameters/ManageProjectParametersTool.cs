@@ -34,14 +34,16 @@ public class ManageProjectParametersTool : ICortexTool
         {
             return action.ToLowerInvariant() switch
             {
-                "list"      => ListParameters(doc),
-                "create"    => CreateParameter(doc, input),
-                "delete"    => DeleteParameter(doc, input, session),
-                "modify"    => ModifyParameter(doc, input),
-                "set_group" => SetParameterGroup(doc, input, session),
+                "list"             => ListParameters(doc),
+                "create"           => CreateParameter(doc, input),
+                "delete"           => DeleteParameter(doc, input, session),
+                "modify"           => ModifyParameter(doc, input),
+                "set_group"        => SetParameterGroup(doc, input, session),
+                "set_binding_type" => SetBindingType(doc, input, session),
+                "rename"           => RenameParameter(doc, input, session),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}",
-                    suggestion: "Use one of: list, create, delete, modify, set_group")
+                    suggestion: "Use one of: list, create, delete, modify, set_group, set_binding_type, rename")
             };
         }
         catch (Exception ex)
@@ -119,6 +121,15 @@ public class ManageProjectParametersTool : ICortexTool
         {
             app.SharedParametersFilename = tempPath;
             var tempSharedFile = app.OpenSharedParameterFile();
+            // OpenSharedParameterFile can return null (file not yet readable, locked,
+            // or hijacked by another add-in). Without this guard the next line throws
+            // a NullReferenceException that escapes as a generic "An error occurred
+            // invoking" before the router can log or surface a useful message.
+            if (tempSharedFile == null)
+                return CortexResult<object>.Fail(CortexErrorCode.Unknown,
+                    "Could not open a temporary shared parameter file to back the new project parameter.",
+                    suggestion: "Another add-in may be holding the shared parameter file. Close other Revit add-ins, or set a valid Shared Parameters file in Manage → Shared Parameters, then retry.");
+
             var group = tempSharedFile.Groups.Create("RevitCortex_Temp");
 
 #if REVIT2023_OR_GREATER
@@ -154,10 +165,18 @@ public class ManageProjectParametersTool : ICortexTool
                 ? (ElementBinding)app.Create.NewInstanceBinding(categorySet)
                 : (ElementBinding)app.Create.NewTypeBinding(categorySet);
 
-            using var tx = new Transaction(doc, "RevitCortex: Create Project Parameter");
-            tx.Start();
-            doc.ParameterBindings.Insert(definition, binding);
-            tx.Commit();
+            bool inserted;
+            using (var tx = new Transaction(doc, "RevitCortex: Create Project Parameter"))
+            {
+                tx.Start();
+                inserted = doc.ParameterBindings.Insert(definition, binding);
+                tx.Commit();
+            }
+
+            if (!inserted)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rejected creating project parameter '{parameterName}'. A parameter with this name may already be bound.",
+                    suggestion: "Call action:list to check existing parameters; use a different name or action:modify to change its bindings.");
 
             return CortexResult<object>.Ok(new
             {
@@ -167,6 +186,14 @@ public class ManageProjectParametersTool : ICortexTool
                 dataType,
                 boundCategories
             });
+        }
+        catch (Exception ex)
+        {
+            // Turn any unhandled Revit/IO/COM exception into a structured failure
+            // with the real message, instead of a generic "An error occurred invoking".
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown,
+                $"Failed to create project parameter '{parameterName}': {ex.Message}",
+                suggestion: "If another add-in is interfering with the shared parameter file, close it and retry, or create the parameter from a shared parameter file via add_shared_parameter.");
         }
         finally
         {
@@ -204,17 +231,207 @@ public class ManageProjectParametersTool : ICortexTool
         if (!session.RequestConfirmation("delete project parameter", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
-        using var tx = new Transaction(doc, "RevitCortex: Delete Project Parameter");
-        tx.Start();
-        var removed = bindingMap.Remove(targetDef);
-        tx.Commit();
+        // A shared-based project parameter (ExternalDefinition) is removed cleanly
+        // via BindingMap.Remove. A NON-shared (internal) project parameter hits
+        // Autodesk bug REVIT-136670: BindingMap.Remove returns true but leaves the
+        // parameter in place. For those we must delete the underlying
+        // ParameterElement instead. We branch accordingly and then VERIFY the
+        // binding is actually gone before reporting success.
+        bool isShared = targetDef is ExternalDefinition;
+        string method;
+
+        using (var tx = new Transaction(doc, "RevitCortex: Delete Project Parameter"))
+        {
+            tx.Start();
+
+            if (isShared)
+            {
+                bindingMap.Remove(targetDef);
+                method = "BindingMap.Remove";
+            }
+            else
+            {
+                // Find the ParameterElement backing this non-shared definition and
+                // delete the element — the documented workaround for REVIT-136670.
+                var paramElement = new FilteredElementCollector(doc)
+                    .OfClass(typeof(ParameterElement))
+                    .Cast<ParameterElement>()
+                    .FirstOrDefault(pe => pe.GetDefinition()?.Name == parameterName);
+
+                if (paramElement != null)
+                {
+                    doc.Delete(paramElement.Id);
+                    method = "Document.Delete(ParameterElement)";
+                }
+                else
+                {
+                    // Fall back to Remove if the element can't be located.
+                    bindingMap.Remove(targetDef);
+                    method = "BindingMap.Remove (ParameterElement not found)";
+                }
+            }
+
+            tx.Commit();
+        }
+
+        // Verify: re-scan the bindings. The parameter must no longer be present.
+        bool stillBound = false;
+        var verifyIter = doc.ParameterBindings.ForwardIterator();
+        while (verifyIter.MoveNext())
+        {
+            if (verifyIter.Key.Name == parameterName) { stillBound = true; break; }
+        }
+
+        if (stillBound)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Parameter '{parameterName}' could not be removed (still bound after delete via {method}). " +
+                (isShared ? "" : "This is a non-shared project parameter affected by Revit bug REVIT-136670."),
+                suggestion: "The parameter may be in use, locked, or built-in. Verify in Revit's Project Parameters dialog.");
 
         return CortexResult<object>.Ok(new
         {
             action = "delete",
             parameterName,
-            success = removed
+            isShared,
+            method,
+            success = true
         });
+    }
+
+    /// <summary>
+    /// Toggles a project parameter between Instance and Type binding. The Revit API
+    /// has no in-place toggle: we capture the existing categories + group, Remove the
+    /// binding, then Insert a fresh binding of the opposite type with the same
+    /// categories. Collect-then-mutate (iterator must be closed before mutating).
+    /// </summary>
+    private static CortexResult<object> SetBindingType(Document doc, JObject input, CortexSession session)
+    {
+        var parameterName = input["parameterName"]?.Value<string>();
+        if (string.IsNullOrEmpty(parameterName))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "parameterName is required for set_binding_type. Example: {\"action\":\"set_binding_type\",\"parameterName\":\"MyParam\",\"isInstance\":false}. First call {\"action\":\"list\"} to discover names.");
+
+        var targetIsInstance = input["isInstance"]?.Value<bool>();
+        if (targetIsInstance == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "isInstance (bool) is required for set_binding_type: true = instance parameter, false = type parameter.");
+
+        // Capture definition, current binding, categories and group up-front.
+        Definition? targetDef = null;
+        ElementBinding? existingBinding = null;
+        {
+            var iter = doc.ParameterBindings.ForwardIterator();
+            while (iter.MoveNext())
+            {
+                if (iter.Key?.Name == parameterName)
+                {
+                    targetDef = iter.Key;
+                    existingBinding = iter.Current as ElementBinding;
+                    break;
+                }
+            }
+        }
+
+        if (targetDef == null || existingBinding == null)
+            return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                $"Parameter '{parameterName}' not found in project bindings");
+
+        bool currentIsInstance = existingBinding is InstanceBinding;
+        if (currentIsInstance == targetIsInstance.Value)
+            return CortexResult<object>.Ok(new
+            {
+                action = "set_binding_type",
+                parameterName,
+                isInstance = currentIsInstance,
+                changed = false,
+                message = $"Parameter is already {(currentIsInstance ? "instance" : "type")}-bound."
+            });
+
+        // Preserve categories (by name → re-fetched canonical Category objects) and group.
+        var catNames = existingBinding.Categories.Cast<Category>().Select(c => c.Name).ToList();
+        var group = (targetDef as InternalDefinition)?.GetGroupTypeId();
+
+        if (!session.RequestConfirmation(
+                $"change '{parameterName}' to {(targetIsInstance.Value ? "instance" : "type")} parameter", 1))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        var app = doc.Application;
+        var categorySet = BuildCategorySet(doc, app, catNames);
+        if (categorySet.Size == 0)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                "Could not rebuild the parameter's category set.");
+
+        ElementBinding newBinding = targetIsInstance.Value
+            ? (ElementBinding)app.Create.NewInstanceBinding(categorySet)
+            : (ElementBinding)app.Create.NewTypeBinding(categorySet);
+
+        using (var tx = new Transaction(doc, "RevitCortex: Change Parameter Binding Type"))
+        {
+            tx.Start();
+            var freshMap = doc.ParameterBindings;
+            freshMap.Remove(targetDef);
+            bool inserted = group != null
+                ? freshMap.Insert(targetDef, newBinding, group)
+                : freshMap.Insert(targetDef, newBinding);
+            if (!inserted)
+            {
+                tx.RollBack();
+                return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
+                    $"Revit rejected re-binding '{parameterName}'. The parameter may be built-in or Revit-owned.",
+                    suggestion: "Instance/type toggle only works on user-created project parameters.");
+            }
+            tx.Commit();
+        }
+
+        return CortexResult<object>.Ok(new
+        {
+            action = "set_binding_type",
+            parameterName,
+            isInstance = targetIsInstance.Value,
+            changed = true,
+            categories = catNames
+        });
+    }
+
+    /// <summary>
+    /// Renaming a bound project parameter is NOT supported by the Revit API
+    /// (Definition.Name is read-only for shared and non-shared definitions; only
+    /// global parameters can be renamed). We surface this clearly rather than
+    /// silently failing, and point at the only real workaround.
+    /// </summary>
+    private static CortexResult<object> RenameParameter(Document doc, JObject input, CortexSession session)
+    {
+        var parameterName = input["parameterName"]?.Value<string>();
+        var newName = input["newName"]?.Value<string>();
+        if (string.IsNullOrEmpty(parameterName) || string.IsNullOrEmpty(newName))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "Both parameterName and newName are required for rename.");
+
+        // Confirm the parameter exists so the error is specific.
+        bool exists = false;
+        bool isShared = false;
+        var iter = doc.ParameterBindings.ForwardIterator();
+        while (iter.MoveNext())
+        {
+            if (iter.Key?.Name == parameterName)
+            {
+                exists = true;
+                isShared = iter.Key is ExternalDefinition;
+                break;
+            }
+        }
+
+        if (!exists)
+            return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                $"Parameter '{parameterName}' not found in project bindings");
+
+        return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
+            $"The Revit API cannot rename a bound {(isShared ? "shared" : "non-shared")} project parameter — " +
+            "Definition.Name is read-only and only global parameters support renaming. " +
+            "Renaming is only possible through Revit's Project Parameters dialog UI.",
+            suggestion: "Workaround: create a new project parameter with the desired name (same data type/categories), " +
+                        "copy values across elements with transfer_parameters or bulk_modify_parameter_values, " +
+                        "then delete the old parameter with {\"action\":\"delete\"}.");
     }
 
     private static CortexResult<object> ModifyParameter(Document doc, JObject input)

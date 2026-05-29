@@ -1,0 +1,87 @@
+<Window x:Class="RevitCortex.Plugin.UI.AutoModeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RevitCortex — Auto mode"
+        Width="430" SizeToContent="Height"
+        WindowStartupLocation="Manual"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStyle="ToolWindow"
+        Topmost="True"
+        Background="White"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+        <!-- Command-link style matching a native Revit TaskDialog link:
+             white background, thin border highlighting on hover, blue arrow,
+             blue title, grey description. -->
+        <Style x:Key="CommandLink" TargetType="Button">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F0F6FC"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#7DA7D9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#E1EDF9"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4F86C6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <!-- Amber accent bar, consistent with the rest of RevitCortex chrome -->
+    <Border BorderBrush="#FB8C00" BorderThickness="0,3,0,0" Background="White">
+        <StackPanel Margin="0">
+
+            <!-- Header (blue, like the TaskDialog main instruction) -->
+            <StackPanel Orientation="Horizontal" Margin="18,16,18,4">
+                <Ellipse Width="10" Height="10" Fill="#FB8C00"
+                         VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Text="Auto mode ON"
+                           FontSize="15" Foreground="#003C8F"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <TextBlock Text="Destructive operations are approved automatically, without confirmation dialogs."
+                       FontSize="12" Foreground="#666"
+                       TextWrapping="Wrap" Margin="18,0,18,10"/>
+
+            <!-- Stop Auto — rendered as a TaskDialog-style command link -->
+            <Button x:Name="StopButton" Style="{StaticResource CommandLink}"
+                    Margin="10,0,10,12" Click="Stop_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#x2192;" FontSize="15" Foreground="#1565C0"
+                               VerticalAlignment="Top" Margin="0,0,10,0"/>
+                    <StackPanel>
+                        <TextBlock Text="Stop Auto" FontSize="13" Foreground="#1565C0"/>
+                        <TextBlock Text="Resume confirmation dialogs for destructive operations"
+                                   FontSize="11" Foreground="#666"
+                                   TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Button>
+
+        </StackPanel>
+    </Border>
+</Window>

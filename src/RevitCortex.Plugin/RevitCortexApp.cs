@@ -23,7 +23,7 @@ public class RevitCortexApp : IExternalApplication
     private UIApplication? _uiApplication;
     private int _port = 8080;
     private Autodesk.Revit.UI.PushButton? _connectButton;
-    private Autodesk.Revit.UI.PushButton? _stopAutoButton;
+    private UI.AutoModeWindow? _autoModeWindow;
     private bool _updateNotificationShown;
     private PbiSelectHttpListener? _pbiSelectListener;
     private PbiActionEventHandler? _pbiActionHandler;
@@ -81,6 +81,7 @@ public class RevitCortexApp : IExternalApplication
             _session = new CortexSession(store);
             _session.ConfirmAction = (action, count, desc) =>
                 ConfirmationHelper.ConfirmWithSession(action, count, desc, _session);
+            _session.AutoModeActivity += OnAutoModeActivity;
             ConfirmationHelper.AutoModeChanged += OnAutoModeChanged;
             var analyzer = new DocumentAnalyzer();
 
@@ -271,18 +272,68 @@ public class RevitCortexApp : IExternalApplication
     }
 
     /// <summary>
-    /// Called when Auto mode is activated or deactivated. Updates the ribbon button
-    /// so it is enabled (and visually prominent) only while Auto is active.
+    /// Called when Auto mode is activated or deactivated. Shows a non-modal
+    /// floating window while Auto is active and closes it when Auto stops.
+    /// Marshals to the UI thread since the activating "Auto" click and the
+    /// deactivation paths can originate off the UI thread.
     /// </summary>
     private void OnAutoModeChanged(bool active)
     {
-        if (_stopAutoButton == null) return;
-        _stopAutoButton.Enabled = active;
-        _stopAutoButton.Image = IconFactory.CreateStopAutoIcon(16, active);
-        _stopAutoButton.LargeImage = IconFactory.CreateStopAutoIcon(32, active);
-        _stopAutoButton.ToolTip = active
-            ? "Auto mode ON — click to stop and resume confirmation dialogs"
-            : "Auto mode is not active";
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke((System.Action)(() => OnAutoModeChanged(active)));
+            return;
+        }
+
+        if (active)
+        {
+            if (_autoModeWindow != null) return; // already showing
+            try
+            {
+                _autoModeWindow = new UI.AutoModeWindow();
+                _autoModeWindow.StopRequested += OnAutoModeWindowStopRequested;
+                _autoModeWindow.Closed += (_, _) => _autoModeWindow = null;
+                _autoModeWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(
+                    $"[RevitCortex] Could not show Auto mode window: {ex.Message}");
+                _autoModeWindow = null;
+            }
+        }
+        else
+        {
+            // Auto turned off from somewhere other than the window (e.g. document
+            // close). Close without re-triggering the stop callback.
+            _autoModeWindow?.CloseFromHost();
+            _autoModeWindow = null;
+        }
+    }
+
+    /// <summary>
+    /// Forwards an Auto-mode auto-approval to the floating window so it can reset
+    /// its inactivity timer. Marshals to the UI thread (the signal originates on
+    /// the tool-execution thread).
+    /// </summary>
+    private void OnAutoModeActivity()
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null) return;
+        dispatcher.BeginInvoke((System.Action)(() => _autoModeWindow?.RegisterActivity()));
+    }
+
+    /// <summary>
+    /// The floating window asked to stop Auto mode (button or X). Turn Auto off
+    /// on the session; the resulting AutoModeChanged(false) is a no-op for the
+    /// window since it is already closing.
+    /// </summary>
+    private void OnAutoModeWindowStopRequested()
+    {
+        if (_session != null)
+            _session.AutoMode = false;
+        ConfirmationHelper.NotifyAutoModeChanged(false);
     }
 
     private void CreateRibbonPanel(UIControlledApplication application)
@@ -335,16 +386,8 @@ public class RevitCortexApp : IExternalApplication
         supportBtn.LargeImage = IconFactory.CreateSupportIcon(32);
         panel.AddItem(supportBtn);
 
-        // Stop Auto Mode button — visible only when Auto mode is active
-        var stopAutoBtn = new PushButtonData(
-            "ID_CORTEX_STOP_AUTO", "Stop\r\nAuto",
-            assemblyLocation, "RevitCortex.Plugin.Commands.StopAutoMode");
-        stopAutoBtn.ToolTip = "Stop Auto mode — resume confirmation dialogs for destructive operations";
-        stopAutoBtn.Image = IconFactory.CreateStopAutoIcon(16);
-        stopAutoBtn.LargeImage = IconFactory.CreateStopAutoIcon(32);
-        _stopAutoButton = panel.AddItem(stopAutoBtn) as Autodesk.Revit.UI.PushButton;
-        if (_stopAutoButton != null)
-            _stopAutoButton.Enabled = false; // hidden/disabled until Auto is activated
+        // Note: Auto mode is stopped via a floating AutoModeWindow shown while
+        // active (see OnAutoModeChanged), not a ribbon button.
     }
 
     private void OnDocumentOpened(object? sender, DocumentOpenedEventArgs args)
@@ -378,8 +421,11 @@ public class RevitCortexApp : IExternalApplication
                     "[RevitCortex] Server stopped: document closing");
             }
 
-            // Clear session state (store, capabilities, locale)
+            // Clear session state (store, capabilities, locale). Reinitialize
+            // sets AutoMode=false on the session; notify the UI so the floating
+            // Auto mode window closes with the document.
             _session?.Reinitialize(new Core.Discovery.DocumentCapabilities(), "en");
+            ConfirmationHelper.NotifyAutoModeChanged(false);
 
             System.Diagnostics.Trace.WriteLine(
                 "[RevitCortex] Session reset: document closing");

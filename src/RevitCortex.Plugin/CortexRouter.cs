@@ -158,7 +158,11 @@ public class CortexRouter
         }
         finally
         {
-            _session.ResetApproveAll();
+            // Reset only the per-batch "Yes to All" flag after each tool. AutoMode
+            // ("Auto") must persist across tool calls until the user clicks Stop Auto
+            // or the document is reinitialized — calling ResetApproveAll() here would
+            // clear AutoMode too and re-prompt on every subsequent destructive op.
+            _session.ApproveAll = false;
         }
 
         // Only cache successful results. Failures must always re-execute so a

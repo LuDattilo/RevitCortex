@@ -38,14 +38,19 @@ public class ManageGlobalParametersTool : ICortexTool
         {
             return action.ToLowerInvariant() switch
             {
-                "list"   => ListGlobalParameters(doc),
-                "get"    => GetGlobalParameter(doc, input),
-                "create" => CreateGlobalParameter(doc, input),
-                "set"    => SetGlobalParameterValue(doc, input),
-                "delete" => DeleteGlobalParameter(doc, input, session),
+                "list"        => ListGlobalParameters(doc),
+                "get"         => GetGlobalParameter(doc, input),
+                "create"      => CreateGlobalParameter(doc, input),
+                "set"         => SetGlobalParameterValue(doc, input),
+                "delete"      => DeleteGlobalParameter(doc, input, session),
+                "rename"      => RenameGlobalParameter(doc, input),
+                "set_formula" => SetGlobalParameterFormula(doc, input),
+                "move_up"     => ReorderGlobalParameter(doc, input, up: true),
+                "move_down"   => ReorderGlobalParameter(doc, input, up: false),
+                "sort"        => SortGlobalParameters(doc, input),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}",
-                    suggestion: "Use one of: list, get, create, set, delete")
+                    suggestion: "Use one of: list, get, create, set, delete, rename, set_formula, move_up, move_down, sort")
             };
         }
         catch (Exception ex)
@@ -168,6 +173,134 @@ public class ManageGlobalParametersTool : ICortexTool
         tx.Commit();
 
         return CortexResult<object>.Ok(new { action = "delete", name });
+    }
+
+    /// <summary>
+    /// Renames a global parameter. Unlike shared/project parameters, the
+    /// GlobalParameter.Name setter is writable, so this is supported.
+    /// </summary>
+    private static CortexResult<object> RenameGlobalParameter(Document doc, JObject input)
+    {
+        var name = input["name"]?.Value<string>();
+        var newName = input["newName"]?.Value<string>();
+        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(newName))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "Both name and newName are required for rename.");
+
+        var gp = FindByName(doc, name!);
+        if (gp == null)
+            return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                $"Global parameter '{name}' not found");
+
+        if (!GlobalParametersManager.IsUniqueName(doc, newName!))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                $"A global parameter named '{newName}' already exists.");
+
+        using var tx = new Transaction(doc, "RevitCortex: Rename Global Parameter");
+        tx.Start();
+        gp.Name = newName;
+        tx.Commit();
+
+        return CortexResult<object>.Ok(new { action = "rename", oldName = name, newName });
+    }
+
+    /// <summary>
+    /// Sets (or clears, with an empty string) the formula driving a global
+    /// parameter. A formula makes the parameter's value read-only.
+    /// </summary>
+    private static CortexResult<object> SetGlobalParameterFormula(Document doc, JObject input)
+    {
+        var name = input["name"]?.Value<string>();
+        if (string.IsNullOrEmpty(name))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "name is required");
+
+        // formula may be empty string to clear; treat missing (null) as an error.
+        if (input["formula"] == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "formula is required for set_formula (pass an empty string to clear the formula).");
+        var formula = input["formula"]!.Value<string>() ?? "";
+
+        var gp = FindByName(doc, name!);
+        if (gp == null)
+            return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                $"Global parameter '{name}' not found");
+
+        using var tx = new Transaction(doc, "RevitCortex: Set Global Parameter Formula");
+        tx.Start();
+        try
+        {
+            gp.SetFormula(formula);
+            tx.Commit();
+        }
+        catch (Exception ex)
+        {
+            if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack();
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                $"Revit rejected the formula: {ex.Message}",
+                suggestion: "Check the formula syntax and that referenced parameters exist and don't create a circular reference.");
+        }
+
+        return CortexResult<object>.Ok(new
+        {
+            action = "set_formula",
+            name,
+            formula = string.IsNullOrEmpty(formula) ? null : formula,
+            cleared = string.IsNullOrEmpty(formula)
+        });
+    }
+
+    /// <summary>
+    /// Moves a global parameter up or down in evaluation/display order. Ordering
+    /// only shifts within the parameter's group.
+    /// </summary>
+    private static CortexResult<object> ReorderGlobalParameter(Document doc, JObject input, bool up)
+    {
+        var name = input["name"]?.Value<string>();
+        if (string.IsNullOrEmpty(name))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "name is required");
+
+        var gp = FindByName(doc, name!);
+        if (gp == null)
+            return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                $"Global parameter '{name}' not found");
+
+        bool moved;
+        using (var tx = new Transaction(doc, "RevitCortex: Reorder Global Parameter"))
+        {
+            tx.Start();
+            moved = up
+                ? GlobalParametersManager.MoveParameterUpOrder(doc, gp.Id)
+                : GlobalParametersManager.MoveParameterDownOrder(doc, gp.Id);
+            tx.Commit();
+        }
+
+        return CortexResult<object>.Ok(new
+        {
+            action = up ? "move_up" : "move_down",
+            name,
+            moved,
+            message = moved ? null : "Already at the boundary of its group; no move performed."
+        });
+    }
+
+    /// <summary>
+    /// Sorts all global parameters ascending or descending (within each group).
+    /// </summary>
+    private static CortexResult<object> SortGlobalParameters(Document doc, JObject input)
+    {
+        var order = (input["order"]?.Value<string>() ?? "ascending").ToLowerInvariant();
+        var sortOrder = order == "descending" || order == "desc"
+            ? ParametersOrder.Descending
+            : ParametersOrder.Ascending;
+
+        using (var tx = new Transaction(doc, "RevitCortex: Sort Global Parameters"))
+        {
+            tx.Start();
+            GlobalParametersManager.SortParameters(doc, sortOrder);
+            tx.Commit();
+        }
+
+        return CortexResult<object>.Ok(new { action = "sort", order = sortOrder.ToString() });
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

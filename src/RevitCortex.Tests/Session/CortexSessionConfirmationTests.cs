@@ -51,10 +51,39 @@ public class CortexSessionConfirmationTests
         var session = NewSession();
         session.AutoMode = true;
 
-        // ApproveAll expires after 120 s by wall clock; AutoMode must not.
-        // We can't fast-forward time without injecting a clock, but we can assert
-        // the getter returns the raw flag with no time arithmetic in the path.
+        // ApproveAll expires after 120 s by wall clock; AutoMode must not at the
+        // session level — the inactivity timeout lives in the UI layer, driven by
+        // the AutoModeActivity signal (see RequestConfirmation_*Activity tests).
         Assert.True(session.AutoMode);
+    }
+
+    // ── Activity signal (drives the UI inactivity timer) ─────────────────────
+
+    [Fact]
+    public void RequestConfirmation_WhenAutoModeOn_FiresAutoModeActivity()
+    {
+        var session = NewSession();
+        session.AutoMode = true;
+        var activityCount = 0;
+        session.AutoModeActivity += () => activityCount++;
+
+        session.RequestConfirmation("delete", 5);
+        session.RequestConfirmation("delete", 3);
+
+        Assert.Equal(2, activityCount); // one signal per auto-approved op
+    }
+
+    [Fact]
+    public void RequestConfirmation_WhenAutoModeOff_DoesNotFireAutoModeActivity()
+    {
+        var session = NewSession();
+        var activityFired = false;
+        session.AutoModeActivity += () => activityFired = true;
+        session.ConfirmAction = (_, _, _) => true; // plain Yes, Auto stays off
+
+        session.RequestConfirmation("delete", 5);
+
+        Assert.False(activityFired);
     }
 
     // ── Reset on document boundary ───────────────────────────────────────────

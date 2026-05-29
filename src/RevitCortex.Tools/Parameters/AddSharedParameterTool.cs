@@ -37,6 +37,7 @@ public class AddSharedParameterTool : ICortexTool
         var groupName = input["groupName"]?.Value<string>() ?? "RevitCortex";
         var categories = input["categories"]?.ToObject<List<string>>() ?? new List<string>();
         var isInstance = input["isInstance"]?.Value<bool>() ?? true;
+        var dataType = input["dataType"]?.Value<string>() ?? "text";
 
         if (categories.Count == 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
@@ -63,11 +64,17 @@ public class AddSharedParameterTool : ICortexTool
             var group = sharedParamFile.Groups.get_Item(groupName)
                 ?? sharedParamFile.Groups.Create(groupName);
 
-            // Find or create definition
+            // Find or create definition with the requested data type
             var definition = group.Definitions.get_Item(parameterName);
             if (definition == null)
             {
-                var externalDefOptions = new ExternalDefinitionCreationOptions(parameterName, SpecTypeId.String.Text);
+#if REVIT2023_OR_GREATER
+                var externalDefOptions = new ExternalDefinitionCreationOptions(
+                    parameterName, ResolveSpecTypeId(dataType));
+#else
+                var externalDefOptions = new ExternalDefinitionCreationOptions(
+                    parameterName, ResolveParameterType(dataType));
+#endif
                 definition = group.Definitions.Create(externalDefOptions);
             }
 
@@ -126,6 +133,7 @@ public class AddSharedParameterTool : ICortexTool
                 {
                     parameterName,
                     guid,
+                    dataType,
                     isInstance,
                     boundCategories,
                     unresolvedCategories,
@@ -144,4 +152,40 @@ public class AddSharedParameterTool : ICortexTool
                 $"Failed to add shared parameter: {ex.Message}");
         }
     }
+
+#if REVIT2023_OR_GREATER
+    private static ForgeTypeId ResolveSpecTypeId(string dataType)
+    {
+        return dataType.ToLowerInvariant() switch
+        {
+            "text" or "string" => SpecTypeId.String.Text,
+            "integer" or "int" => SpecTypeId.Int.Integer,
+            "number" or "double" or "real" => SpecTypeId.Number,
+            "length" => SpecTypeId.Length,
+            "area" => SpecTypeId.Area,
+            "volume" => SpecTypeId.Volume,
+            "angle" => SpecTypeId.Angle,
+            "yesno" or "boolean" or "bool" => SpecTypeId.Boolean.YesNo,
+            "url" => SpecTypeId.String.Url,
+            _ => SpecTypeId.String.Text
+        };
+    }
+#else
+    private static ParameterType ResolveParameterType(string dataType)
+    {
+        return dataType.ToLowerInvariant() switch
+        {
+            "text" or "string" => ParameterType.Text,
+            "integer" or "int" => ParameterType.Integer,
+            "number" or "double" or "real" => ParameterType.Number,
+            "length" => ParameterType.Length,
+            "area" => ParameterType.Area,
+            "volume" => ParameterType.Volume,
+            "angle" => ParameterType.Angle,
+            "yesno" or "boolean" or "bool" => ParameterType.YesNo,
+            "url" => ParameterType.URL,
+            _ => ParameterType.Text
+        };
+    }
+#endif
 }

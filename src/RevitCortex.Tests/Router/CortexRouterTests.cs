@@ -135,4 +135,25 @@ public class CortexRouterTests
         Assert.True(result.Success);
         Assert.False(session.ApproveAll);
     }
+
+    [Fact]
+    public void Route_DoesNotResetAutoModeAfterToolExecution()
+    {
+        // "Auto" mode must persist across tool calls until the user clicks Stop Auto
+        // or the document is reinitialized — unlike "Yes to All" (ApproveAll), which
+        // is per-batch. The router's post-execution reset must NOT clear AutoMode,
+        // otherwise every subsequent destructive op re-prompts (v1.0.27 live bug).
+        var router = CreateRouter(out var session);
+        session.AutoMode = true;
+
+        var field = typeof(CortexRouter).GetField("_tools",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var tools = (System.Collections.Generic.Dictionary<string, RevitCortex.Core.Tools.ICortexTool>)field.GetValue(router)!;
+        tools["say_hello"] = new FakeTool { Name = "say_hello" };
+
+        var result = router.Route("say_hello", new JObject());
+
+        Assert.True(result.Success);
+        Assert.True(session.AutoMode); // must survive the tool call
+    }
 }

@@ -233,11 +233,11 @@ Default: `compact: false` (payload pieno). Chiedere a Claude esplicitamente "in 
 
 | Strumento | Scopo |
 |-----------|-------|
-| `add_shared_parameter` | Aggiunge parametro condiviso a categorie |
+| `add_shared_parameter` | Aggiunge un parametro condiviso a categorie. Il `dataType` di una definizione nuova viene rispettato (Text \| Integer \| Number \| Length \| Area \| Volume \| Angle \| YesNo \| URL); default Text. |
 | `sync_csv_parameters` | Importa valori da CSV |
 | `transfer_parameters` | Copia parametri tra elementi |
-| `manage_project_parameters` | Lista, crea, elimina o modifica parametri di progetto. L'azione `modify` supporta `categoriesMode: add\|remove\|replace` per gestire le categorie associate (aggiungere, scollegare o sostituire l'intero set). L'azione `set_group` cambia massivamente il "Group Parameter Under" di uno o più parametri user-defined: `parameterNames[]` + `targetGroup` (es. `IdentityData`, `Data`, `Geometry`, `Constraints`, `Materials`, `Ifc`, ...). I parametri built-in vengono ignorati silenziosamente. Supporta `dryRun: true`. |
-| `manage_global_parameters` | Gestisce i Global Parameters (azioni: list, get, create, set, delete) |
+| `manage_project_parameters` | Lista, crea, elimina, modifica, raggruppa, cambia binding o (tenta di) rinomina parametri di progetto. Azioni: `list \| create \| delete \| modify \| set_group \| set_binding_type \| rename`. `delete` ora rimuove correttamente anche i parametri **non-shared** (workaround del bug Revit REVIT-136670: elimina il `ParameterElement` e verifica la rimozione). `modify` supporta `categoriesMode: add\|remove\|replace`. `set_group` cambia massivamente il "Group Parameter Under" (`parameterNames[]` + `targetGroup`, es. `IdentityData`, `Data`, `Geometry`, ...; built-in ignorati; `dryRun: true`). `set_binding_type` commuta un parametro tra istanza e tipo (`isInstance: true\|false`). `rename` **non è supportato dall'API Revit** per i parametri di progetto bound e restituisce una guida con il workaround (solo i Global Parameters sono rinominabili). |
+| `manage_global_parameters` | Gestisce i Global Parameters. Azioni: `list \| get \| create \| set \| delete \| rename \| set_formula \| move_up \| move_down \| sort`. A differenza di project/shared, i global **possono** essere rinominati (`rename` + `newName`). `set_formula` pilota il valore con una formula (`formula: ""` la rimuove). `move_up`/`move_down` riordinano nel gruppo; `sort` ordina (`order: ascending\|descending`). |
 
 ### Impostazioni Progetto
 
@@ -366,7 +366,20 @@ I Global Parameters sono valori nominati a livello di progetto che possono pilot
 
 "Imposta il valore di 'AltezzaInterpiano' a 3.2"
 → manage_global_parameters con action: "set", name: "AltezzaInterpiano", value: "3.2"
+
+"Rinomina 'AltezzaInterpiano' in 'H_Interpiano'"
+→ manage_global_parameters con action: "rename", name: "AltezzaInterpiano", newName: "H_Interpiano"
+
+"Lega il valore a una formula"
+→ manage_global_parameters con action: "set_formula", name: "H_Totale", formula: "H_Interpiano * 3"
+   (formula: "" rimuove la formula)
+
+"Riordina i parametri globali"
+→ manage_global_parameters con action: "move_up" | "move_down", name: "H_Interpiano"
+→ manage_global_parameters con action: "sort", order: "ascending"
 ```
+
+> **Nota sui limiti dell'API Revit**: una definizione di **shared parameter** non può essere rinominata né eliminata dal file `.txt` via API (solo aggiunta). Un **parametro di progetto** bound non può essere rinominato via API (solo dalla UI di Revit) — usa il workaround: crea il nuovo, copia i valori con `transfer_parameters`, elimina il vecchio. I **Global Parameters**, invece, si rinominano senza problemi.
 
 ### Impostazioni aggiuntive (`manage_additional_settings`)
 

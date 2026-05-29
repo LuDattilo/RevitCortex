@@ -76,10 +76,12 @@ public class CortexSession
     private DateTime _approveAllTimestamp;
 
     /// <summary>
-    /// When true, all subsequent confirmations are auto-approved indefinitely.
-    /// Set by "Auto" in the confirmation dialog. Cleared by the user via the
-    /// ribbon "Stop Auto" button or on document close (Reinitialize).
-    /// Unlike ApproveAll, this has no timeout.
+    /// When true, all subsequent confirmations are auto-approved. Set by "Auto"
+    /// in the confirmation dialog. Cleared by the user (Stop Auto / closing the
+    /// Auto mode window), on document close (Reinitialize), or by an inactivity
+    /// timeout owned by the UI layer. Unlike ApproveAll (a fixed 120 s wall-clock
+    /// window), AutoMode has no built-in timeout — the UI decides when a burst of
+    /// operations has ended, driven by <see cref="AutoModeActivity"/>.
     /// </summary>
     public bool AutoMode
     {
@@ -87,6 +89,14 @@ public class CortexSession
         set { lock (_approveAllLock) { _autoMode = value; } }
     }
     private bool _autoMode;
+
+    /// <summary>
+    /// Raised every time a destructive operation is auto-approved because
+    /// AutoMode is on. The Plugin subscribes to reset its inactivity timer so the
+    /// Auto mode window stays open during a burst and closes shortly after the
+    /// last operation. Core stays Revit-agnostic — it only signals activity.
+    /// </summary>
+    public event Action? AutoModeActivity;
 
     public CortexSession(ISessionStore store)
         : this(store, new ToolResultCache())
@@ -127,7 +137,13 @@ public class CortexSession
     public bool RequestConfirmation(string action, int elementCount, string? description = null)
     {
         if (elementCount <= 0) return true;
-        if (AutoMode) return true;
+        if (AutoMode)
+        {
+            // Auto-approved by Auto mode. Signal activity so the UI keeps the
+            // Auto mode window alive through this burst of operations.
+            AutoModeActivity?.Invoke();
+            return true;
+        }
         if (ApproveAll) return true;
 
         var result = ConfirmAction?.Invoke(action, elementCount, description);
@@ -148,8 +164,8 @@ public class CortexSession
     }
 
     /// <summary>
-    /// Resets both ApproveAll and AutoMode. Called when a batch operation completes
-    /// or when the user clicks "Stop Auto" in the ribbon.
+    /// Resets both ApproveAll and AutoMode. Called when the user stops Auto mode
+    /// (Stop Auto button / closing the Auto mode window) or when a batch completes.
     /// </summary>
     public void ResetApproveAll()
     {
