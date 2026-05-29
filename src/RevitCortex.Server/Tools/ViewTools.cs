@@ -9,15 +9,19 @@ namespace RevitCortex.Server.Tools;
 [McpServerToolType]
 public static class ViewTools
 {
-    [McpServerTool(Name = "create_view"), Description("Create a new view in Revit: floor plan, section, 3D view, or elevation.")]
+    [McpServerTool(Name = "create_view"), Description("Create a new view in Revit: floor plan, ceiling plan, section, elevation, drafting, or 3D view.")]
     public static async Task<string> CreateView(
         RevitConnectionManager revit,
-        [Description("Type of view to create: FloorPlan, Section, ThreeD, Elevation")] string viewType,
-        [Description("Level name (e.g. 'L1 - Block 43') — preferred for floor plans")] string? levelName = null,
+        [Description("Type of view to create: FloorPlan, CeilingPlan, Section, Elevation, Drafting, ThreeD")] string viewType,
+        [Description("Level name (e.g. 'L1 - Block 43') — preferred for floor/ceiling plans")] string? levelName = null,
         [Description("Level element ID (alternative to levelName)")] long? levelId = null,
         [Description("Name for the new view")] string? name = null,
         [Description("View scale denominator, e.g. 100 for 1:100. Default: 100")] int? scale = null,
         [Description("Detail level: Coarse, Medium, Fine. Default: Coarse")] string? detailLevel = null,
+        [Description("Origin X in mm (for Section/Elevation). Default: 0")] double? originX = null,
+        [Description("Origin Y in mm (for Section/Elevation). Default: 0")] double? originY = null,
+        [Description("Origin Z in mm (for Section/Elevation). Default: 0")] double? originZ = null,
+        [Description("Facing direction for Section/Elevation: north | south | east | west. Default: north")] string? direction = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["viewType"] = viewType };
@@ -26,6 +30,10 @@ public static class ViewTools
         if (name != null) p["name"] = name;
         if (scale != null) p["scale"] = scale;
         if (detailLevel != null) p["detailLevel"] = detailLevel;
+        if (originX != null) p["originX"] = originX;
+        if (originY != null) p["originY"] = originY;
+        if (originZ != null) p["originZ"] = originZ;
+        if (direction != null) p["direction"] = direction;
         var result = await revit.ExecuteAsync("create_view", p, ct);
         return result.ToString();
     }
@@ -225,12 +233,12 @@ public static class ViewTools
 
     // ── Viewport & View Template tools ──────────────────────────────────
 
-    [McpServerTool(Name = "align_viewports"), Description("Align viewports across sheets by reference placement.")]
+    [McpServerTool(Name = "align_viewports"), Description("Align viewports across sheets. 'placement' matches box centers; 'model' matches the box outline min-corner so equal-scale views of the same region line up.")]
     public static async Task<string> AlignViewports(
         RevitConnectionManager revit,
         [Description("Reference viewport element ID")] long sourceViewportId,
         [Description("Viewport IDs to align to the reference")] long[] targetViewportIds,
-        [Description("Alignment mode: placement | center | label. Default: placement")] string? alignMode = null,
+        [Description("Alignment mode: placement | model. Default: placement")] string? alignMode = null,
         CancellationToken ct = default)
     {
         var p = new JObject

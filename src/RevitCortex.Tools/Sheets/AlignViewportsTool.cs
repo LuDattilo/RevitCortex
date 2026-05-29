@@ -18,7 +18,7 @@ public class AlignViewportsTool : ICortexTool
     public string Category => "Sheets";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Aligns viewports across sheets by placement position or model coordinates.";
+    public string Description => "Aligns viewports across sheets. alignMode 'placement' matches box centers; 'model' matches the box outline min-corner so equal-scale views of the same model region line up.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -46,7 +46,9 @@ public class AlignViewportsTool : ICortexTool
             if (sourceVp == null)
                 return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "Source viewport not found");
 
+            var useModel = alignMode.Equals("model", StringComparison.OrdinalIgnoreCase);
             var sourceCenter = sourceVp.GetBoxCenter();
+            var sourceAnchor = useModel ? sourceVp.GetBoxOutline().MinimumPoint : sourceCenter;
             var results = new List<object>();
 
             using var tx = new Transaction(doc, "RevitCortex: Align Viewports");
@@ -67,7 +69,15 @@ public class AlignViewportsTool : ICortexTool
 
                 try
                 {
-                    targetVp.SetBoxCenter(sourceCenter);
+                    if (useModel)
+                    {
+                        var delta = sourceAnchor - targetVp.GetBoxOutline().MinimumPoint;
+                        targetVp.SetBoxCenter(targetVp.GetBoxCenter() + delta);
+                    }
+                    else
+                    {
+                        targetVp.SetBoxCenter(sourceAnchor);
+                    }
                     results.Add(new { viewportId = tid, success = true });
                 }
                 catch (Exception ex)

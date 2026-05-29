@@ -130,12 +130,17 @@ public class DuplicateSheetWithContentTool : ICortexTool
                     }
                 }
 
+                // Copy loose annotations placed directly on the sheet
+                // (text notes, generic annotations, detail items, detail lines).
+                int annotationCount = CopySheetAnnotations(doc, sourceSheet, newSheet);
+
                 results.Add(new
                 {
                     sheetId = ToolHelpers.GetElementIdValue(newSheet.Id),
                     number = newSheet.SheetNumber,
                     name = newSheet.Name,
-                    viewportCount
+                    viewportCount,
+                    annotationCount
                 });
             }
 
@@ -145,6 +150,44 @@ public class DuplicateSheetWithContentTool : ICortexTool
         catch (Exception ex)
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
+        }
+    }
+
+    private static readonly BuiltInCategory[] SheetAnnotationCategories =
+    {
+        BuiltInCategory.OST_TextNotes,
+        BuiltInCategory.OST_GenericAnnotation,
+        BuiltInCategory.OST_DetailComponents,
+        BuiltInCategory.OST_Lines
+    };
+
+    /// <summary>
+    /// Copies loose annotation elements owned directly by the source sheet onto the
+    /// destination sheet. Excludes viewports, schedule instances and the title block,
+    /// which are handled separately. Returns the number of elements copied.
+    /// </summary>
+    private static int CopySheetAnnotations(Document doc, ViewSheet sourceSheet, ViewSheet destSheet)
+    {
+        var annoIds = new FilteredElementCollector(doc, sourceSheet.Id)
+            .WhereElementIsNotElementType()
+            .Where(e => e.Category != null
+                && SheetAnnotationCategories.Contains(
+                    (BuiltInCategory)ToolHelpers.GetElementIdValue(e.Category.Id)))
+            .Select(e => e.Id)
+            .ToList();
+
+        if (annoIds.Count == 0) return 0;
+
+        try
+        {
+            var copied = ElementTransformUtils.CopyElements(
+                sourceSheet, annoIds, destSheet, Transform.Identity, new CopyPasteOptions());
+            return copied?.Count ?? 0;
+        }
+        catch
+        {
+            // Some annotation kinds resist cross-view copy; skip rather than fail the duplicate.
+            return 0;
         }
     }
 

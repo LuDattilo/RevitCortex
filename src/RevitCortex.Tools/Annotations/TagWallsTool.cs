@@ -19,7 +19,7 @@ public class TagWallsTool : ICortexTool
     public string Category => "Annotations";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Tags all walls in the current view at their midpoint.";
+    public string Description => "Tags walls in the current view. Tags all walls by default, or specific ones via wallIds. Supports useLeader, tagTypeId, and orientation (horizontal/vertical).";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -27,19 +27,31 @@ public class TagWallsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
 
         var useLeader = input["useLeader"]?.Value<bool>() ?? false;
+        var orientationStr = input["orientation"]?.Value<string>() ?? "horizontal";
+        var tagOrientation = orientationStr.Equals("vertical", StringComparison.OrdinalIgnoreCase)
+            ? TagOrientation.Vertical : TagOrientation.Horizontal;
+        var requestedTagTypeId = input["tagTypeId"]?.Value<long?>() ?? 0;
+        var wallIds = input["wallIds"]?.ToObject<List<long>>();
 
         try
         {
             var view = doc.ActiveView;
 
-            var walls = new FilteredElementCollector(doc, view.Id)
+            var wallsQuery = new FilteredElementCollector(doc, view.Id)
                 .OfCategory(BuiltInCategory.OST_Walls)
                 .WhereElementIsNotElementType()
-                .Cast<Wall>()
-                .ToList();
+                .Cast<Wall>();
 
-            // Find wall tag type
-            var tagType = new FilteredElementCollector(doc)
+            var walls = (wallIds != null && wallIds.Count > 0)
+                ? wallsQuery.Where(w => wallIds.Contains(ToolHelpers.GetElementIdValue(w.Id))).ToList()
+                : wallsQuery.ToList();
+
+            // Find wall tag type — honor requested tagTypeId first
+            FamilySymbol? tagType = null;
+            if (requestedTagTypeId > 0)
+                tagType = doc.GetElement(ToolHelpers.ToElementId(requestedTagTypeId)) as FamilySymbol;
+
+            tagType ??= new FilteredElementCollector(doc)
                 .OfCategory(BuiltInCategory.OST_WallTags)
                 .OfClass(typeof(FamilySymbol))
                 .Cast<FamilySymbol>()
@@ -81,8 +93,8 @@ public class TagWallsTool : ICortexTool
                     var midPoint = locCurve.Curve.Evaluate(0.5, true);
                     var reference = new Reference(wall);
 
-                    IndependentTag.Create(doc, view.Id, reference, false, TagMode.TM_ADDBY_CATEGORY,
-                        TagOrientation.Horizontal, midPoint);
+                    IndependentTag.Create(doc, view.Id, reference, useLeader, TagMode.TM_ADDBY_CATEGORY,
+                        tagOrientation, midPoint);
                     taggedCount++;
                 }
                 catch (Exception ex)

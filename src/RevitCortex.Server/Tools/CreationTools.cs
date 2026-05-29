@@ -100,10 +100,10 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_dimensions"), Description("Create dimension annotations in the active view. Pass a JSON array of dimension specs: [{viewId, referenceIds:[...], linePoint:{x,y,z}, dimensionTypeName?}].")]
+    [McpServerTool(Name = "create_dimensions"), Description("Create dimension annotations in the active view. Pass a JSON array of dimension specs. Element mode: [{viewId, referenceIds:[...], linePoint:{x,y,z}, dimensionStyleId?}]. Point-to-point mode: [{viewId, startPoint:{x,y,z}, endPoint:{x,y,z}, linePoint?, dimensionStyleId?}]. dimensionStyleId is honored in both modes.")]
     public static async Task<string> CreateDimensions(
         RevitConnectionManager revit,
-        [Description("JSON array of dimension specs: [{viewId, referenceIds, linePoint, dimensionTypeName?}]")] string dimensions,
+        [Description("JSON array of dimension specs. Element mode uses referenceIds; point-to-point uses startPoint+endPoint. Both accept dimensionStyleId")] string dimensions,
         CancellationToken ct = default)
     {
         var p = new JObject { ["dimensions"] = JArray.Parse(dimensions) };
@@ -357,11 +357,11 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "batch_export"), Description("Export views/sheets to DWG, DXF, DGN, or image formats.")]
+    [McpServerTool(Name = "batch_export"), Description("Export views/sheets to DWG, DXF, DGN, PDF, or image (PNG) formats.")]
     public static async Task<string> BatchExport(
         RevitConnectionManager revit,
         [Description("Output directory")] string outputDirectory,
-        [Description("Export format: DWG | DXF | DGN | IMAGE. Default: DWG")] string? format = null,
+        [Description("Export format: DWG | DXF | DGN | PDF | IMAGE. Default: DWG")] string? format = null,
         [Description("Sheet IDs to export")] long[]? sheetIds = null,
         [Description("View IDs to export")] long[]? viewIds = null,
         CancellationToken ct = default)

@@ -121,12 +121,16 @@ Per CLAUDE.md, all code must compile on **net48** (R2023/R2024) AND **net8+** (R
 - **Read-only naming convention**: write tools are blocked in read-only mode unless prefixed `get_/list_/find_/analyze_/check_/measure_/audit_/export_`. New write actions on a `get_*`/`list_*` tool would bypass read-only mode — prefer adding writes to a non-read-prefixed tool, or split.
 - TDD: each new action gets a failing test first (FakeTool/FakeAnalyzer harness in `RevitCortex.Tests`).
 
-## Recommended Sequencing (to confirm with user)
+## Sequencing (APPROVED by user 2026-05-29)
 
-1. **Phase 0 — Fix latent bugs (B1–B9).** Smallest, highest-trust: stop advertising operations we don't perform. Mostly implementing the missing switch case.
-2. **Phase 1 — H1 unit-aware writes.** Data-integrity fix across `set_element_parameters` + Excel/PBI import.
+**Decision on latent bugs (B1–B9):** *Implement the missing behavior* (not just align descriptions). Each tool will actually perform what it advertises. Where an API path is too complex/risky/not-net48-safe, fall back to description-alignment and note why.
+
+**Decision on order:** Follow the phases below in order. Each phase = its own build (R23→R27 all green) + test (`-c "Debug R25"`) + commit cycle. User updated at end of each phase.
+
+1. **Phase 0 — Fix latent bugs (B1–B9).** Implement the missing switch case / apply the parsed-but-ignored parameter. Smallest, highest-trust.
+2. **Phase 1 — H1 unit-aware writes.** Data-integrity fix across `set_element_parameters` + Excel/PBI import (`SetValueString` path + clear/reset).
 3. **Phase 2 — Remaining HIGH gaps (H2–H5).**
 4. **Phase 3 — MEDIUM by theme** (2a edit-existing, 2c filters, 2d annotations, 2e read→write, 2f geometry accuracy, then the rest).
 5. **Phase 4 — verify docs + full all-target build + release.**
 
-Each phase = its own build+test+commit cycle. Phases 0–2 are the 80/20.
+Phases 0–2 are the 80/20. Per CLAUDE.md: one file at a time, verify build after each file before the next.

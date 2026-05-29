@@ -175,7 +175,7 @@ public static class ElementTools
         [Description("Second element ID (optional; use point2 as alternative)")] long? elementId2 = null,
         [Description("First point as JSON array [x,y,z] (optional)")] string? point1 = null,
         [Description("Second point as JSON array [x,y,z] (optional)")] string? point2 = null,
-        [Description("Measurement mode: center_to_center | closest_face. Default: center_to_center")] string? measureType = null,
+        [Description("Measurement mode: center_to_center | closest_points | bounding_box. closest_points needs two elementIds (uses their bounding-box closest points). Default: center_to_center")] string? measureType = null,
         CancellationToken ct = default)
     {
         var p = new JObject();

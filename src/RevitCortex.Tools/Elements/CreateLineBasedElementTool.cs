@@ -230,10 +230,23 @@ public class CreateLineBasedElementTool : ICortexTool
                         var instance = doc.Create.NewFamilyInstance(locationLine, symbol, baseLevel, structuralType);
                         if (instance != null)
                         {
-                            // Set base offset if applicable
-                            var offsetParam = instance.get_Parameter(BuiltInParameter.INSTANCE_FREE_HOST_OFFSET_PARAM)
-                                          ?? instance.get_Parameter(BuiltInParameter.STRUCTURAL_BEAM_END0_ELEVATION);
-                            // Use Z elevation from start point for structural framing
+                            // Apply base offset (start+end elevation for beams, else free-host offset)
+                            if (Math.Abs(baseOffset) > 1e-9)
+                            {
+                                var startElev = instance.get_Parameter(BuiltInParameter.STRUCTURAL_BEAM_END0_ELEVATION);
+                                var endElev = instance.get_Parameter(BuiltInParameter.STRUCTURAL_BEAM_END1_ELEVATION);
+                                if (startElev != null && !startElev.IsReadOnly && endElev != null && !endElev.IsReadOnly)
+                                {
+                                    startElev.Set(baseOffset);
+                                    endElev.Set(baseOffset);
+                                }
+                                else
+                                {
+                                    var freeOffset = instance.get_Parameter(BuiltInParameter.INSTANCE_FREE_HOST_OFFSET_PARAM);
+                                    if (freeOffset != null && !freeOffset.IsReadOnly)
+                                        freeOffset.Set(baseOffset);
+                                }
+                            }
                             createdIds.Add(ToolHelpers.GetElementIdValue(instance.Id));
                         }
                         tx2.Commit();

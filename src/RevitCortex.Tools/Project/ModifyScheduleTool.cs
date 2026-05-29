@@ -57,11 +57,13 @@ public class ModifyScheduleTool : ICortexTool
                 normalizedAction != "remove_field" &&
                 normalizedAction != "set_sorting" &&
                 normalizedAction != "clear_sorting" &&
+                normalizedAction != "set_filter" &&
+                normalizedAction != "clear_filter" &&
                 normalizedAction != "rename")
             {
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}",
-                    suggestion: "Use: add_field, remove_field, set_sorting, clear_sorting, rename");
+                    suggestion: "Use: add_field, remove_field, set_sorting, clear_sorting, set_filter, clear_filter, rename");
             }
 
             if (!session.RequestConfirmation("modify schedule", 1, schedule.Name))
@@ -76,6 +78,8 @@ public class ModifyScheduleTool : ICortexTool
                 "remove_field" => RemoveFields(schedule, input),
                 "set_sorting" => SetSorting(schedule, input),
                 "clear_sorting" => ClearSorting(schedule),
+                "set_filter" => SetFilter(schedule, input),
+                "clear_filter" => ClearFilter(schedule),
                 "rename" => RenameSchedule(schedule, input),
                 _ => new object()
             };
@@ -162,6 +166,75 @@ public class ModifyScheduleTool : ICortexTool
     {
         schedule.Definition.ClearSortGroupFields();
         return new { action = "clear_sorting" };
+    }
+
+    private static object SetFilter(ViewSchedule schedule, JObject input)
+    {
+        var fieldName = input["filterField"]?.Value<string>() ?? input["fieldName"]?.Value<string>();
+        var op = (input["filterType"]?.Value<string>() ?? input["operator"]?.Value<string>() ?? "equal")
+            .ToLowerInvariant().Replace("_", "").Replace(" ", "");
+        var valueToken = input["filterValue"] ?? input["value"];
+        if (string.IsNullOrEmpty(fieldName))
+            return new { error = "filterField required" };
+
+        var def = schedule.Definition;
+        ScheduleFieldId? fieldId = null;
+        for (int i = 0; i < def.GetFieldCount(); i++)
+        {
+            var f = def.GetField(i);
+            if (f.GetName().Equals(fieldName, StringComparison.OrdinalIgnoreCase))
+            {
+                fieldId = f.FieldId;
+                break;
+            }
+        }
+        if (fieldId == null)
+            return new { error = $"Field '{fieldName}' not present in schedule. Add it first with add_field." };
+
+        var filterType = op switch
+        {
+            "notequal" => ScheduleFilterType.NotEqual,
+            "greater" or "greaterthan" => ScheduleFilterType.GreaterThan,
+            "greaterorequal" or "greaterthanorequal" => ScheduleFilterType.GreaterThanOrEqual,
+            "less" or "lessthan" => ScheduleFilterType.LessThan,
+            "lessorequal" or "lessthanorequal" => ScheduleFilterType.LessThanOrEqual,
+            "contains" => ScheduleFilterType.Contains,
+            "notcontains" or "doesnotcontain" => ScheduleFilterType.NotContains,
+            "beginswith" => ScheduleFilterType.BeginsWith,
+            "endswith" => ScheduleFilterType.EndsWith,
+            "hasvalue" => ScheduleFilterType.HasParameter,
+            "hasnovalue" or "isempty" => ScheduleFilterType.HasNoValue,
+            _ => ScheduleFilterType.Equal
+        };
+
+        ScheduleFilter filter;
+        if (filterType == ScheduleFilterType.HasParameter || filterType == ScheduleFilterType.HasNoValue)
+        {
+            filter = new ScheduleFilter(fieldId, filterType);
+        }
+        else if (valueToken != null && valueToken.Type == JTokenType.Integer)
+        {
+            filter = new ScheduleFilter(fieldId, filterType, valueToken.Value<int>());
+        }
+        else if (valueToken != null && valueToken.Type == JTokenType.Float)
+        {
+            filter = new ScheduleFilter(fieldId, filterType, valueToken.Value<double>());
+        }
+        else
+        {
+            filter = new ScheduleFilter(fieldId, filterType, valueToken?.Value<string>() ?? "");
+        }
+
+        def.AddFilter(filter);
+        return new { action = "set_filter", field = fieldName, filterType = filterType.ToString() };
+    }
+
+    private static object ClearFilter(ViewSchedule schedule)
+    {
+        var def = schedule.Definition;
+        int count = def.GetFilterCount();
+        def.ClearFilters();
+        return new { action = "clear_filter", clearedCount = count };
     }
 
     private static object RenameSchedule(ViewSchedule schedule, JObject input)

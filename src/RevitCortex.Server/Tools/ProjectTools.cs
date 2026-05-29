@@ -317,14 +317,20 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "tag_walls"), Description("Tag walls at their midpoints in the active view. Operates on the active view only.")]
+    [McpServerTool(Name = "tag_walls"), Description("Tag walls at their midpoints in the active view. Operates on the active view only. Tags all walls by default, or a subset via wallIds.")]
     public static async Task<string> TagWalls(
         RevitConnectionManager revit,
         [Description("Use leader on tags. Default: false")] bool? useLeader = null,
+        [Description("Tag orientation: horizontal | vertical. Default: horizontal")] string? orientation = null,
+        [Description("Tag type (FamilySymbol) element ID. Default: first available wall tag type")] long? tagTypeId = null,
+        [Description("JSON array of wall element IDs to tag. Omit to tag all walls in the view")] string? wallIds = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (useLeader != null) p["useLeader"] = useLeader;
+        if (orientation != null) p["orientation"] = orientation;
+        if (tagTypeId != null) p["tagTypeId"] = tagTypeId;
+        if (wallIds != null) p["wallIds"] = JArray.Parse(wallIds);
         var result = await revit.ExecuteAsync("tag_walls", p, ct);
         return result.ToString();
     }
@@ -357,14 +363,17 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "modify_schedule"), Description("Modify schedule fields, sorting, or rename the schedule. Supported actions: add_field, remove_field, set_sorting, clear_sorting, rename.")]
+    [McpServerTool(Name = "modify_schedule"), Description("Modify schedule fields, sorting, filters, or rename the schedule. Supported actions: add_field, remove_field, set_sorting, clear_sorting, set_filter, clear_filter, rename.")]
     public static async Task<string> ModifySchedule(
         RevitConnectionManager revit,
-        [Description("Action: add_field | remove_field | set_sorting | clear_sorting | rename. Default: add_field")] string? action = null,
+        [Description("Action: add_field | remove_field | set_sorting | clear_sorting | set_filter | clear_filter | rename. Default: add_field")] string? action = null,
         [Description("Schedule element ID (alternative to scheduleName)")] long? scheduleId = null,
         [Description("Schedule name (alternative to scheduleId)")] string? scheduleName = null,
         [Description("Field names for add_field/remove_field actions")] string[]? fieldNames = null,
         [Description("Sort field specs as JSON array: [{fieldName, ascending:true}]")] string? sortFields = null,
+        [Description("Field to filter on (for set_filter). Must already be a field in the schedule")] string? filterField = null,
+        [Description("Filter operator for set_filter: equal | not_equal | greater | less | contains | begins_with | ends_with | has_value | is_empty. Default: equal")] string? filterType = null,
+        [Description("Filter value for set_filter (string or number). Omit for has_value/is_empty")] string? filterValue = null,
         [Description("New schedule name (for rename action)")] string? newName = null,
         CancellationToken ct = default)
     {
@@ -374,6 +383,9 @@ public static class ProjectTools
         if (scheduleName != null) p["scheduleName"] = scheduleName;
         if (fieldNames != null) p["fieldNames"] = new JArray(fieldNames);
         if (sortFields != null) p["sortFields"] = JArray.Parse(sortFields);
+        if (filterField != null) p["filterField"] = filterField;
+        if (filterType != null) p["filterType"] = filterType;
+        if (filterValue != null) p["filterValue"] = filterValue;
         if (newName != null) p["newName"] = newName;
         var result = await revit.ExecuteAsync("modify_schedule", p, ct);
         return result.ToString();

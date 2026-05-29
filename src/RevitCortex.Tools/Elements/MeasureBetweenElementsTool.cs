@@ -47,8 +47,21 @@ public class MeasureBetweenElementsTool : ICortexTool
 
         try
         {
-            XYZ p1 = ResolvePoint(doc, elementId1, rawPoint1, measureType);
-            XYZ p2 = ResolvePoint(doc, elementId2, rawPoint2, measureType);
+            XYZ p1, p2;
+            if (measureType.Equals("closest_points", StringComparison.OrdinalIgnoreCase)
+                && elementId1 > 0 && elementId2 > 0)
+            {
+                var e1 = doc.GetElement(ToElementId(elementId1));
+                var e2 = doc.GetElement(ToElementId(elementId2));
+                if (e1 == null) throw new ArgumentException($"Element {elementId1} not found");
+                if (e2 == null) throw new ArgumentException($"Element {elementId2} not found");
+                ClosestPoints(e1, e2, out p1, out p2);
+            }
+            else
+            {
+                p1 = ResolvePoint(doc, elementId1, rawPoint1, measureType);
+                p2 = ResolvePoint(doc, elementId2, rawPoint2, measureType);
+            }
 
             double distanceFeet = p1.DistanceTo(p2);
             double distanceMm   = distanceFeet * 304.8;
@@ -107,6 +120,51 @@ public class MeasureBetweenElementsTool : ICortexTool
         }
 
         throw new ArgumentException("No valid point reference provided (neither elementId > 0 nor explicit point)");
+    }
+
+    /// <summary>
+    /// Computes the closest points between two elements using their axis-aligned
+    /// bounding boxes (deterministic, available on all targets). For each axis the
+    /// nearest in-range coordinate is chosen, giving the closest points of the two AABBs.
+    /// Falls back to centroid/location when an element has no bounding box.
+    /// </summary>
+    private static void ClosestPoints(Element e1, Element e2, out XYZ p1, out XYZ p2)
+    {
+        var bb1 = e1.get_BoundingBox(null);
+        var bb2 = e2.get_BoundingBox(null);
+        if (bb1 == null || bb2 == null)
+        {
+            p1 = CenterOf(e1);
+            p2 = CenterOf(e2);
+            return;
+        }
+
+        p1 = new XYZ(
+            NearestOnInterval(bb1.Min.X, bb1.Max.X, bb2.Min.X, bb2.Max.X),
+            NearestOnInterval(bb1.Min.Y, bb1.Max.Y, bb2.Min.Y, bb2.Max.Y),
+            NearestOnInterval(bb1.Min.Z, bb1.Max.Z, bb2.Min.Z, bb2.Max.Z));
+        p2 = new XYZ(
+            NearestOnInterval(bb2.Min.X, bb2.Max.X, bb1.Min.X, bb1.Max.X),
+            NearestOnInterval(bb2.Min.Y, bb2.Max.Y, bb1.Min.Y, bb1.Max.Y),
+            NearestOnInterval(bb2.Min.Z, bb2.Max.Z, bb1.Min.Z, bb1.Max.Z));
+    }
+
+    // Nearest point on [aMin,aMax] to the midpoint of interval [bMin,bMax] on one axis.
+    private static double NearestOnInterval(double aMin, double aMax, double bMin, double bMax)
+    {
+        var target = (bMin + bMax) / 2.0;
+        if (target < aMin) return aMin;
+        if (target > aMax) return aMax;
+        return target;
+    }
+
+    private static XYZ CenterOf(Element e)
+    {
+        var bb = e.get_BoundingBox(null);
+        if (bb != null) return (bb.Min + bb.Max) / 2.0;
+        if (e.Location is LocationPoint lp) return lp.Point;
+        if (e.Location is LocationCurve lc) return lc.Curve.Evaluate(0.5, true);
+        throw new ArgumentException("Element has no measurable geometry");
     }
 
     private static double[]? ParsePoint(JToken? token)

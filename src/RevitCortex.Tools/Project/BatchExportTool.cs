@@ -20,7 +20,7 @@ public class BatchExportTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Exports multiple views/sheets to DWG, DXF, DGN, or image formats. PDF export requires Revit 2023+ PDF export API.";
+    public string Description => "Exports multiple views/sheets to DWG, DXF, DGN, PDF, or image (PNG) formats.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -159,9 +159,33 @@ public class BatchExportTool : ICortexTool
                     }
                     break;
                 }
+                case "PDF":
+                {
+                    foreach (var id in allIds)
+                    {
+                        var view = doc.GetElement(id) as View;
+                        if (view == null) continue;
+                        var name = SanitizeFileName(view.Name);
+                        try
+                        {
+                            var pdfOptions = new PDFExportOptions
+                            {
+                                FileName = name,
+                                Combine = false
+                            };
+                            doc.Export(outputDir, new List<ElementId> { id }, pdfOptions);
+                            results.Add(new { name = view.Name, file = $"{name}.pdf", success = true });
+                        }
+                        catch (Exception ex)
+                        {
+                            results.Add(new { name = view.Name, success = false, reason = ex.Message });
+                        }
+                    }
+                    break;
+                }
                 default:
                     return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                        $"Unsupported format: {format}", suggestion: "Use: DWG, DXF, DGN, IMAGE");
+                        $"Unsupported format: {format}", suggestion: "Use: DWG, DXF, DGN, PDF, IMAGE");
             }
 
             return CortexResult<object>.Ok(new

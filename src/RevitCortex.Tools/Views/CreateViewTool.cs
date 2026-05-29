@@ -61,10 +61,19 @@ public class CreateViewTool : ICortexTool
                 case "section":
                     createdView = CreateSectionView(doc, input);
                     break;
+                case "elevation":
+                    createdView = CreateElevationView(doc, input);
+                    break;
+                case "drafting":
+                case "draftingview":
+                    var vftDraft = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
+                        .FirstOrDefault(v => v.ViewFamily == ViewFamily.Drafting);
+                    if (vftDraft != null) createdView = ViewDrafting.Create(doc, vftDraft.Id);
+                    break;
                 default:
                     return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                         $"Unsupported viewType: {viewType}",
-                        suggestion: "Use: floorplan, ceilingplan, section, 3d");
+                        suggestion: "Use: floorplan, ceilingplan, section, elevation, drafting, 3d");
             }
 
             if (createdView == null)
@@ -172,5 +181,29 @@ public class CreateViewTool : ICortexTool
         bb.Transform = transform;
 
         return ViewSection.CreateSection(doc, vft.Id, bb);
+    }
+
+    private static ViewSection? CreateElevationView(Document doc, JObject input)
+    {
+        var vft = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
+            .FirstOrDefault(v => v.ViewFamily == ViewFamily.Elevation);
+        if (vft == null) return null;
+
+        // An elevation needs a marker placed on a plan view at an origin point.
+        var ownerPlan = new FilteredElementCollector(doc).OfClass(typeof(ViewPlan)).Cast<ViewPlan>()
+            .FirstOrDefault(v => !v.IsTemplate);
+        if (ownerPlan == null) return null;
+
+        var originX = (input["originX"]?.Value<double>() ?? 0) / MmPerFoot;
+        var originY = (input["originY"]?.Value<double>() ?? 0) / MmPerFoot;
+        var originZ = (input["originZ"]?.Value<double>() ?? 0) / MmPerFoot;
+        var origin = new XYZ(originX, originY, originZ);
+        var scale = input["scale"]?.Value<int?>() ?? 100;
+
+        var marker = ElevationMarker.CreateElevationMarker(doc, vft.Id, origin, scale);
+        // Marker indices run 0..3 around the marker; map a cardinal direction onto one.
+        var dirStr = (input["direction"]?.Value<string>() ?? "north").ToLowerInvariant();
+        int index = dirStr switch { "east" => 1, "south" => 2, "west" => 3, _ => 0 };
+        return marker.CreateElevation(doc, ownerPlan.Id, index);
     }
 }

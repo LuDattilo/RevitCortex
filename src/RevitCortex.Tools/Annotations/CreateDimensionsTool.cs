@@ -232,7 +232,22 @@ public class CreateDimensionsTool : ICortexTool
         var dimLine = Line.CreateBound(p0, p1);
         var dim = doc.Create.NewDimension(view, dimLine, refs);
         if (dim != null)
+        {
             createdIds.Add(ToolHelpers.GetElementIdValue(dim.Id));
+
+            // Apply dimension type if specified (parity with element-mode branch)
+            var dimensionStyleId = spec["dimensionStyleId"]?.Value<long>() ?? -1;
+            if (dimensionStyleId > 0)
+            {
+#if REVIT2024_OR_GREATER
+                var styleElem = doc.GetElement(new ElementId(dimensionStyleId));
+#else
+                var styleElem = doc.GetElement(new ElementId((int)dimensionStyleId));
+#endif
+                if (styleElem is DimensionType dt)
+                    dim.DimensionType = dt;
+            }
+        }
     }
 
     private static Reference? GetBestReference(Element elem, View view)
