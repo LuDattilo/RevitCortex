@@ -155,13 +155,17 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "purge_unused"), Description("Purge unused elements from the Revit project.")]
+    [McpServerTool(Name = "purge_unused"), Description("Purge unused families/types and materials, and optionally unreferenced view templates and view filters, from the project.")]
     public static async Task<string> PurgeUnused(
         RevitConnectionManager revit,
         [Description("Preview changes without applying")] bool dryRun = true,
+        [Description("Also purge view templates not referenced by any view. Default: true")] bool? includeViewTemplates = null,
+        [Description("Also purge view filters not applied to any view. Default: true")] bool? includeFilters = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["dryRun"] = dryRun };
+        if (includeViewTemplates != null) p["includeViewTemplates"] = includeViewTemplates;
+        if (includeFilters != null) p["includeFilters"] = includeFilters;
         var result = await revit.ExecuteAsync("purge_unused", p, ct);
         return result.ToString();
     }

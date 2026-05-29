@@ -5,6 +5,20 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 ---
 
+## Bulk Test Nuovi Tool su Modello Aperto
+
+**Sequenza:** `get_project_info` completo -> rilevamento lingua con `get_element_parameters` su 1 elemento -> smoke read-only mirati -> test write piccoli con prefisso `RC_BULK_*` -> build seriali `Debug R25` e `Debug R24` -> report `.md`
+**Parametri chiave:**
+- Per coprire parametri appena aggiunti ma non ancora visibili nella metadata MCP, chiamare il bridge locale JSON-RPC sulla porta letta da `~/.revitcortex/settings.json`: `{"jsonrpc":"2.0","method":"tool_name","params":{...},"id":"bulk-N"}`.
+- Usare payload minimi (`maxElements`, `maxWarnings`, `compact`) e salvare solo riepiloghi: status, tempi, conteggi, id creati, errori strutturati.
+- Evitare tool notoriamente pesanti nello stesso batch degli altri test. Se `lines_per_view_count` va in timeout, attendere che Revit liberi l'ExternalEvent prima di proseguire.
+- Eseguire `dotnet build -c "Debug R25"` e `dotnet build -c "Debug R24"` in sequenza, non in parallelo: le configurazioni condividono `obj/project.assets.json` e possono generare falsi `NETSDK1005`.
+**NON fare:** Non bypassare sandbox, audit o conferme native. Non usare `send_code_to_revit` per orchestrare il bulk test senza consenso esplicito. Non mischiare un timeout pesante con write test immediatamente successivi.
+
+**Fonte:** sessione bulk test su Snowdon Towers del 2026-05-29
+
+---
+
 ## Controllo Qualita Mattutino
 
 **Sequenza:** `check_model_health` -> `get_warnings` -> (opzionale) `clash_detection`
