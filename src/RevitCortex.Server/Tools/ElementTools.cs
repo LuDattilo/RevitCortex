@@ -359,17 +359,18 @@ public static class ElementTools
         return ToolResponseShaper.Shape("get_room_openings", result, compact, summaryOnly).ToString();
     }
 
-    [McpServerTool(Name = "modify_element"), Description("Move, rotate, mirror, or copy elements. Action-specific params: move needs 'translation' [x,y,z]; rotate needs 'rotationCenter' [x,y,z] and 'rotationAngle' (radians); mirror needs 'mirrorPlaneOrigin' and 'mirrorPlaneNormal'; copy needs 'copyOffset' [x,y,z].")]
+    [McpServerTool(Name = "modify_element"), Description("Move, rotate, mirror, or copy elements. Vectors are {\"x\":mm,\"y\":mm,\"z\":mm} JSON objects. move needs translation; rotate needs rotationCenter + rotationAngle (degrees) and optionally rotationAxis (default Z); mirror needs mirrorPlaneOrigin + mirrorPlaneNormal; copy needs copyOffset.")]
     public static async Task<string> ModifyElement(
         RevitConnectionManager revit,
         [Description("Element IDs to modify")] long[] elementIds,
         [Description("Action: move | rotate | mirror | copy")] string action,
-        [Description("Translation vector [x,y,z] for move action (JSON array)")] string? translation = null,
-        [Description("Rotation center [x,y,z] for rotate action (JSON array)")] string? rotationCenter = null,
-        [Description("Rotation angle in radians for rotate action")] double? rotationAngle = null,
-        [Description("Mirror plane origin [x,y,z] (JSON array)")] string? mirrorPlaneOrigin = null,
-        [Description("Mirror plane normal [x,y,z] (JSON array)")] string? mirrorPlaneNormal = null,
-        [Description("Copy offset [x,y,z] for copy action (JSON array)")] string? copyOffset = null,
+        [Description("Translation vector {x,y,z} in mm for move (JSON object)")] string? translation = null,
+        [Description("Rotation center {x,y,z} in mm for rotate (JSON object)")] string? rotationCenter = null,
+        [Description("Rotation angle in DEGREES for rotate")] double? rotationAngle = null,
+        [Description("Rotation axis direction {x,y,z} for rotate (JSON object). Default: Z axis")] string? rotationAxis = null,
+        [Description("Mirror plane origin {x,y,z} in mm (JSON object)")] string? mirrorPlaneOrigin = null,
+        [Description("Mirror plane normal {x,y,z} unit vector (JSON object)")] string? mirrorPlaneNormal = null,
+        [Description("Copy offset {x,y,z} in mm for copy (JSON object)")] string? copyOffset = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -377,12 +378,13 @@ public static class ElementTools
             ["elementIds"] = new JArray(elementIds.Cast<object>().ToArray()),
             ["action"] = action,
         };
-        if (translation != null) p["translation"] = JArray.Parse(translation);
-        if (rotationCenter != null) p["rotationCenter"] = JArray.Parse(rotationCenter);
+        if (translation != null) p["translation"] = JToken.Parse(translation);
+        if (rotationCenter != null) p["rotationCenter"] = JToken.Parse(rotationCenter);
         if (rotationAngle != null) p["rotationAngle"] = rotationAngle;
-        if (mirrorPlaneOrigin != null) p["mirrorPlaneOrigin"] = JArray.Parse(mirrorPlaneOrigin);
-        if (mirrorPlaneNormal != null) p["mirrorPlaneNormal"] = JArray.Parse(mirrorPlaneNormal);
-        if (copyOffset != null) p["copyOffset"] = JArray.Parse(copyOffset);
+        if (rotationAxis != null) p["rotationAxis"] = JToken.Parse(rotationAxis);
+        if (mirrorPlaneOrigin != null) p["mirrorPlaneOrigin"] = JToken.Parse(mirrorPlaneOrigin);
+        if (mirrorPlaneNormal != null) p["mirrorPlaneNormal"] = JToken.Parse(mirrorPlaneNormal);
+        if (copyOffset != null) p["copyOffset"] = JToken.Parse(copyOffset);
         var result = await revit.ExecuteAsync("modify_element", p, ct);
         return result.ToString();
     }

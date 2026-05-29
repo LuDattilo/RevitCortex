@@ -15,7 +15,7 @@ public class ModifyElementTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Modify Element";
+    public string Description => "Move, rotate, mirror, or copy elements. Rotate is about the Z axis by default, or any axis via rotationAxis {x,y,z}.";
     // 1 foot = 304.8 mm
     private const double MmPerFoot = 304.8;
 
@@ -132,10 +132,20 @@ public class ModifyElementTool : ICortexTool
         var angleDegrees = angleToken.Value<double>();
         var angleRadians = angleDegrees * Math.PI / 180.0;
 
-        // Rotation axis is the Z-axis at the given center point
-        var axisEnd = center + XYZ.BasisZ;
-        var axis = Line.CreateBound(center, axisEnd);
+        // Rotation axis: default Z at the center, or an arbitrary direction vector
+        // via rotationAxis {x,y,z} (e.g. {x:1,y:0,z:0} to tilt about the X axis).
+        var axisToken = input["rotationAxis"];
+        XYZ axisDir = XYZ.BasisZ;
+        if (axisToken != null && axisToken.Type != JTokenType.Null)
+        {
+            var ax = axisToken["x"]?.Value<double>() ?? 0;
+            var ay = axisToken["y"]?.Value<double>() ?? 0;
+            var az = axisToken["z"]?.Value<double>() ?? 1;
+            var dir = new XYZ(ax, ay, az);
+            if (dir.GetLength() > 1e-9) axisDir = dir.Normalize();
+        }
 
+        var axis = Line.CreateBound(center, center + axisDir);
         ElementTransformUtils.RotateElements(doc, elementIds, axis, angleRadians);
     }
 

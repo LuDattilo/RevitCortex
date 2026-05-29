@@ -21,11 +21,12 @@ public class ColorElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Colors elements in the active view by grouping them on a parameter value. Supports OST_* category codes or localized display names. Color strategies: customColors array → gradient (blue→red) → random. Mirrors the fork's ColorSplashEventHandler logic.";
+    public string Description => "Colors elements in the active view by grouping them on a parameter value, or resets (clears) the color overrides. Actions: color (default), reset. Supports OST_* category codes or localized display names. Color strategies: customColors array → gradient (blue→red) → random.";
     private static readonly Random Rng = new Random();
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
+        var action        = (input["action"]?.Value<string>() ?? "color").ToLowerInvariant();
         var categoryName  = input["categoryName"]?.Value<string>();
         var parameterName = input["parameterName"]?.Value<string>();
         var useGradient   = input["useGradient"]?.Value<bool>() ?? false;
@@ -36,10 +37,15 @@ public class ColorElementsTool : ICortexTool
                 "categoryName is required",
                 suggestion: "Use an OST_* code (e.g. OST_Walls) or a localized display name");
 
-        if (string.IsNullOrWhiteSpace(parameterName))
+        // parameterName is only needed for the 'color' action.
+        if (action == "color" && string.IsNullOrWhiteSpace(parameterName))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "parameterName is required",
                 suggestion: "E.g. \"Type Name\", \"Level\", \"Comments\"");
+
+        if (action != "color" && action != "reset")
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                $"Unknown action: {action}", suggestion: "Use: color, reset");
 
         var doc = session.Store.Get<object>("activeDocument") as Document;
         if (doc == null)
@@ -79,6 +85,27 @@ public class ColorElementsTool : ICortexTool
             if (elements.Count == 0)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"No elements of category '{categoryName}' found in the current view");
+
+            // ── Reset action: clear overrides on the category's elements ──────────
+            if (action == "reset")
+            {
+                using var resetTx = new Transaction(doc, "RevitCortex: Reset Element Colors");
+                resetTx.Start();
+                var blank = new OverrideGraphicSettings();
+                int reset = 0;
+                foreach (var element in elements)
+                {
+                    activeView.SetElementOverrides(element.Id, blank);
+                    reset++;
+                }
+                resetTx.Commit();
+
+                return CortexResult<object>.Ok(new
+                {
+                    message = $"Cleared color overrides on {reset} element(s) of '{categoryName}' in the active view",
+                    resetCount = reset
+                });
+            }
 
             // Group elements by parameter value (instance → type → "None")
             var groups = new Dictionary<string, List<ElementId>>(StringComparer.Ordinal);

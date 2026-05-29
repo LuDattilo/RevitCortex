@@ -119,20 +119,21 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "color_elements"), Description("Apply a color override to elements of a given category in a view.")]
+    [McpServerTool(Name = "color_elements"), Description("Color the active view's elements of a category by grouping them on a parameter value, or reset (clear) those color overrides. action=color|reset. Operates on the ACTIVE model view (not a sheet).")]
     public static async Task<string> ColorElements(
         RevitConnectionManager revit,
-        [Description("Category name (e.g. Walls, Doors)")] string category,
-        [Description("Color as hex string (e.g. #FF0000)")] string color,
-        [Description("View element ID. Uses active view if not specified")] long? viewId = null,
+        [Description("Category name or OST_* code (e.g. OST_Walls, Doors)")] string categoryName,
+        [Description("Parameter to group/color by (required for color), e.g. \"Type Name\", \"Level\"")] string? parameterName = null,
+        [Description("Action: color | reset. Default: color")] string? action = null,
+        [Description("Use a blue→red gradient across groups. Default: false (random colors)")] bool? useGradient = null,
+        [Description("Optional explicit colors as JSON array [{r,g,b}, ...], cycled across groups")] string? customColors = null,
         CancellationToken ct = default)
     {
-        var p = new JObject
-        {
-            ["category"] = category,
-            ["color"] = color,
-        };
-        if (viewId != null) p["viewId"] = viewId;
+        var p = new JObject { ["categoryName"] = categoryName };
+        if (parameterName != null) p["parameterName"] = parameterName;
+        if (action != null) p["action"] = action;
+        if (useGradient != null) p["useGradient"] = useGradient;
+        if (customColors != null) p["customColors"] = JArray.Parse(customColors);
         var result = await revit.ExecuteAsync("color_elements", p, ct);
         return result.ToString();
     }
