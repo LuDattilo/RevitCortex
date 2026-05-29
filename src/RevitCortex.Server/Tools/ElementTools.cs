@@ -91,15 +91,16 @@ public static class ElementTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "copy_elements"), Description("Copy elements with optional offset. Can target a different view.")]
+    [McpServerTool(Name = "copy_elements"), Description("Copy elements with optional mm offset. Can target a different view (sourceViewId+targetViewId) or another OPEN document (targetDocumentTitle).")]
     public static async Task<string> CopyElements(
         RevitConnectionManager revit,
         [Description("Element IDs to copy")] long[] elementIds,
-        [Description("Source view ID (optional)")] long? sourceViewId = null,
-        [Description("Target view ID (optional)")] long? targetViewId = null,
-        [Description("Offset X in project units. Default: 0")] double? offsetX = null,
-        [Description("Offset Y in project units. Default: 0")] double? offsetY = null,
-        [Description("Offset Z in project units. Default: 0")] double? offsetZ = null,
+        [Description("Source view ID (optional; required with targetViewId)")] long? sourceViewId = null,
+        [Description("Target view ID (optional; required with sourceViewId)")] long? targetViewId = null,
+        [Description("Title of another open document to copy into (without .rvt). Omit for same-document copy")] string? targetDocumentTitle = null,
+        [Description("Offset X in mm. Default: 0")] double? offsetX = null,
+        [Description("Offset Y in mm. Default: 0")] double? offsetY = null,
+        [Description("Offset Z in mm. Default: 0")] double? offsetZ = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -108,6 +109,7 @@ public static class ElementTools
         };
         if (sourceViewId != null) p["sourceViewId"] = sourceViewId;
         if (targetViewId != null) p["targetViewId"] = targetViewId;
+        if (targetDocumentTitle != null) p["targetDocumentTitle"] = targetDocumentTitle;
         if (offsetX != null) p["offsetX"] = offsetX;
         if (offsetY != null) p["offsetY"] = offsetY;
         if (offsetZ != null) p["offsetZ"] = offsetZ;

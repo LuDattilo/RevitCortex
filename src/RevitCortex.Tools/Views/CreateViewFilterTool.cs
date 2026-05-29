@@ -19,7 +19,7 @@ public class CreateViewFilterTool : ICortexTool
     public string Category => "Views";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates, applies, or lists view filters with optional parameter rules and graphic overrides.";
+    public string Description => "Creates, applies, or lists view filters. A filter can carry one rule (parameterName/filterRule/filterValue) or several via a 'rules' array combined with AND/OR (logic). Apply supports color overrides.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -84,31 +84,58 @@ public class CreateViewFilterTool : ICortexTool
 
         var filter = ParameterFilterElement.Create(doc, filterName, catIds);
 
-        // Optional parameter rule
-        var parameterName = input["parameterName"]?.Value<string>();
-        var filterRule = input["filterRule"]?.Value<string>();
-        var filterValue = input["filterValue"]?.Value<string>();
+        // A sample element from the first category, used to resolve parameter ids by name.
+        var testElem = new FilteredElementCollector(doc)
+            .OfCategoryId(catIds[0])
+            .WhereElementIsNotElementType()
+            .FirstOrDefault();
 
-        if (!string.IsNullOrEmpty(parameterName) && !string.IsNullOrEmpty(filterRule))
+        // Collect rules: single (parameterName/filterRule/filterValue) and/or a `rules` array.
+        var ruleSpecs = new List<(string name, string rule, string value)>();
+        var singleName = input["parameterName"]?.Value<string>();
+        var singleRule = input["filterRule"]?.Value<string>();
+        if (!string.IsNullOrEmpty(singleName) && !string.IsNullOrEmpty(singleRule))
+            ruleSpecs.Add((singleName!, singleRule!, input["filterValue"]?.Value<string>() ?? ""));
+
+        var rulesArray = input["rules"] as JArray;
+        if (rulesArray != null)
         {
-            // Find parameter among the first category's elements
-            var testElem = new FilteredElementCollector(doc)
-                .OfCategoryId(catIds[0])
-                .WhereElementIsNotElementType()
-                .FirstOrDefault();
-
-            if (testElem != null)
+            foreach (var r in rulesArray.OfType<JObject>())
             {
-                var param = testElem.LookupParameter(parameterName);
-                if (param != null)
-                {
-                    var rule = CreateRule(param.Id, filterRule!, filterValue ?? "", param.StorageType);
-                    if (rule != null)
-                    {
-                        var elemFilter = new ElementParameterFilter(rule);
-                        filter.SetElementFilter(elemFilter);
-                    }
-                }
+                var n = r["parameterName"]?.Value<string>();
+                var rl = r["rule"]?.Value<string>() ?? r["filterRule"]?.Value<string>();
+                if (!string.IsNullOrEmpty(n) && !string.IsNullOrEmpty(rl))
+                    ruleSpecs.Add((n!, rl!, r["value"]?.Value<string>() ?? r["filterValue"]?.Value<string>() ?? ""));
+            }
+        }
+
+        var rulesApplied = 0;
+        var ruleWarnings = new List<string>();
+        if (ruleSpecs.Count > 0 && testElem != null)
+        {
+            var filters = new List<ElementFilter>();
+            foreach (var spec in ruleSpecs)
+            {
+                var param = testElem.LookupParameter(spec.name);
+                if (param == null) { ruleWarnings.Add($"Parameter '{spec.name}' not found on sample element"); continue; }
+                var rule = CreateRule(param.Id, spec.rule, spec.value, param.StorageType);
+                if (rule == null) { ruleWarnings.Add($"Unsupported rule '{spec.rule}' for '{spec.name}'"); continue; }
+                filters.Add(new ElementParameterFilter(rule));
+            }
+
+            if (filters.Count == 1)
+            {
+                filter.SetElementFilter(filters[0]);
+                rulesApplied = 1;
+            }
+            else if (filters.Count > 1)
+            {
+                var logic = (input["logic"]?.Value<string>() ?? "and").ToLowerInvariant();
+                ElementFilter combined = logic == "or"
+                    ? new LogicalOrFilter(filters)
+                    : (ElementFilter)new LogicalAndFilter(filters);
+                filter.SetElementFilter(combined);
+                rulesApplied = filters.Count;
             }
         }
 
@@ -118,7 +145,9 @@ public class CreateViewFilterTool : ICortexTool
         {
             filterId = ToolHelpers.GetElementIdValue(filter.Id),
             filterName = filter.Name,
-            categoryCount = catIds.Count
+            categoryCount = catIds.Count,
+            rulesApplied,
+            warnings = ruleWarnings
         });
     }
 

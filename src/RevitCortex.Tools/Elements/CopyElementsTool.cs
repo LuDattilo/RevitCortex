@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -20,7 +21,7 @@ public class CopyElementsTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Copies elements within the same document, optionally between views. Offsets are in mm and converted to internal units (feet). Mirrors the fork's CopyElementsEventHandler logic.";
+    public string Description => "Copies elements within the same document, between views, or to another open document (set targetDocumentTitle). Offsets are in mm.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var elementIdsToken = input["elementIds"];
@@ -46,6 +47,7 @@ public class CopyElementsTool : ICortexTool
 
         var sourceViewId = input["sourceViewId"]?.Value<long?>() ?? 0;
         var targetViewId = input["targetViewId"]?.Value<long?>() ?? 0;
+        var targetDocumentTitle = input["targetDocumentTitle"]?.Value<string>();
         var offsetX = input["offsetX"]?.Value<double>() ?? 0.0;
         var offsetY = input["offsetY"]?.Value<double>() ?? 0.0;
         var offsetZ = input["offsetZ"]?.Value<double>() ?? 0.0;
@@ -64,6 +66,60 @@ public class CopyElementsTool : ICortexTool
         try
         {
             ICollection<ElementId> copiedIds;
+
+            if (!string.IsNullOrWhiteSpace(targetDocumentTitle))
+            {
+                // Cross-document copy to another OPEN document, matched by Title.
+                Document? destDoc = null;
+                foreach (Document d in doc.Application.Documents)
+                {
+                    if (!d.IsLinked && d.Title.Equals(targetDocumentTitle, StringComparison.OrdinalIgnoreCase))
+                    {
+                        destDoc = d;
+                        break;
+                    }
+                }
+                if (destDoc == null)
+                    return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                        $"No open document titled '{targetDocumentTitle}'",
+                        suggestion: "Open the target document in Revit first; match its title (without .rvt) exactly");
+                if (destDoc.Equals(doc))
+                    return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                        "targetDocumentTitle is the active document — omit it for a same-document copy");
+
+                using var tx = new Transaction(destDoc, "RevitCortex: Copy Elements Across Documents");
+                tx.Start();
+                try
+                {
+                    copiedIds = ElementTransformUtils.CopyElements(
+                        doc, ids, destDoc, transform, new CopyPasteOptions());
+                    tx.Commit();
+                }
+                catch
+                {
+                    if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack();
+                    throw;
+                }
+
+                var crossElems = copiedIds.Select(id =>
+                {
+                    var e = destDoc.GetElement(id);
+                    return (object)new
+                    {
+                        id = ToolHelpers.GetElementIdValue(id),
+                        name = e?.Name ?? "",
+                        category = e?.Category?.Name ?? ""
+                    };
+                }).ToList();
+
+                return CortexResult<object>.Ok(new
+                {
+                    message = $"Copied {copiedIds.Count} element(s) to '{destDoc.Title}'",
+                    copiedCount = copiedIds.Count,
+                    targetDocument = destDoc.Title,
+                    copiedElements = crossElems
+                });
+            }
 
             if (sourceViewId > 0 || targetViewId > 0)
             {

@@ -91,24 +91,38 @@ public static class ViewTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_view_filter"), Description("Create a parameter-based view filter and apply it to categories.")]
+    [McpServerTool(Name = "create_view_filter"), Description("Create, apply, or list parameter-based view filters. action=create|apply|list. A filter carries one rule (parameterName/filterRule/filterValue) or several via the rules array combined with AND/OR (logic). For apply: filterId+viewId, optional overrideR/G/B.")]
     public static async Task<string> CreateViewFilter(
         RevitConnectionManager revit,
-        [Description("Filter name")] string name,
-        [Description("Categories to apply the filter to (e.g. [\"Walls\", \"Floors\"])")] string[] categories,
-        [Description("Parameter name to filter on")] string parameterName,
-        [Description("Filter rule: equals, notEquals, greater, less, contains, startsWith, endsWith")] string rule,
-        [Description("Value to compare against")] string? value = null,
+        [Description("Action: create | apply | list. Default: create")] string? action = null,
+        [Description("Filter name (for create)")] string? filterName = null,
+        [Description("Category names for create (e.g. [\"Walls\", \"Floors\"])")] string[]? categoryNames = null,
+        [Description("Parameter name to filter on (single-rule create)")] string? parameterName = null,
+        [Description("Filter rule (single-rule create): equals | not_equals | contains | begins_with | ends_with | greater_than | less_than")] string? filterRule = null,
+        [Description("Value to compare against (single-rule create)")] string? filterValue = null,
+        [Description("Multi-rule create: JSON array of {parameterName, rule, value}")] string? rules = null,
+        [Description("Combine multiple rules with: and | or. Default: and")] string? logic = null,
+        [Description("Filter id (for apply)")] long? filterId = null,
+        [Description("View id (for apply)")] long? viewId = null,
+        [Description("Override color R 0-255 (for apply)")] int? overrideR = null,
+        [Description("Override color G 0-255 (for apply)")] int? overrideG = null,
+        [Description("Override color B 0-255 (for apply)")] int? overrideB = null,
         CancellationToken ct = default)
     {
-        var p = new JObject
-        {
-            ["name"] = name,
-            ["categories"] = new JArray(categories),
-            ["parameterName"] = parameterName,
-            ["rule"] = rule,
-        };
-        if (value != null) p["value"] = value;
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (filterName != null) p["filterName"] = filterName;
+        if (categoryNames != null) p["categoryNames"] = new JArray(categoryNames);
+        if (parameterName != null) p["parameterName"] = parameterName;
+        if (filterRule != null) p["filterRule"] = filterRule;
+        if (filterValue != null) p["filterValue"] = filterValue;
+        if (rules != null) p["rules"] = JArray.Parse(rules);
+        if (logic != null) p["logic"] = logic;
+        if (filterId != null) p["filterId"] = filterId;
+        if (viewId != null) p["viewId"] = viewId;
+        if (overrideR != null) p["overrideR"] = overrideR;
+        if (overrideG != null) p["overrideG"] = overrideG;
+        if (overrideB != null) p["overrideB"] = overrideB;
         var result = await revit.ExecuteAsync("create_view_filter", p, ct);
         return result.ToString();
     }
