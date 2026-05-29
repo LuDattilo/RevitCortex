@@ -143,7 +143,7 @@ pbi_publish_selection(workspaceId:string,null, datasetId:string,null, datasetNam
 pbi_query(workspaceId:string,null, datasetId:string,null, datasetName:string,null, category:string,null, level:string,null, parameterName:string,null, parameterValue:string,null, exportRunId:string,null, daxQuery:string,null, action:string,null, maxElements:integer)
 pbi_sign_out()
 pin_unpin_link_instance(instanceIds:array!, pin:boolean,null)
-place_viewport(sheetId:integer!, viewId:integer!, x:number,null, y:number,null)
+place_viewport(sheetId:integer!, viewId:integer!, positionX:number,null, positionY:number,null, rotation:string,null, viewportTypeId:integer,null)
 purge_unused(dryRun:boolean)
 push_table_to_powerbi(headers:string!, rows:string!, outputFolder:string,null, subfolder:string,null, fileName:string,null)
 push_to_powerbi(categories:array,null, parameterNames:array,null, scheduleIds:array,null, includeTypeParameters:boolean, maxElements:integer, scopeMode:string,null, selectionIds:array,null, activeViewId:integer,null, outputFolder:string,null, fileName:string,null)

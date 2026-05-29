@@ -257,10 +257,10 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_text_note"), Description("Create text notes in a view. Pass a JSON array: [{viewId, text, x, y, textTypeName?, textSize?}].")]
+    [McpServerTool(Name = "create_text_note"), Description("Create text notes in a view. Pass a JSON array: [{text, position:{x,y,z}, viewId?, textNoteTypeId?, width?, horizontalAlignment?, verticalAlignment?, rotation?, leader?}]. rotation is degrees; leader is left|right|leftArc|rightArc.")]
     public static async Task<string> CreateTextNote(
         RevitConnectionManager revit,
-        [Description("JSON array of text note specs: [{viewId, text, x, y, ...}]")] string textNotes,
+        [Description("JSON array of text note specs: [{text, position:{x,y,z}, viewId?, width?, horizontalAlignment?, verticalAlignment?, rotation?, leader?}]")] string textNotes,
         CancellationToken ct = default)
     {
         var p = new JObject { ["textNotes"] = JArray.Parse(textNotes) };

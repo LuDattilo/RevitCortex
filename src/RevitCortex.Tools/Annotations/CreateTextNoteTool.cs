@@ -149,12 +149,44 @@ public class CreateTextNoteTool : ICortexTool
             _        => HorizontalTextAlignment.Left,
         };
 
+        // Rotation (degrees clockwise from horizontal) → radians for the Revit API.
+        var rotationDeg = spec["rotation"]?.Value<double?>();
+        if (rotationDeg.HasValue && Math.Abs(rotationDeg.Value) > 1e-9)
+            options.Rotation = rotationDeg.Value * Math.PI / 180.0;
+
         var textNote = TextNote.Create(doc, view.Id, position, text, options);
 
         // Set width if specified
         var widthMm = spec["width"]?.Value<double>() ?? 0;
         if (widthMm > 0)
             textNote.Width = widthMm / MmPerFoot;
+
+        // Vertical alignment (top/middle/bottom) — set on the created note.
+        var vAlign = spec["verticalAlignment"]?.Value<string>();
+        if (!string.IsNullOrEmpty(vAlign))
+        {
+            textNote.VerticalAlignment = vAlign!.ToLowerInvariant() switch
+            {
+                "top"    => VerticalTextAlignment.Top,
+                "bottom" => VerticalTextAlignment.Bottom,
+                _        => VerticalTextAlignment.Middle,
+            };
+        }
+
+        // Optional leader, e.g. "left" / "right" (the two straight-leader types).
+        var leader = spec["leader"]?.Value<string>();
+        if (!string.IsNullOrEmpty(leader))
+        {
+            var leaderType = leader!.ToLowerInvariant() switch
+            {
+                "right"       => TextNoteLeaderTypes.TNLT_STRAIGHT_R,
+                "leftarc" or "leftcurved"   => TextNoteLeaderTypes.TNLT_ARC_L,
+                "rightarc" or "rightcurved" => TextNoteLeaderTypes.TNLT_ARC_R,
+                _             => TextNoteLeaderTypes.TNLT_STRAIGHT_L,
+            };
+            try { textNote.AddLeader(leaderType); }
+            catch (Exception ex) { warnings.Add($"Leader not added: {ex.Message}"); }
+        }
 
         createdIds.Add(ToolHelpers.GetElementIdValue(textNote.Id));
     }

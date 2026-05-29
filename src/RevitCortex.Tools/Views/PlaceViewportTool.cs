@@ -17,7 +17,7 @@ public class PlaceViewportTool : ICortexTool
     public string Category => "Views";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Places a view on a sheet at the specified position.";
+    public string Description => "Places a view on a sheet at the specified position, with optional rotation and viewport type.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -30,6 +30,8 @@ public class PlaceViewportTool : ICortexTool
         var viewId = input["viewId"]?.Value<long>() ?? 0;
         var posXMm = input["positionX"]?.Value<double>() ?? 0;
         var posYMm = input["positionY"]?.Value<double>() ?? 0;
+        var rotation = input["rotation"]?.Value<string>();
+        var viewportTypeId = input["viewportTypeId"]?.Value<long?>() ?? 0;
 
         if (sheetId <= 0 || viewId <= 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "sheetId and viewId are required");
@@ -59,13 +61,34 @@ public class PlaceViewportTool : ICortexTool
             using var tx = new Transaction(doc, "RevitCortex: Place Viewport");
             tx.Start();
             var viewport = Viewport.Create(doc, sheetEid, viewEid, position);
+
+            // Optional rotation
+            if (!string.IsNullOrEmpty(rotation))
+            {
+                viewport.Rotation = rotation!.ToLowerInvariant() switch
+                {
+                    "clockwise"        => ViewportRotation.Clockwise,
+                    "counterclockwise" => ViewportRotation.Counterclockwise,
+                    _                  => ViewportRotation.None,
+                };
+            }
+
+            // Optional viewport type (controls title/detail-number appearance)
+            if (viewportTypeId > 0)
+            {
+                var vpType = doc.GetElement(ToolHelpers.ToElementId(viewportTypeId));
+                if (vpType is ElementType && viewport.IsValidType(vpType.Id))
+                    viewport.ChangeTypeId(vpType.Id);
+            }
+
             tx.Commit();
 
             return CortexResult<object>.Ok(new
             {
                 viewportId = ToolHelpers.GetElementIdValue(viewport.Id),
                 sheetNumber = sheet.SheetNumber,
-                viewName = view.Name
+                viewName = view.Name,
+                rotation = viewport.Rotation.ToString()
             });
         }
         catch (Exception ex)

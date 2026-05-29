@@ -158,13 +158,15 @@ public static class ViewTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "place_viewport"), Description("Place a view on a sheet as a viewport.")]
+    [McpServerTool(Name = "place_viewport"), Description("Place a view on a sheet as a viewport, with optional rotation and viewport type.")]
     public static async Task<string> PlaceViewport(
         RevitConnectionManager revit,
         [Description("Sheet element ID")] long sheetId,
         [Description("View element ID to place")] long viewId,
-        [Description("X coordinate for viewport center")] double? x = null,
-        [Description("Y coordinate for viewport center")] double? y = null,
+        [Description("X coordinate for viewport center, in mm")] double? positionX = null,
+        [Description("Y coordinate for viewport center, in mm")] double? positionY = null,
+        [Description("Rotation: none | clockwise | counterclockwise. Default: none")] string? rotation = null,
+        [Description("Viewport type (ElementType) id to apply")] long? viewportTypeId = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -172,8 +174,10 @@ public static class ViewTools
             ["sheetId"] = sheetId,
             ["viewId"] = viewId,
         };
-        if (x != null) p["x"] = x;
-        if (y != null) p["y"] = y;
+        if (positionX != null) p["positionX"] = positionX;
+        if (positionY != null) p["positionY"] = positionY;
+        if (rotation != null) p["rotation"] = rotation;
+        if (viewportTypeId != null) p["viewportTypeId"] = viewportTypeId;
         var result = await revit.ExecuteAsync("place_viewport", p, ct);
         return result.ToString();
     }
