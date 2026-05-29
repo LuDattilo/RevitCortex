@@ -19,7 +19,7 @@ public class CreateGridTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates a grid system with specified counts, spacing, and labeling.";
+    public string Description => "Creates a grid system, or renames/deletes an existing grid. Actions: create (default), rename, delete.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -27,6 +27,13 @@ public class CreateGridTool : ICortexTool
         var doc = session.Store.Get<object>("activeDocument") as Document;
         if (doc == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
+
+        var action = (input["action"]?.Value<string>() ?? "create").ToLowerInvariant();
+        if (action == "rename") return RenameGrid(doc, input, session);
+        if (action == "delete") return DeleteGrid(doc, input, session);
+        if (action != "create")
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                $"Unknown action: {action}", suggestion: "Use: create, rename, delete");
 
         var xCount = input["xCount"]?.Value<int>() ?? 0;
         var yCount = input["yCount"]?.Value<int>() ?? 0;
@@ -130,5 +137,68 @@ public class CreateGridTool : ICortexTool
     {
         try { grid.Name = name; return true; }
         catch { return false; }
+    }
+
+    private static CortexResult<object> RenameGrid(Document doc, JObject input, CortexSession session)
+    {
+        var (grid, error) = ResolveGrid(doc, input);
+        if (error != null) return error;
+
+        var newName = input["newName"]?.Value<string>();
+        if (string.IsNullOrWhiteSpace(newName))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "newName is required for rename");
+
+        var clash = new FilteredElementCollector(doc).OfClass(typeof(Grid)).Cast<Grid>()
+            .FirstOrDefault(g => g.Id != grid!.Id && g.Name.Equals(newName, StringComparison.OrdinalIgnoreCase));
+        if (clash != null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, $"A grid named '{newName}' already exists");
+
+        if (!session.RequestConfirmation("rename grid", 1, grid!.Name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        var oldName = grid.Name;
+        using var tx = new Transaction(doc, "RevitCortex: Rename Grid");
+        tx.Start();
+        grid.Name = newName;
+        tx.Commit();
+
+        return CortexResult<object>.Ok(new { action = "rename", gridId = ToolHelpers.GetElementIdValue(grid.Id), oldName, newName });
+    }
+
+    private static CortexResult<object> DeleteGrid(Document doc, JObject input, CortexSession session)
+    {
+        var (grid, error) = ResolveGrid(doc, input);
+        if (error != null) return error;
+
+        if (!session.RequestConfirmation("delete grid", 1, grid!.Name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        var name = grid!.Name;
+        using var tx = new Transaction(doc, "RevitCortex: Delete Grid");
+        tx.Start();
+        doc.Delete(grid.Id);
+        tx.Commit();
+
+        return CortexResult<object>.Ok(new { action = "delete", deletedGrid = name });
+    }
+
+    /// <summary>Resolves a grid by gridId or name from the input.</summary>
+    private static (Grid?, CortexResult<object>?) ResolveGrid(Document doc, JObject input)
+    {
+        var gridIdLong = input["gridId"]?.Value<long?>() ?? 0;
+        var name = input["name"]?.Value<string>();
+
+        Grid? grid = null;
+        if (gridIdLong > 0)
+            grid = doc.GetElement(ToolHelpers.ToElementId(gridIdLong)) as Grid;
+        if (grid == null && !string.IsNullOrEmpty(name))
+            grid = new FilteredElementCollector(doc).OfClass(typeof(Grid)).Cast<Grid>()
+                .FirstOrDefault(g => g.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        if (grid == null)
+            return (null, CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                "Grid not found", suggestion: "Provide a valid gridId or name"));
+
+        return (grid, null);
     }
 }

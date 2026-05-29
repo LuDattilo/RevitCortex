@@ -19,7 +19,7 @@ public class CreateLevelTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates a new level at the specified elevation, optionally with floor/ceiling plan views.";
+    public string Description => "Creates, edits, renames, or deletes levels. Actions: create (default), set (elevation/isBuildingStory), rename, delete.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -28,6 +28,28 @@ public class CreateLevelTool : ICortexTool
         if (doc == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
 
+        var action = (input["action"]?.Value<string>() ?? "create").ToLowerInvariant();
+
+        try
+        {
+            return action switch
+            {
+                "create" => CreateLevel(doc, input),
+                "set"    => SetLevel(doc, input, session),
+                "rename" => RenameLevel(doc, input, session),
+                "delete" => DeleteLevel(doc, input, session),
+                _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"Unknown action: {action}", suggestion: "Use: create, set, rename, delete")
+            };
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to manage level: {ex.Message}");
+        }
+    }
+
+    private static CortexResult<object> CreateLevel(Document doc, JObject input)
+    {
         var name = input["name"]?.Value<string>();
         if (string.IsNullOrEmpty(name))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "name is required");
@@ -37,7 +59,6 @@ public class CreateLevelTool : ICortexTool
         var createFloorPlan = input["createFloorPlan"]?.Value<bool>() ?? false;
         var createCeilingPlan = input["createCeilingPlan"]?.Value<bool>() ?? false;
 
-        try
         {
             // Check for duplicate name
             var existing = new FilteredElementCollector(doc)
@@ -101,9 +122,110 @@ public class CreateLevelTool : ICortexTool
                 warnings
             });
         }
-        catch (Exception ex)
+    }
+
+    private static CortexResult<object> SetLevel(Document doc, JObject input, CortexSession session)
+    {
+        var (level, error) = ResolveLevel(doc, input);
+        if (error != null) return error;
+
+        if (!session.RequestConfirmation("modify level", 1, level!.Name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        var changed = new List<string>();
+        using var tx = new Transaction(doc, "RevitCortex: Set Level");
+        tx.Start();
+
+        var elevationMm = input["elevation"]?.Value<double?>();
+        if (elevationMm.HasValue)
         {
-            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to create level: {ex.Message}");
+            level.Elevation = elevationMm.Value / MmPerFoot;
+            changed.Add("elevation");
         }
+
+        var isBuildingStory = input["isBuildingStory"]?.Value<bool?>();
+        if (isBuildingStory.HasValue)
+        {
+            var storyParam = level.get_Parameter(BuiltInParameter.LEVEL_IS_BUILDING_STORY);
+            if (storyParam != null && !storyParam.IsReadOnly)
+            {
+                storyParam.Set(isBuildingStory.Value ? 1 : 0);
+                changed.Add("isBuildingStory");
+            }
+        }
+
+        tx.Commit();
+
+        return CortexResult<object>.Ok(new
+        {
+            action = "set",
+            levelId = ToolHelpers.GetElementIdValue(level.Id),
+            name = level.Name,
+            elevationMm = level.Elevation * MmPerFoot,
+            changedFields = changed
+        });
+    }
+
+    private static CortexResult<object> RenameLevel(Document doc, JObject input, CortexSession session)
+    {
+        var (level, error) = ResolveLevel(doc, input);
+        if (error != null) return error;
+
+        var newName = input["newName"]?.Value<string>();
+        if (string.IsNullOrWhiteSpace(newName))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "newName is required for rename");
+
+        var clash = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+            .FirstOrDefault(l => l.Id != level!.Id && l.Name.Equals(newName, StringComparison.OrdinalIgnoreCase));
+        if (clash != null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, $"A level named '{newName}' already exists");
+
+        if (!session.RequestConfirmation("rename level", 1, level!.Name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        var oldName = level.Name;
+        using var tx = new Transaction(doc, "RevitCortex: Rename Level");
+        tx.Start();
+        level.Name = newName;
+        tx.Commit();
+
+        return CortexResult<object>.Ok(new { action = "rename", levelId = ToolHelpers.GetElementIdValue(level.Id), oldName, newName });
+    }
+
+    private static CortexResult<object> DeleteLevel(Document doc, JObject input, CortexSession session)
+    {
+        var (level, error) = ResolveLevel(doc, input);
+        if (error != null) return error;
+
+        if (!session.RequestConfirmation("delete level", 1, level!.Name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        var name = level!.Name;
+        using var tx = new Transaction(doc, "RevitCortex: Delete Level");
+        tx.Start();
+        doc.Delete(level.Id);
+        tx.Commit();
+
+        return CortexResult<object>.Ok(new { action = "delete", deletedLevel = name });
+    }
+
+    /// <summary>Resolves a level by levelId or name from the input.</summary>
+    private static (Level?, CortexResult<object>?) ResolveLevel(Document doc, JObject input)
+    {
+        var levelIdLong = input["levelId"]?.Value<long?>() ?? 0;
+        var name = input["name"]?.Value<string>();
+
+        Level? level = null;
+        if (levelIdLong > 0)
+            level = doc.GetElement(ToolHelpers.ToElementId(levelIdLong)) as Level;
+        if (level == null && !string.IsNullOrEmpty(name))
+            level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                .FirstOrDefault(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        if (level == null)
+            return (null, CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                "Level not found", suggestion: "Provide a valid levelId or name"));
+
+        return (level, null);
     }
 }

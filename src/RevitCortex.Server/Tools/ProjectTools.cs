@@ -203,18 +203,24 @@ public static class ProjectTools
         return ToolResponseShaper.Shape("workflow_model_audit", result, compact, summaryOnly: false).ToString();
     }
 
-    [McpServerTool(Name = "create_level"), Description("Create a new level in the Revit project.")]
+    [McpServerTool(Name = "create_level"), Description("Create, edit, rename, or delete a level. action=create|set|rename|delete. For set/rename/delete identify the level by levelId or name.")]
     public static async Task<string> CreateLevel(
         RevitConnectionManager revit,
-        [Description("Name of the new level")] string name,
-        [Description("Elevation of the level")] double elevation,
+        [Description("Level name (required for create; identifies the target for set/rename/delete when levelId is omitted)")] string? name = null,
+        [Description("Elevation in mm (create, or set to change an existing level's elevation)")] double? elevation = null,
+        [Description("Action: create | set | rename | delete. Default: create")] string? action = null,
+        [Description("Level element id (identifies the target for set/rename/delete)")] long? levelId = null,
+        [Description("Mark as a building story (create/set)")] bool? isBuildingStory = null,
+        [Description("New name (for rename)")] string? newName = null,
         CancellationToken ct = default)
     {
-        var p = new JObject
-        {
-            ["name"] = name,
-            ["elevation"] = elevation,
-        };
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (name != null) p["name"] = name;
+        if (elevation != null) p["elevation"] = elevation;
+        if (levelId != null) p["levelId"] = levelId;
+        if (isBuildingStory != null) p["isBuildingStory"] = isBuildingStory;
+        if (newName != null) p["newName"] = newName;
         var result = await revit.ExecuteAsync("create_level", p, ct);
         return result.ToString();
     }
@@ -255,18 +261,22 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "duplicate_system_type"), Description("Duplicate an existing system type with a new name.")]
+    [McpServerTool(Name = "duplicate_system_type"), Description("Duplicate, rename, or delete a system type (wall, floor, roof, ceiling). action=duplicate|rename|delete.")]
     public static async Task<string> DuplicateSystemType(
         RevitConnectionManager revit,
-        [Description("Element ID of the source type to duplicate")] long sourceTypeId,
-        [Description("Name for the new duplicated type")] string newName,
+        [Description("Element ID of the source/target type")] long? sourceTypeId = null,
+        [Description("Name for the new type (duplicate) or new name (rename)")] string? newName = null,
+        [Description("Action: duplicate | rename | delete. Default: duplicate")] string? action = null,
+        [Description("Source/target type name (alternative to sourceTypeId)")] string? sourceTypeName = null,
+        [Description("Category to disambiguate the type name (e.g. Walls)")] string? category = null,
         CancellationToken ct = default)
     {
-        var p = new JObject
-        {
-            ["sourceTypeId"] = sourceTypeId,
-            ["newName"] = newName,
-        };
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (sourceTypeId != null) p["sourceTypeId"] = sourceTypeId;
+        if (newName != null) p["newName"] = newName;
+        if (sourceTypeName != null) p["sourceTypeName"] = sourceTypeName;
+        if (category != null) p["category"] = category;
         var result = await revit.ExecuteAsync("duplicate_system_type", p, ct);
         return result.ToString();
     }

@@ -78,24 +78,32 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_grid"), Description("Create a grid line between two points with an optional label.")]
+    [McpServerTool(Name = "create_grid"), Description("Create a grid system (X and/or Y grids by count + spacing), or rename/delete an existing grid. action=create|rename|delete. Spacing/extent values are in mm.")]
     public static async Task<string> CreateGrid(
         RevitConnectionManager revit,
-        [Description("Start X coordinate")] double startX,
-        [Description("Start Y coordinate")] double startY,
-        [Description("End X coordinate")] double endX,
-        [Description("End Y coordinate")] double endY,
-        [Description("Grid label")] string? label = null,
+        [Description("Action: create | rename | delete. Default: create")] string? action = null,
+        [Description("Number of X grids (vertical lines) to create")] int? xCount = null,
+        [Description("Number of Y grids (horizontal lines) to create")] int? yCount = null,
+        [Description("Spacing between X grids in mm. Default: 5000")] double? xSpacing = null,
+        [Description("Spacing between Y grids in mm. Default: 5000")] double? ySpacing = null,
+        [Description("First X grid label. Default: A")] string? xStartLabel = null,
+        [Description("First Y grid label. Default: 1")] string? yStartLabel = null,
+        [Description("Grid element id (for rename/delete)")] long? gridId = null,
+        [Description("Grid name (identifies the target for rename/delete when gridId is omitted)")] string? name = null,
+        [Description("New name (for rename)")] string? newName = null,
         CancellationToken ct = default)
     {
-        var p = new JObject
-        {
-            ["startX"] = startX,
-            ["startY"] = startY,
-            ["endX"] = endX,
-            ["endY"] = endY,
-        };
-        if (label != null) p["label"] = label;
+        var p = new JObject();
+        if (action != null) p["action"] = action;
+        if (xCount != null) p["xCount"] = xCount;
+        if (yCount != null) p["yCount"] = yCount;
+        if (xSpacing != null) p["xSpacing"] = xSpacing;
+        if (ySpacing != null) p["ySpacing"] = ySpacing;
+        if (xStartLabel != null) p["xStartLabel"] = xStartLabel;
+        if (yStartLabel != null) p["yStartLabel"] = yStartLabel;
+        if (gridId != null) p["gridId"] = gridId;
+        if (name != null) p["name"] = name;
+        if (newName != null) p["newName"] = newName;
         var result = await revit.ExecuteAsync("create_grid", p, ct);
         return result.ToString();
     }
