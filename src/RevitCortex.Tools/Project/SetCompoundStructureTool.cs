@@ -21,7 +21,7 @@ public class SetCompoundStructureTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Modifies compound structure (layer stratigraphy) on system family types. Supports replacing all layers, adding layers, removing layers, or modifying individual layer properties.";
+    public string Description => "Modifies compound structure (layer stratigraphy) on system family types. Actions: replace, add, remove, modify (layers), and set_wrapping (openingWrapping/endCap/per-layer wraps).";
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
@@ -77,9 +77,12 @@ public class SetCompoundStructureTool : ICortexTool
                 case "modify":
                     return ModifyLayer(doc, hostType, cs, input, session, dryRun);
 
+                case "set_wrapping":
+                    return SetWrapping(doc, hostType, cs, input, session, dryRun);
+
                 default:
                     return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                        $"Unknown action '{action}'. Use: replace, add, remove, modify");
+                        $"Unknown action '{action}'. Use: replace, add, remove, modify, set_wrapping");
             }
         }
         catch (Exception ex)
@@ -381,6 +384,82 @@ public class SetCompoundStructureTool : ICortexTool
             layerIndex,
             changes,
             message = $"Modified layer {layerIndex} on '{hostType.Name}': {string.Join(", ", changes)}"
+        });
+    }
+
+    private CortexResult<object> SetWrapping(Document doc, HostObjAttributes hostType,
+        CompoundStructure cs, JObject input, CortexSession session, bool dryRun)
+    {
+        var changes = new List<string>();
+
+        // Opening (insert) wrapping: how layers wrap around doors/windows.
+        var openingWrap = input["openingWrapping"]?.Value<string>();
+        if (!string.IsNullOrEmpty(openingWrap))
+        {
+            cs.OpeningWrapping = openingWrap!.ToLowerInvariant().Replace("_", "").Replace(" ", "") switch
+            {
+                "none" or "donotwrap" => OpeningWrappingCondition.None,
+                "exterior"            => OpeningWrappingCondition.Exterior,
+                "interior"            => OpeningWrappingCondition.Interior,
+                _                     => OpeningWrappingCondition.ExteriorAndInterior,
+            };
+            changes.Add("openingWrapping");
+        }
+
+        // End cap condition: how layers cap at wall ends.
+        var endCap = input["endCap"]?.Value<string>();
+        if (!string.IsNullOrEmpty(endCap))
+        {
+            cs.EndCap = endCap!.ToLowerInvariant().Replace("_", "").Replace(" ", "") switch
+            {
+                "none" or "noendcap"  => EndCapCondition.NoEndCap,
+                "interior"            => EndCapCondition.Interior,
+                _                     => EndCapCondition.Exterior,
+            };
+            changes.Add("endCap");
+        }
+
+        // Per-layer participation in wrapping: layerWrapping = [{layerIndex, wraps:bool}]
+        var layerWrap = input["layerWrapping"] as JArray;
+        if (layerWrap != null)
+        {
+            int layerCount = cs.GetLayers().Count;
+            foreach (var lw in layerWrap.OfType<JObject>())
+            {
+                var idx = lw["layerIndex"]?.Value<int?>();
+                var wraps = lw["wraps"]?.Value<bool?>();
+                if (idx.HasValue && wraps.HasValue && idx.Value >= 0 && idx.Value < layerCount)
+                {
+                    cs.SetParticipatesInWrapping(idx.Value, wraps.Value);
+                    changes.Add($"layer{idx.Value}.wraps");
+                }
+            }
+        }
+
+        if (changes.Count == 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "No wrapping changes specified. Provide openingWrapping, endCap, or layerWrapping[].");
+
+        if (dryRun)
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true, typeName = hostType.Name, action = "set_wrapping", changes
+            });
+
+        if (!session.RequestConfirmation("set compound structure wrapping", 1, hostType.Name))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        using (var tx = new Transaction(doc, "RevitCortex: Set Compound Structure Wrapping"))
+        {
+            tx.Start();
+            hostType.SetCompoundStructure(cs);
+            tx.Commit();
+        }
+
+        return CortexResult<object>.Ok(new
+        {
+            dryRun = false, typeName = hostType.Name, action = "set_wrapping", changes,
+            message = $"Updated wrapping on '{hostType.Name}': {string.Join(", ", changes)}"
         });
     }
 

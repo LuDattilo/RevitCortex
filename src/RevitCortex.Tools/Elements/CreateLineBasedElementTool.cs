@@ -21,7 +21,7 @@ public class CreateLineBasedElementTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates one or more line-based elements (walls, beams, structural framing, etc.). Mirrors the fork's CreateLineElementEventHandler logic.";
+    public string Description => "Creates one or more line-based elements (walls, beams, structural framing, etc.). Each locationLine has p0 and p1 (mm); add an optional pMid point to create a curved (arc) wall or beam.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -90,14 +90,24 @@ public class CreateLineBasedElementTool : ICortexTool
             return;
         }
 
-        Line locationLine;
+        // Optional mid point (pMid) turns the location into an arc (curved wall/beam).
+        var pMidToken = locationLineToken["pMid"];
+        Curve locationLine;
         try
         {
-            locationLine = Line.CreateBound(p0, p1);
+            if (pMidToken != null && pMidToken.Type != JTokenType.Null)
+            {
+                var pMid = ParseXYZ(pMidToken);
+                locationLine = Arc.Create(p0, p1, pMid);
+            }
+            else
+            {
+                locationLine = Line.CreateBound(p0, p1);
+            }
         }
         catch (Exception ex)
         {
-            warnings.Add($"Cannot create location line: {ex.Message}");
+            warnings.Add($"Cannot create location curve: {ex.Message}");
             return;
         }
 

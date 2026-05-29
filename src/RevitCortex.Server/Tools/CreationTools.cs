@@ -20,10 +20,10 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_line_based_element"), Description("Create line-based elements (walls). Pass a JSON array of creation specs: [{category, startPoint:{x,y,z}, endPoint:{x,y,z}, typeName, levelId|levelName, heightMm?, ...}].")]
+    [McpServerTool(Name = "create_line_based_element"), Description("Create line-based elements (walls, beams). Pass a JSON array of specs: [{category, locationLine:{p0:{x,y,z}, p1:{x,y,z}, pMid?:{x,y,z}}, typeId?, height?, baseLevel?, baseOffset?}]. Add pMid to make a curved (arc) wall/beam. Coordinates in mm.")]
     public static async Task<string> CreateLineBasedElement(
         RevitConnectionManager revit,
-        [Description("JSON array of creation specs: [{category, startPoint, endPoint, typeName, levelId|levelName, heightMm?, ...}]")] string specs,
+        [Description("JSON array of specs: [{category, locationLine:{p0, p1, pMid?}, typeId?, height?, baseLevel?, baseOffset?}]")] string specs,
         CancellationToken ct = default)
     {
         var p = new JObject { ["data"] = JArray.Parse(specs) };

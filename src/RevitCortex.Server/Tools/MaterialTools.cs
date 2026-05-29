@@ -48,20 +48,24 @@ public static class MaterialTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "set_compound_structure"), Description("Set or replace compound structure layers on a wall/floor/roof/ceiling type.")]
+    [McpServerTool(Name = "set_compound_structure"), Description("Modify compound structure on a wall/floor/roof/ceiling type. action=replace|add|remove|modify|set_wrapping. set_wrapping sets openingWrapping (none|exterior|interior|both), endCap (none|exterior|interior), and per-layer layerWrapping.")]
     public static async Task<string> SetCompoundStructure(
         RevitConnectionManager revit,
         [Description("Type element ID")] long typeId,
-        [Description("Layer definitions as JSON array: [{function, materialName, widthMm}]")] string layers,
+        [Description("Action: replace | add | remove | modify | set_wrapping. Default: replace")] string? action = null,
+        [Description("Layer definitions as JSON array for replace: [{function, materialName, widthMm}]")] string? layers = null,
+        [Description("Opening (insert) wrapping for set_wrapping: none | exterior | interior | both")] string? openingWrapping = null,
+        [Description("End cap condition for set_wrapping: none | exterior | interior")] string? endCap = null,
+        [Description("Per-layer wrapping for set_wrapping: JSON [{layerIndex, wraps:bool}]")] string? layerWrapping = null,
         [Description("Preview changes without applying")] bool dryRun = true,
         CancellationToken ct = default)
     {
-        var p = new JObject
-        {
-            ["typeId"] = typeId,
-            ["dryRun"] = dryRun,
-            ["layers"] = JArray.Parse(layers),
-        };
+        var p = new JObject { ["typeId"] = typeId, ["dryRun"] = dryRun };
+        if (action != null) p["action"] = action;
+        if (layers != null) p["layers"] = JArray.Parse(layers);
+        if (openingWrapping != null) p["openingWrapping"] = openingWrapping;
+        if (endCap != null) p["endCap"] = endCap;
+        if (layerWrapping != null) p["layerWrapping"] = JArray.Parse(layerWrapping);
         var result = await revit.ExecuteAsync("set_compound_structure", p, ct);
         return result.ToString();
     }

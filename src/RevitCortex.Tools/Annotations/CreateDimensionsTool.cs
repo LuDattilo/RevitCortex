@@ -19,7 +19,7 @@ public class CreateDimensionsTool : ICortexTool
     public string Category => "Annotations";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates one or more dimension annotations between points or element references.";
+    public string Description => "Creates linear dimension annotations between elementIds (2+) or startPoint/endPoint. (Radial/diameter/angular dimensions are not available: the Revit API exposes them only via the Family editor's FamilyItemFactory, not in a project document.)";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
