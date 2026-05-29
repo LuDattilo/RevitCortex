@@ -19,7 +19,7 @@ public class CreateFilledRegionTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates a filled region from boundary points in the specified view.";
+    public string Description => "Creates a filled region from boundary points in the specified view, optionally with holes (inner loops).";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -78,16 +78,42 @@ public class CreateFilledRegionTool : ICortexTool
             for (int i = 0; i < points.Count; i++)
                 loop.Append(Line.CreateBound(points[i], points[(i + 1) % points.Count]));
 
+            var loops = new List<CurveLoop> { loop };
+            var warnings = new List<string>();
+            var holes = input["holes"] as JArray;
+            if (holes != null)
+            {
+                int holeIndex = 0;
+                foreach (var hole in holes.OfType<JArray>())
+                {
+                    holeIndex++;
+                    if (hole.Count < 3) { warnings.Add($"Hole {holeIndex} skipped: needs at least 3 points"); continue; }
+                    try
+                    {
+                        var hpts = hole.Select(p => new XYZ(
+                            p["x"]!.Value<double>() / MmPerFoot,
+                            p["y"]!.Value<double>() / MmPerFoot, 0)).ToList();
+                        var hloop = new CurveLoop();
+                        for (int i = 0; i < hpts.Count; i++)
+                            hloop.Append(Line.CreateBound(hpts[i], hpts[(i + 1) % hpts.Count]));
+                        loops.Add(hloop);
+                    }
+                    catch (Exception ex) { warnings.Add($"Hole {holeIndex} skipped: {ex.Message}"); }
+                }
+            }
+
             using var tx = new Transaction(doc, "RevitCortex: Create Filled Region");
             tx.Start();
-            var region = FilledRegion.Create(doc, regionType.Id, view.Id, new List<CurveLoop> { loop });
+            var region = FilledRegion.Create(doc, regionType.Id, view.Id, loops);
             tx.Commit();
 
             return CortexResult<object>.Ok(new
             {
                 filledRegionId = ToolHelpers.GetElementIdValue(region.Id),
                 typeName = regionType.Name,
-                viewName = view.Name
+                viewName = view.Name,
+                holeCount = loops.Count - 1,
+                warnings
             });
         }
         catch (Exception ex)

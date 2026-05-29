@@ -20,7 +20,7 @@ public class CreateFloorTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Creates an architectural floor (category: Floors) from boundary points or a room boundary. For structural foundation slabs use create_surface_based_element with category OST_StructuralFoundation. If a floorTypeName is not provided, defaults to the first architectural floor type (OST_Floors) in the project.";
+    public string Description => "Creates an architectural floor (category: Floors) from boundary points or a room boundary, optionally with holes (inner loops). For structural foundation slabs use create_surface_based_element with category OST_StructuralFoundation. If a floorTypeName is not provided, defaults to the first architectural floor type (OST_Floors) in the project.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -118,19 +118,52 @@ public class CreateFloorTool : ICortexTool
             if (level == null)
                 return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No levels found");
 
-            using var tx = new Transaction(doc, "RevitCortex: Create Floor");
-            tx.Start();
-            var floor = Floor.Create(doc, new List<CurveLoop> { loop }, floorType.Id, level.Id);
-            tx.Commit();
-
             var warnings = new List<string>();
             if (floorTypeWarning != null) warnings.Add(floorTypeWarning);
+
+            // Outer loop + optional holes (inner loops). Floor.Create takes IList<CurveLoop>.
+            var loops = new List<CurveLoop> { loop };
+            var holes = input["holes"] as JArray;
+            if (holes != null)
+            {
+                int holeIndex = 0;
+                foreach (var hole in holes.OfType<JArray>())
+                {
+                    holeIndex++;
+                    if (hole.Count < 3)
+                    {
+                        warnings.Add($"Hole {holeIndex} skipped: needs at least 3 points");
+                        continue;
+                    }
+                    try
+                    {
+                        var hpts = hole.Select(p => new XYZ(
+                            p["x"]!.Value<double>() / MmPerFoot,
+                            p["y"]!.Value<double>() / MmPerFoot,
+                            0)).ToList();
+                        var hloop = new CurveLoop();
+                        for (int i = 0; i < hpts.Count; i++)
+                            hloop.Append(Line.CreateBound(hpts[i], hpts[(i + 1) % hpts.Count]));
+                        loops.Add(hloop);
+                    }
+                    catch (Exception ex)
+                    {
+                        warnings.Add($"Hole {holeIndex} skipped: {ex.Message}");
+                    }
+                }
+            }
+
+            using var tx = new Transaction(doc, "RevitCortex: Create Floor");
+            tx.Start();
+            var floor = Floor.Create(doc, loops, floorType.Id, level.Id);
+            tx.Commit();
 
             return CortexResult<object>.Ok(new
             {
                 floorId = ToolHelpers.GetElementIdValue(floor.Id),
                 floorTypeName = floorType.Name,
                 levelName = level.Name,
+                holeCount = loops.Count - 1,
                 warnings
             });
         }

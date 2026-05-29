@@ -42,20 +42,22 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_floor"), Description("Create a floor element from boundary points, type name, and level.")]
+    [McpServerTool(Name = "create_floor"), Description("Create an architectural floor from a boundary (or a room), optionally with holes. Provide boundaryPoints OR roomId.")]
     public static async Task<string> CreateFloor(
         RevitConnectionManager revit,
-        [Description("Level element ID")] long levelId,
-        [Description("JSON array of boundary points [{x, y, z}]")] string boundaryPoints,
-        [Description("Floor type name")] string? typeName = null,
+        [Description("JSON array of boundary points [{x, y}] in mm (outer loop). Omit if using roomId")] string? boundaryPoints = null,
+        [Description("Room element id to take the boundary from (alternative to boundaryPoints)")] long? roomId = null,
+        [Description("Floor type name. Defaults to first architectural floor type")] string? floorTypeName = null,
+        [Description("Target level elevation in mm (picks the nearest level). Ignored when roomId is given")] double? levelElevation = null,
+        [Description("JSON array of holes, each a [{x,y}] inner loop, e.g. [[{x,y},{x,y},{x,y}]]")] string? holes = null,
         CancellationToken ct = default)
     {
-        var p = new JObject
-        {
-            ["levelId"] = levelId,
-            ["boundaryPoints"] = JArray.Parse(boundaryPoints),
-        };
-        if (typeName != null) p["typeName"] = typeName;
+        var p = new JObject();
+        if (boundaryPoints != null) p["boundaryPoints"] = JArray.Parse(boundaryPoints);
+        if (roomId != null) p["roomId"] = roomId;
+        if (floorTypeName != null) p["floorTypeName"] = floorTypeName;
+        if (levelElevation != null) p["levelElevation"] = levelElevation;
+        if (holes != null) p["holes"] = JArray.Parse(holes);
         var result = await revit.ExecuteAsync("create_floor", p, ct);
         return result.ToString();
     }
@@ -218,17 +220,19 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_filled_region"), Description("Create a filled region in a view from a closed boundary.")]
+    [McpServerTool(Name = "create_filled_region"), Description("Create a filled region in a view from a closed boundary, optionally with holes (inner loops).")]
     public static async Task<string> CreateFilledRegion(
         RevitConnectionManager revit,
-        [Description("Boundary points as JSON array [{x,y,z}, ...] (closed loop)")] string boundaryPoints,
-        [Description("View ID to host the region (optional; uses active view when -1)")] long? viewId = null,
+        [Description("Boundary points as JSON array [{x,y}, ...] (outer closed loop)")] string boundaryPoints,
+        [Description("View ID to host the region (optional; uses active view when omitted)")] long? viewId = null,
         [Description("Filled region type name")] string? filledRegionTypeName = null,
+        [Description("JSON array of holes, each a [{x,y}] inner loop, e.g. [[{x,y},{x,y},{x,y}]]")] string? holes = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["boundaryPoints"] = JArray.Parse(boundaryPoints) };
         if (viewId != null) p["viewId"] = viewId;
         if (filledRegionTypeName != null) p["filledRegionTypeName"] = filledRegionTypeName;
+        if (holes != null) p["holes"] = JArray.Parse(holes);
         var result = await revit.ExecuteAsync("create_filled_region", p, ct);
         return result.ToString();
     }
