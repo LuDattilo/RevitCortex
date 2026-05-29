@@ -166,13 +166,14 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "clash_detection"), Description("Detect clashes between two element categories.")]
+    [McpServerTool(Name = "clash_detection"), Description("Detect clashes between two element categories. Uses true solid-geometry intersection by default (fewer false positives than bounding boxes).")]
     public static async Task<string> ClashDetection(
         RevitConnectionManager revit,
         [Description("First category for clash detection (e.g. OST_Walls)")] string categoryA,
         [Description("Second category for clash detection (e.g. OST_Floors)")] string categoryB,
         [Description("Maximum number of clash pairs to return. Default: 100. Use higher values on dense models to discover the true clash count; lower for quick checks.")] int maxResults = 100,
-        [Description("Bounding-box intersection tolerance in millimeters. Default: 0 (any overlap). Positive values shrink the test, ignoring tiny grazing intersections.")] double tolerance = 0,
+        [Description("Bounding-box pre-filter tolerance in millimeters. Default: 0 (any overlap). Positive values shrink the test, ignoring tiny grazing intersections.")] double tolerance = 0,
+        [Description("Confirm bbox candidates with true solid intersection. Default: true. Set false for a faster bbox-only approximation.")] bool? useSolidGeometry = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -182,6 +183,7 @@ public static class ProjectTools
             ["maxResults"] = maxResults,
             ["tolerance"] = tolerance,
         };
+        if (useSolidGeometry != null) p["useSolidGeometry"] = useSolidGeometry;
         var result = await revit.ExecuteAsync("clash_detection", p, ct);
         return result.ToString();
     }

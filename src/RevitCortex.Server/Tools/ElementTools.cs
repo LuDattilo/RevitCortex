@@ -293,6 +293,7 @@ public static class ElementTools
         [Description("Custom box max X (when volumeType=custom)")] double? customMaxX = null,
         [Description("Custom box max Y (when volumeType=custom)")] double? customMaxY = null,
         [Description("Custom box max Z (when volumeType=custom)")] double? customMaxZ = null,
+        [Description("For volumeType=room, confirm containment against the real room solid (ClosedShell) instead of the room bounding box. Default: true.")] bool? useRoomSolid = null,
         [Description("Strip per-element extras. Default: false")] bool compact = false,
         CancellationToken ct = default)
     {
@@ -301,6 +302,7 @@ public static class ElementTools
         if (volumeIds != null) p["volumeIds"] = new JArray(volumeIds.Cast<object>().ToArray());
         if (categoryFilter != null) p["categoryFilter"] = new JArray(categoryFilter);
         if (maxElementsPerVolume != null) p["maxElementsPerVolume"] = maxElementsPerVolume;
+        if (useRoomSolid != null) p["useRoomSolid"] = useRoomSolid;
         if (customMinX != null) p["customMinX"] = customMinX;
         if (customMinY != null) p["customMinY"] = customMinY;
         if (customMinZ != null) p["customMinZ"] = customMinZ;

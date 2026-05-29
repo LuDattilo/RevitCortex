@@ -22,7 +22,7 @@ public class GetElementsInSpatialVolumeTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Returns elements contained within a spatial volume: room bounding box, area bounding box, or a custom axis-aligned bounding box defined in mm. Mirrors the fork's GetElementsInSpatialVolumeEventHandler logic.";
+    public string Description => "Returns elements contained within a spatial volume: a room, an area, or a custom axis-aligned bounding box (mm). For rooms, true solid containment (Room ClosedShell) is used by default to avoid the over-reporting of an L-shaped room's bounding box; set useRoomSolid=false for the faster bbox approximation.";
     // 1 foot = 304.8 mm — used for MM<->feet conversions
     private const double MmPerFoot = 304.8;
 
@@ -38,6 +38,8 @@ public class GetElementsInSpatialVolumeTool : ICortexTool
         var volumeIds           = input["volumeIds"]?.ToObject<List<long>>() ?? new List<long>();
         var categoryFilter      = input["categoryFilter"]?.ToObject<List<string>>() ?? new List<string>();
         var maxElementsPerVolume = input["maxElementsPerVolume"]?.Value<int>() ?? 100;
+        // For room volumes, confirm bbox candidates against the room's real solid.
+        var useRoomSolid        = input["useRoomSolid"]?.Value<bool>() ?? true;
 
         // Custom bounding box coordinates in mm
         var customMinX = input["customMinX"]?.Value<double>() ?? 0;
@@ -140,6 +142,29 @@ public class GetElementsInSpatialVolumeTool : ICortexTool
 
                     var elements = FilterByCategories(doc, collector, categoryFilter);
 
+                    // Refine room results against the real room solid (ClosedShell) so an
+                    // L-shaped room doesn't pull in elements that only its bbox overlaps.
+                    if (useRoomSolid && spatial is Room roomForSolid)
+                    {
+                        var roomSolid = GetRoomSolid(roomForSolid);
+                        if (roomSolid != null)
+                        {
+                            var candidateIds = elements.Select(e => e.Id).ToList();
+                            if (candidateIds.Count > 0)
+                            {
+                                try
+                                {
+                                    var inside = new FilteredElementCollector(doc, candidateIds)
+                                        .WherePasses(new ElementIntersectsSolidFilter(roomSolid))
+                                        .ToElementIds();
+                                    var insideSet = new HashSet<ElementId>(inside);
+                                    elements = elements.Where(e => insideSet.Contains(e.Id)).ToList();
+                                }
+                                catch { /* keep bbox candidates on solid-filter failure */ }
+                            }
+                        }
+                    }
+
                     // Exclude the spatial element itself from results
 #if REVIT2024_OR_GREATER
                     long spatialIdVal = spatial.Id.Value;
@@ -204,6 +229,28 @@ public class GetElementsInSpatialVolumeTool : ICortexTool
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Extracts the room's enclosing solid via its geometry (the closed shell Revit
+    /// builds from the room's boundaries up to its height). Returns null when no solid
+    /// can be obtained (unbounded/unplaced room).
+    /// </summary>
+    private static Solid? GetRoomSolid(Room room)
+    {
+        try
+        {
+            var opts = new Options { ComputeReferences = false, DetailLevel = ViewDetailLevel.Coarse };
+            var geom = room.get_Geometry(opts);
+            if (geom == null) return null;
+            foreach (var obj in geom)
+            {
+                if (obj is Solid s && s.Volume > 1e-6)
+                    return s;
+            }
+        }
+        catch { /* fall through */ }
+        return null;
+    }
 
     /// <summary>
     /// Filters a collector's results to only those elements whose category

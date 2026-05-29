@@ -19,7 +19,7 @@ public class ClashDetectionTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Detects geometric intersections (clashes) between two sets of elements.";
+    public string Description => "Detects geometric intersections (clashes) between two sets of elements. Uses true solid-geometry intersection by default (bounding-box pre-filter + ElementIntersectsElementFilter); set useSolidGeometry=false for a faster bbox-only approximation.";
     private const double MmPerFoot = 304.8;
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
@@ -34,6 +34,8 @@ public class ClashDetectionTool : ICortexTool
         var elementIdsB = input["elementIdsB"]?.ToObject<List<long>>() ?? new List<long>();
         var toleranceMm = input["tolerance"]?.Value<double>() ?? 0;
         var maxResults = input["maxResults"]?.Value<int>() ?? 100;
+        // True solid-geometry intersection (default) vs. bbox-only approximation.
+        var useSolidGeometry = input["useSolidGeometry"]?.Value<bool>() ?? true;
 
         try
         {
@@ -86,32 +88,62 @@ public class ClashDetectionTool : ICortexTool
             var tolerance = toleranceMm / MmPerFoot;
             var clashes = new List<object>();
 
+            // Pre-cache B bounding boxes (and a B id-set) once for the bbox pre-filter.
+            var setBWithBoxes = setB
+                .Select(b => new { Elem = b, Box = b.get_BoundingBox(null) })
+                .Where(x => x.Box != null)
+                .ToList();
+
             foreach (var a in setA)
             {
                 if (clashes.Count >= maxResults) break;
                 var bbA = a.get_BoundingBox(null);
                 if (bbA == null) continue;
 
-                foreach (var b in setB)
+                // Bounding-box pre-filter: cheap, narrows the candidates.
+                var candidates = setBWithBoxes
+                    .Where(x => x.Elem.Id != a.Id && BoundingBoxesIntersect(bbA, x.Box!, tolerance))
+                    .Select(x => x.Elem)
+                    .ToList();
+                if (candidates.Count == 0) continue;
+
+                // Solid-geometry confirmation: ElementIntersectsElementFilter tests the
+                // actual solids, eliminating bbox false positives (e.g. an L-shaped beam
+                // whose box overlaps but whose solid does not).
+                HashSet<long>? solidHitIds = null;
+                if (useSolidGeometry)
+                {
+                    try
+                    {
+                        var candidateIds = candidates.Select(c => c.Id).ToList();
+                        var intersecting = new FilteredElementCollector(doc, candidateIds)
+                            .WherePasses(new ElementIntersectsElementFilter(a))
+                            .ToElementIds();
+                        solidHitIds = new HashSet<long>(intersecting.Select(id => ToolHelpers.GetElementIdValue(id)));
+                    }
+                    catch
+                    {
+                        // Some elements (no solid geometry) make the filter throw — fall
+                        // back to the bbox candidates for this A rather than dropping it.
+                        solidHitIds = null;
+                    }
+                }
+
+                foreach (var b in candidates)
                 {
                     if (clashes.Count >= maxResults) break;
-                    if (a.Id == b.Id) continue;
+                    if (solidHitIds != null && !solidHitIds.Contains(ToolHelpers.GetElementIdValue(b.Id)))
+                        continue;
 
-                    var bbB = b.get_BoundingBox(null);
-                    if (bbB == null) continue;
-
-                    if (BoundingBoxesIntersect(bbA, bbB, tolerance))
+                    clashes.Add(new
                     {
-                        clashes.Add(new
-                        {
-                            elementIdA = ToolHelpers.GetElementIdValue(a.Id),
-                            elementIdB = ToolHelpers.GetElementIdValue(b.Id),
-                            categoryA = a.Category?.Name,
-                            categoryB = b.Category?.Name,
-                            nameA = a.Name,
-                            nameB = b.Name
-                        });
-                    }
+                        elementIdA = ToolHelpers.GetElementIdValue(a.Id),
+                        elementIdB = ToolHelpers.GetElementIdValue(b.Id),
+                        categoryA = a.Category?.Name,
+                        categoryB = b.Category?.Name,
+                        nameA = a.Name,
+                        nameB = b.Name
+                    });
                 }
             }
 
@@ -119,6 +151,7 @@ public class ClashDetectionTool : ICortexTool
             {
                 setACount = setA.Count,
                 setBCount = setB.Count,
+                method = useSolidGeometry ? "solid_geometry" : "bounding_box",
                 clashCount = clashes.Count,
                 clashes
             });
