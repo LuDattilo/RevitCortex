@@ -32,7 +32,7 @@ public class ToolExecutionHandlerTests
         }
     }
 
-    [Fact]
+    [RequiresRevitApiFact]
     public void TryPrepareExecution_RejectsSecondCommandUntilFirstExternalEventDrains()
     {
         var executed = new List<string>();

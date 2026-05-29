@@ -116,9 +116,17 @@ dotnet build src/RevitCortex.Server/RevitCortex.Server.csproj
 
 ### Tests
 
+Target the test project with an explicit configuration — **do NOT run `dotnet test` on the solution**:
+
 ```bash
-dotnet test -c "Debug R25"
+dotnet test src/RevitCortex.Tests/RevitCortex.Tests.csproj -c "Debug R25"
 ```
+
+Solution-wide `dotnet test` fails NuGet restore with `'.*' is not a valid version string`, because the Plugin/Tools csprojs use `Version="$(RevitVersion).*"` and `$(RevitVersion)` is only set inside the configuration-conditional `PropertyGroup`s. A solution restore leaves it empty → literal `.*`. Targeting the csproj with `-c "Debug R25"` populates `$(RevitVersion)=2025`.
+
+Scope to a subset with `--filter "FullyQualifiedName~CortexSessionConfirmationTests"`.
+
+**RevitAPIUI-dependent tests**: tests that load a Plugin type implementing `IExternalEventHandler` or taking `UIApplication` (e.g. `ToolExecutionHandlerTests`) need the real `RevitAPIUI.dll`, which the Nice3point reference-only NuGets do not copy to test output. Mark them `[RequiresRevitApiFact]` (subclass of `[Fact]` in `src/RevitCortex.Tests/RequiresRevitApiFactAttribute.cs`) so they **skip** rather than fail where Revit is absent. Expected clean result without Revit installed: 221 passed / 1 skipped / 0 failed.
 
 ## Key Patterns
 
