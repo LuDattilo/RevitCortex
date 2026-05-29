@@ -134,15 +134,17 @@ public static class LinkTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "manage_links"), Description("List, reload, or unload linked files.")]
+    [McpServerTool(Name = "manage_links"), Description("List, reload, reload-from-path, unload, or remove linked files. To add a NEW link use add_linked_file instead.")]
     public static async Task<string> ManageLinks(
         RevitConnectionManager revit,
-        [Description("Action to perform: list, reload, unload")] string action = "list",
-        [Description("Link element ID (required for reload/unload)")] long? linkId = null,
+        [Description("Action to perform: list | reload | reload_from | unload | remove")] string action = "list",
+        [Description("Link element ID (required for reload/reload_from/unload/remove)")] long? linkId = null,
+        [Description("New absolute path to reload the link from (required for reload_from)")] string? newPath = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["action"] = action };
         if (linkId != null) p["linkId"] = linkId;
+        if (newPath != null) p["newPath"] = newPath;
         var result = await revit.ExecuteAsync("manage_links", p, ct);
         return result.ToString();
     }

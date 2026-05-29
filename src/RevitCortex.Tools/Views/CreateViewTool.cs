@@ -96,6 +96,12 @@ public class CreateViewTool : ICortexTool
                 };
             }
 
+            // Optional crop box (mm bounds in the view's coordinate system) + crop toggle
+            ApplyCropBox(createdView, input);
+
+            // Optional view template by id or name
+            ApplyViewTemplate(doc, createdView, input);
+
             tx.Commit();
 
             return CortexResult<object>.Ok(new
@@ -205,5 +211,58 @@ public class CreateViewTool : ICortexTool
         var dirStr = (input["direction"]?.Value<string>() ?? "north").ToLowerInvariant();
         int index = dirStr switch { "east" => 1, "south" => 2, "west" => 3, _ => 0 };
         return marker.CreateElevation(doc, ownerPlan.Id, index);
+    }
+
+    /// <summary>
+    /// Applies an optional crop box. cropActive toggles cropping; cropMin/cropMax (mm,
+    /// {x,y} in the view plane) set the crop rectangle when both are supplied.
+    /// </summary>
+    private static void ApplyCropBox(View view, JObject input)
+    {
+        var cropActive = input["cropActive"]?.Value<bool?>();
+        if (cropActive.HasValue)
+        {
+            view.CropBoxActive = cropActive.Value;
+            view.CropBoxVisible = cropActive.Value;
+        }
+
+        var minToken = input["cropMin"];
+        var maxToken = input["cropMax"];
+        if (minToken == null || maxToken == null) return;
+
+        try
+        {
+            var current = view.CropBox; // keep Z range + transform; only swap XY extents
+            var minX = (minToken["x"]?.Value<double>() ?? 0) / MmPerFoot;
+            var minY = (minToken["y"]?.Value<double>() ?? 0) / MmPerFoot;
+            var maxX = (maxToken["x"]?.Value<double>() ?? 0) / MmPerFoot;
+            var maxY = (maxToken["y"]?.Value<double>() ?? 0) / MmPerFoot;
+
+            current.Min = new XYZ(minX, minY, current.Min.Z);
+            current.Max = new XYZ(maxX, maxY, current.Max.Z);
+            view.CropBox = current;
+            view.CropBoxActive = true;
+            view.CropBoxVisible = true;
+        }
+        catch { /* some view types reject an explicit crop box; ignore */ }
+    }
+
+    /// <summary>Applies an optional view template by templateId or templateName.</summary>
+    private static void ApplyViewTemplate(Document doc, View view, JObject input)
+    {
+        var templateIdLong = input["templateId"]?.Value<long?>() ?? 0;
+        var templateName = input["templateName"]?.Value<string>();
+
+        View? template = null;
+        if (templateIdLong > 0)
+            template = doc.GetElement(ToolHelpers.ToElementId(templateIdLong)) as View;
+        if (template == null && !string.IsNullOrEmpty(templateName))
+            template = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>()
+                .FirstOrDefault(v => v.IsTemplate && v.Name.Equals(templateName, StringComparison.OrdinalIgnoreCase));
+
+        if (template != null && template.IsTemplate)
+        {
+            try { view.ViewTemplateId = template.Id; } catch { /* incompatible template type */ }
+        }
     }
 }

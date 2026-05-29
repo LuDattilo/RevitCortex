@@ -19,7 +19,7 @@ public class CreateRevisionTool : ICortexTool
     public string Category => "Project";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Lists, creates, or assigns revisions to sheets.";
+    public string Description => "Lists, creates, updates, or assigns revisions to sheets. Actions: list, create, set, add_to_sheets.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -34,10 +34,11 @@ public class CreateRevisionTool : ICortexTool
             {
                 "list" => ListRevisions(doc),
                 "create" => CreateNewRevision(doc, input),
+                "set" => SetRevision(doc, input),
                 "add_to_sheets" => AddToSheets(doc, input),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}",
-                    suggestion: "Use: list, create, or add_to_sheets")
+                    suggestion: "Use: list, create, set, or add_to_sheets")
             };
         }
         catch (Exception ex)
@@ -81,6 +82,7 @@ public class CreateRevisionTool : ICortexTool
         if (!string.IsNullOrEmpty(description)) revision.Description = description;
         if (!string.IsNullOrEmpty(issuedBy)) revision.IssuedBy = issuedBy;
         if (!string.IsNullOrEmpty(issuedTo)) revision.IssuedTo = issuedTo;
+        ApplyIssuedAndVisibility(revision, input);
 
         tx.Commit();
 
@@ -89,8 +91,64 @@ public class CreateRevisionTool : ICortexTool
             action = "create",
             revisionId = ToolHelpers.GetElementIdValue(revision.Id),
             date = revision.RevisionDate,
-            description = revision.Description
+            description = revision.Description,
+            issued = revision.Issued,
+            visibility = revision.Visibility.ToString()
         });
+    }
+
+    private static CortexResult<object> SetRevision(Document doc, JObject input)
+    {
+        var revisionIdLong = input["revisionId"]?.Value<long>() ?? 0;
+        if (revisionIdLong <= 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "revisionId is required for action 'set'");
+
+        var revision = doc.GetElement(ToolHelpers.ToElementId(revisionIdLong)) as Revision;
+        if (revision == null)
+            return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, $"Revision {revisionIdLong} not found");
+
+        using var tx = new Transaction(doc, "RevitCortex: Update Revision");
+        tx.Start();
+
+        var date = input["date"]?.Value<string>();
+        var description = input["description"]?.Value<string>();
+        var issuedBy = input["issuedBy"]?.Value<string>();
+        var issuedTo = input["issuedTo"]?.Value<string>();
+        if (date != null) revision.RevisionDate = date;
+        if (description != null) revision.Description = description;
+        if (issuedBy != null) revision.IssuedBy = issuedBy;
+        if (issuedTo != null) revision.IssuedTo = issuedTo;
+        ApplyIssuedAndVisibility(revision, input);
+
+        tx.Commit();
+
+        return CortexResult<object>.Ok(new
+        {
+            action = "set",
+            revisionId = ToolHelpers.GetElementIdValue(revision.Id),
+            date = revision.RevisionDate,
+            description = revision.Description,
+            issued = revision.Issued,
+            visibility = revision.Visibility.ToString()
+        });
+    }
+
+    /// <summary>Applies the optional Issued flag and Visibility (cloud/tag/none) from input.</summary>
+    private static void ApplyIssuedAndVisibility(Revision revision, JObject input)
+    {
+        var issued = input["issued"]?.Value<bool?>();
+        if (issued.HasValue) revision.Issued = issued.Value;
+
+        var visibility = input["visibility"]?.Value<string>();
+        if (!string.IsNullOrEmpty(visibility))
+        {
+            revision.Visibility = visibility!.ToLowerInvariant().Replace("_", "").Replace(" ", "") switch
+            {
+                "none" or "hidden" => RevisionVisibility.Hidden,
+                "tagonly" or "tag" or "tagvisible" => RevisionVisibility.TagVisible,
+                _ => RevisionVisibility.CloudAndTagVisible
+            };
+        }
     }
 
     private static CortexResult<object> AddToSheets(Document doc, JObject input)

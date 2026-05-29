@@ -260,16 +260,18 @@ public static class CreationTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "create_revision"), Description("List, create, or assign revisions to sheets. action=list|create|assign.")]
+    [McpServerTool(Name = "create_revision"), Description("List, create, update, or assign revisions to sheets. action=list|create|set|add_to_sheets. 'set' updates an existing revision (needs revisionId).")]
     public static async Task<string> CreateRevision(
         RevitConnectionManager revit,
-        [Description("Action: list | create | assign. Default: list")] string? action = null,
-        [Description("Revision date (for create)")] string? date = null,
-        [Description("Revision description (for create)")] string? description = null,
-        [Description("Issued by (for create)")] string? issuedBy = null,
-        [Description("Issued to (for create)")] string? issuedTo = null,
-        [Description("Sheet element IDs (for assign)")] long[]? sheetIds = null,
-        [Description("Revision element ID (for assign)")] long? revisionId = null,
+        [Description("Action: list | create | set | add_to_sheets. Default: list")] string? action = null,
+        [Description("Revision date (for create/set)")] string? date = null,
+        [Description("Revision description (for create/set)")] string? description = null,
+        [Description("Issued by (for create/set)")] string? issuedBy = null,
+        [Description("Issued to (for create/set)")] string? issuedTo = null,
+        [Description("Mark the revision issued (true) or not (false), for create/set")] bool? issued = null,
+        [Description("Revision visibility: cloud_and_tag | tag_visible | none, for create/set")] string? visibility = null,
+        [Description("Sheet element IDs (for add_to_sheets)")] long[]? sheetIds = null,
+        [Description("Revision element ID (required for set and add_to_sheets)")] long? revisionId = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
@@ -278,6 +280,8 @@ public static class CreationTools
         if (description != null) p["description"] = description;
         if (issuedBy != null) p["issuedBy"] = issuedBy;
         if (issuedTo != null) p["issuedTo"] = issuedTo;
+        if (issued != null) p["issued"] = issued;
+        if (visibility != null) p["visibility"] = visibility;
         if (sheetIds != null) p["sheetIds"] = new JArray(sheetIds.Cast<object>().ToArray());
         if (revisionId != null) p["revisionId"] = revisionId;
         var result = await revit.ExecuteAsync("create_revision", p, ct);

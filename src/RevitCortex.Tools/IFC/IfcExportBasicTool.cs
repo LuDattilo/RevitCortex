@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
@@ -42,6 +43,7 @@ public class IfcExportBasicTool : ICortexTool, ICommandTimeoutTool
         var exportBaseQuantities = input["exportBaseQuantities"]?.Value<bool>() ?? false;
         var wallAndColumnSplitting = input["wallAndColumnSplitting"]?.Value<bool>() ?? false;
         var spaceBoundaryLevel = input["spaceBoundaryLevel"]?.Value<int>() ?? 0;
+        var overrides = input["overrides"]?.ToObject<Dictionary<string, string>>();
 
         if (!Enum.TryParse<IFCVersion>(fileVersionStr, ignoreCase: true, out var fileVersion))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
@@ -63,6 +65,15 @@ public class IfcExportBasicTool : ICortexTool, ICommandTimeoutTool
 
             if (filterViewIdRaw.HasValue)
                 options.FilterViewId = ToolHelpers.ToElementId(filterViewIdRaw.Value);
+
+            // Free-form IFC export options (ExportInternalRevitPropertySets,
+            // ExportIFCCommonPropertySets, Export2DElements, VisibleElementsOfViewExport,
+            // ExportRoomsInView, ActivePhaseId, site placement, tessellation level, etc.).
+            if (overrides != null)
+            {
+                foreach (var kvp in overrides)
+                    options.AddOption(kvp.Key, kvp.Value);
+            }
 
             var mappingFile = session.Store.Get<string>("ifc_family_mapping_file");
             if (!string.IsNullOrWhiteSpace(mappingFile) && File.Exists(mappingFile))

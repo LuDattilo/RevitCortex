@@ -22,6 +22,11 @@ public static class ViewTools
         [Description("Origin Y in mm (for Section/Elevation). Default: 0")] double? originY = null,
         [Description("Origin Z in mm (for Section/Elevation). Default: 0")] double? originZ = null,
         [Description("Facing direction for Section/Elevation: north | south | east | west. Default: north")] string? direction = null,
+        [Description("View template element ID to apply on creation (optional)")] long? templateId = null,
+        [Description("View template name to apply on creation (alternative to templateId)")] string? templateName = null,
+        [Description("Activate the crop box. Default: unchanged")] bool? cropActive = null,
+        [Description("Crop rectangle min corner as JSON {\"x\":mm,\"y\":mm} (in the view plane). Requires cropMax")] string? cropMin = null,
+        [Description("Crop rectangle max corner as JSON {\"x\":mm,\"y\":mm}. Requires cropMin")] string? cropMax = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["viewType"] = viewType };
@@ -34,6 +39,11 @@ public static class ViewTools
         if (originY != null) p["originY"] = originY;
         if (originZ != null) p["originZ"] = originZ;
         if (direction != null) p["direction"] = direction;
+        if (templateId != null) p["templateId"] = templateId;
+        if (templateName != null) p["templateName"] = templateName;
+        if (cropActive != null) p["cropActive"] = cropActive;
+        if (cropMin != null) p["cropMin"] = JObject.Parse(cropMin);
+        if (cropMax != null) p["cropMax"] = JObject.Parse(cropMax);
         var result = await revit.ExecuteAsync("create_view", p, ct);
         return result.ToString();
     }

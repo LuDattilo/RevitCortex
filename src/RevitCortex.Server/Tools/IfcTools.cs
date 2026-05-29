@@ -78,7 +78,7 @@ public static class IfcTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "ifc_export_basic"), Description("Export the active document to IFC with a minimal set of options.")]
+    [McpServerTool(Name = "ifc_export_basic"), Description("Export the active document to IFC. First-class flags cover the common options; use overrides for any other IFCExportOptions key.")]
     public static async Task<string> IfcExportBasic(
         RevitConnectionManager revit,
         [Description("Output directory for the IFC file")] string outputDirectory,
@@ -88,6 +88,7 @@ public static class IfcTools
         [Description("Export base quantities. Default: false")] bool? exportBaseQuantities = null,
         [Description("Split walls and columns by level. Default: false")] bool? wallAndColumnSplitting = null,
         [Description("Space boundary level: 0, 1, 2. Default: 0")] int? spaceBoundaryLevel = null,
+        [Description("Extra IFCExportOptions as a JSON object {key: \"value\", ...}, e.g. {\"ExportInternalRevitPropertySets\":\"true\", \"Export2DElements\":\"true\", \"VisibleElementsOfViewExport\":\"true\"}")] string? overrides = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["outputDirectory"] = outputDirectory };
@@ -97,6 +98,7 @@ public static class IfcTools
         if (exportBaseQuantities != null) p["exportBaseQuantities"] = exportBaseQuantities;
         if (wallAndColumnSplitting != null) p["wallAndColumnSplitting"] = wallAndColumnSplitting;
         if (spaceBoundaryLevel != null) p["spaceBoundaryLevel"] = spaceBoundaryLevel;
+        if (overrides != null) p["overrides"] = JObject.Parse(overrides);
         // IFC export on large models can take several minutes — use 15 min timeout.
         var result = await revit.ExecuteAsync("ifc_export_basic", p, commandTimeoutSeconds: 900, ct);
         return result.ToString();
