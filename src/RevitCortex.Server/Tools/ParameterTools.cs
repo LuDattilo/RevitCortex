@@ -56,22 +56,28 @@ public static class ParameterTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "filter_by_parameter_value"), Description("Filter elements by category and parameter value. Returns elements whose parameter matches the specified value.")]
+    [McpServerTool(Name = "filter_by_parameter_value"), Description("Filter elements by one parameter condition, or several combined with AND/OR via the conditions array. Conditions: equals, not_equals, contains, not_contains, begins_with, ends_with, greater_than, less_than, is_empty, is_not_empty.")]
     public static async Task<string> FilterByParameterValue(
         RevitConnectionManager revit,
-        [Description("Category to filter (e.g. Walls, Doors)")] string category,
-        [Description("Parameter name to filter by")] string parameterName,
-        [Description("Value to match")] string value,
+        [Description("Category to filter (e.g. Walls, Doors). Optional when scanning the whole model")] string? category = null,
+        [Description("Parameter name (single-condition mode)")] string? parameterName = null,
+        [Description("Condition (single-condition mode): equals | not_equals | contains | greater_than | less_than | is_empty | ... Default: equals")] string? condition = null,
+        [Description("Value to match (single-condition mode)")] string? value = null,
+        [Description("Multi-condition mode: JSON array of {parameterName, condition, value, parameterType?}")] string? conditions = null,
+        [Description("How to combine multiple conditions: and | or. Default: and")] string? logic = null,
         [Description("Parameter type: instance, type, or both. Default: both")] string? parameterType = "both",
+        [Description("Scope: whole_model | active_view | selection. Default: whole_model")] string? scope = null,
         CancellationToken ct = default)
     {
-        var p = new JObject
-        {
-            ["category"] = category,
-            ["parameterName"] = parameterName,
-            ["value"] = value,
-        };
+        var p = new JObject();
+        if (category != null) p["categories"] = new JArray(category);
+        if (parameterName != null) p["parameterName"] = parameterName;
+        if (condition != null) p["condition"] = condition;
+        if (value != null) p["value"] = value;
+        if (conditions != null) p["conditions"] = JArray.Parse(conditions);
+        if (logic != null) p["logic"] = logic;
         if (parameterType != null) p["parameterType"] = parameterType;
+        if (scope != null) p["scope"] = scope;
         var result = await revit.ExecuteAsync("filter_by_parameter_value", p, ct);
         return result.ToString();
     }

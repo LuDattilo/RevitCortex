@@ -25,13 +25,16 @@ public static class ElementTools
         return ToolResponseShaper.Shape("get_element_parameters", result, compact, summaryOnly: false).ToString();
     }
 
-    [McpServerTool(Name = "ai_element_filter"), Description("Query elements by category, parameter filters, and conditions. Supports type and instance filtering.")]
+    [McpServerTool(Name = "ai_element_filter"), Description("Query elements by category, element class, family symbol, bounding box, or level. Filters combine with AND (default) or OR, and the whole set can be inverted (NOT). Supports type and instance filtering. For parameter-VALUE filtering use filter_by_parameter_value.")]
     public static async Task<string> AIElementFilter(
         RevitConnectionManager revit,
         [Description("BuiltInCategory code, e.g. OST_Walls, OST_Doors")] string? filterCategory = null,
         [Description("Include type elements")] bool includeTypes = false,
         [Description("Include instance elements")] bool includeInstances = true,
         [Description("Max elements to return")] int maxElements = 100,
+        [Description("Combine the filters with: and | or. Default: and")] string? combineWith = null,
+        [Description("Invert the combined filter (NOT) — return elements that do NOT match. Default: false")] bool? invert = null,
+        [Description("Restrict instances to a level: JSON {\"levelId\":123} or {\"levelName\":\"L1\"}")] string? levelFilter = null,
         CancellationToken ct = default)
     {
         var data = new JObject();
@@ -39,6 +42,9 @@ public static class ElementTools
         data["includeTypes"] = includeTypes;
         data["includeInstances"] = includeInstances;
         data["maxElements"] = maxElements;
+        if (combineWith != null) data["combineWith"] = combineWith;
+        if (invert != null) data["invert"] = invert;
+        if (levelFilter != null) data["levelFilter"] = JObject.Parse(levelFilter);
 
         var p = new JObject { ["data"] = data };
         var result = await revit.ExecuteAsync("ai_element_filter", p, ct);

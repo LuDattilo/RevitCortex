@@ -22,7 +22,7 @@ public class FilterByParameterValueTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Filters elements by parameter value conditions with flexible matching (equals, contains, greater_than, etc.). Supports scope filtering (whole model, active view, selection) and instance/type parameter lookup.";
+    public string Description => "Filters elements by one parameter condition, or several combined with AND/OR via the 'conditions' array. Flexible matching (equals, contains, greater_than, is_empty, etc.). Supports scope filtering (whole model, active view, selection) and instance/type parameter lookup.";
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
         var doc = session.Store.Get<object>("activeDocument") as Document;
@@ -39,9 +39,35 @@ public class FilterByParameterValueTool : ICortexTool
         var parameterType   = input["parameterType"]?.Value<string>() ?? "both";
         var returnParameters = input["returnParameters"]?.ToObject<List<string>>() ?? new List<string>();
 
-        if (string.IsNullOrWhiteSpace(parameterName))
-            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "parameterName is required");
+        // Multi-condition mode: an array of {parameterName, condition, value, parameterType?}
+        // combined with AND (default) or OR. Falls back to the single-parameter inputs.
+        var conditionsToken = input["conditions"] as JArray;
+        var logic           = (input["logic"]?.Value<string>() ?? "and").ToLowerInvariant();
+
+        var clauses = new List<FilterClause>();
+        if (conditionsToken != null && conditionsToken.Count > 0)
+        {
+            foreach (var c in conditionsToken.OfType<JObject>())
+            {
+                var name = c["parameterName"]?.Value<string>();
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                clauses.Add(new FilterClause(
+                    name!,
+                    c["condition"]?.Value<string>() ?? "equals",
+                    c["value"]?.Value<string>() ?? "",
+                    c["parameterType"]?.Value<string>() ?? parameterType));
+            }
+            if (clauses.Count == 0)
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    "conditions array provided but no valid {parameterName, condition, value} entries found");
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(parameterName))
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    "parameterName (or a non-empty conditions array) is required");
+            clauses.Add(new FilterClause(parameterName, condition, value, parameterType));
+        }
 
         try
         {
@@ -128,13 +154,24 @@ public class FilterByParameterValueTool : ICortexTool
             var matchedElements = new List<object>();
             var typeCache = new Dictionary<ElementId, Element?>();
 
+            bool useOr = logic == "or";
+
             foreach (var elem in elements)
             {
-                string? paramValue = GetParameterValue(doc, elem, parameterName, parameterType, typeCache);
-                if (paramValue == null) continue;
-
-                if (!MatchesCondition(paramValue, value, condition, caseSensitive))
-                    continue;
+                // Evaluate every clause; a null parameter value counts as "not matched"
+                // unless the condition is is_empty (handled inside MatchesCondition).
+                string? firstMatchedValue = null;
+                bool overall = useOr ? false : true;
+                foreach (var clause in clauses)
+                {
+                    string? pv = GetParameterValue(doc, elem, clause.ParameterName, clause.ParameterType, typeCache);
+                    bool clauseMatch = MatchesCondition(pv ?? "", clause.Value, clause.Condition, caseSensitive);
+                    if (clauseMatch && firstMatchedValue == null) firstMatchedValue = pv ?? "";
+                    if (useOr) overall |= clauseMatch;
+                    else       overall &= clauseMatch;
+                    if (!useOr && !overall) break; // AND short-circuit
+                }
+                if (!overall) continue;
 
                 var elementData = new Dictionary<string, object>
                 {
@@ -146,7 +183,7 @@ public class FilterByParameterValueTool : ICortexTool
                     { "category", elem.Category?.Name ?? "Unknown" },
                     { "familyName", GetFamilyName(elem) },
                     { "typeName", GetTypeName(doc, elem, typeCache) },
-                    { "matchedValue", paramValue }
+                    { "matchedValue", firstMatchedValue ?? "" }
                 };
 
                 if (returnParameters.Count > 0)
@@ -178,9 +215,8 @@ public class FilterByParameterValueTool : ICortexTool
             {
                 matchCount    = matchedElements.Count,
                 totalScanned  = elements.Count,
-                parameterName,
-                condition,
-                value,
+                logic         = clauses.Count > 1 ? logic : null,
+                conditions    = clauses.Select(c => new { c.ParameterName, c.Condition, c.Value }).ToList(),
                 elements = matchedElements
             });
         }
@@ -264,5 +300,22 @@ public class FilterByParameterValueTool : ICortexTool
         var typeElem = doc.GetElement(typeId);
         cache[typeId] = typeElem;
         return typeElem;
+    }
+
+    /// <summary>One parameter-value condition (net48-safe: class, not record).</summary>
+    private sealed class FilterClause
+    {
+        public string ParameterName { get; }
+        public string Condition { get; }
+        public string Value { get; }
+        public string ParameterType { get; }
+
+        public FilterClause(string parameterName, string condition, string value, string parameterType)
+        {
+            ParameterName = parameterName;
+            Condition = condition;
+            Value = value;
+            ParameterType = parameterType;
+        }
     }
 }

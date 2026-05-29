@@ -45,6 +45,13 @@ public class AIElementFilterTool : ICortexTool
         var filterVisibleInView = data["filterVisibleInCurrentView"]?.Value<bool>() ?? false;
         var maxElements        = data["maxElements"]?.Value<int>() ?? 100;
 
+        // Logical combination of the individual filters: "and" (default) or "or".
+        var combineWith        = (data["combineWith"]?.Value<string>() ?? "and").ToLowerInvariant();
+        // Invert the whole combined filter (NOT) — e.g. "everything that is NOT a wall".
+        var invert             = data["invert"]?.Value<bool>() ?? false;
+        // Optional level filter: {levelId} or {levelName} — instances on that level only.
+        var levelFilterToken   = data["levelFilter"] as JObject;
+
         // Bounding box (coordinates in mm, matching the fork's convention)
         var bbMinToken = data["boundingBoxMin"];
         var bbMaxToken = data["boundingBoxMax"];
@@ -58,9 +65,11 @@ public class AIElementFilterTool : ICortexTool
 
         if (string.IsNullOrWhiteSpace(filterCategory) &&
             string.IsNullOrWhiteSpace(filterElementType) &&
-            filterFamilySymId <= 0)
+            filterFamilySymId <= 0 &&
+            levelFilterToken == null &&
+            bbMin == null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                "Specify at least one filter: filterCategory, filterElementType, or filterFamilySymbolId",
+                "Specify at least one filter: filterCategory, filterElementType, filterFamilySymbolId, levelFilter, or boundingBox",
                 suggestion: "Use OST_* codes for filterCategory, e.g. OST_Walls, OST_Doors");
 
         if ((bbMin == null) != (bbMax == null))
@@ -97,7 +106,8 @@ public class AIElementFilterTool : ICortexTool
             {
                 var (cntInst, instList) = CollectByKind(doc, isElementType: false,
                     filterCategory, filterElementType, filterFamilySymId,
-                    filterVisibleInView, bbMin, bbMax, maxElements);
+                    filterVisibleInView, bbMin, bbMax, maxElements,
+                    combineWith, invert, levelFilterToken);
                 elements.AddRange(instList);
                 totalCount += cntInst;
 
@@ -109,7 +119,8 @@ public class AIElementFilterTool : ICortexTool
                 var (cntType, typeList) = CollectByKind(doc, isElementType: true,
                     filterCategory, filterElementType, filterFamilySymId: -1,
                     filterVisibleInView: false, bbMin, bbMax,
-                    maxElements > 0 ? remaining : 0);
+                    maxElements > 0 ? remaining : 0,
+                    combineWith, invert, levelFilter: null);
                 elements.AddRange(typeList);
                 totalCount += cntType;
             }
@@ -117,7 +128,8 @@ public class AIElementFilterTool : ICortexTool
             {
                 var (cnt, list) = CollectByKind(doc, isElementType: false,
                     filterCategory, filterElementType, filterFamilySymId,
-                    filterVisibleInView, bbMin, bbMax, maxElements);
+                    filterVisibleInView, bbMin, bbMax, maxElements,
+                    combineWith, invert, levelFilterToken);
                 elements.AddRange(list);
                 totalCount = cnt;
             }
@@ -125,7 +137,8 @@ public class AIElementFilterTool : ICortexTool
             {
                 var (cnt, list) = CollectByKind(doc, isElementType: true,
                     filterCategory, filterElementType, filterFamilySymId: -1,
-                    filterVisibleInView: false, bbMin, bbMax, maxElements);
+                    filterVisibleInView: false, bbMin, bbMax, maxElements,
+                    combineWith, invert, levelFilter: null);
                 elements.AddRange(list);
                 totalCount = cnt;
             }
@@ -174,7 +187,10 @@ public class AIElementFilterTool : ICortexTool
         bool filterVisibleInView,
         XYZ? bbMin,
         XYZ? bbMax,
-        int maxElements = 0)
+        int maxElements = 0,
+        string combineWith = "and",
+        bool invert = false,
+        JObject? levelFilter = null)
     {
         // Choose base collector (view-constrained or whole-model)
         FilteredElementCollector collector =
@@ -230,11 +246,46 @@ public class AIElementFilterTool : ICortexTool
             filters.Add(new BoundingBoxIntersectsFilter(outline));
         }
 
-        // Apply combined filter
+        // 5. Level filter (instances on a specific level, by id or name)
+        if (!isElementType && levelFilter != null)
+        {
+            var lf = BuildLevelFilter(doc, levelFilter);
+            if (lf != null) filters.Add(lf);
+        }
+
+        // Combine the individual filters with AND (default) or OR, then optionally
+        // invert the whole thing (NOT) via ElementFilter's inverted constructor.
+        ElementFilter? combined = null;
         if (filters.Count == 1)
-            collector = collector.WherePasses(filters[0]);
+            combined = filters[0];
         else if (filters.Count > 1)
-            collector = collector.WherePasses(new LogicalAndFilter(filters));
+            combined = combineWith == "or"
+                ? new LogicalOrFilter(filters)
+                : (ElementFilter)new LogicalAndFilter(filters);
+
+        if (combined != null)
+        {
+            if (invert)
+            {
+                // LogicalAndFilter/LogicalOrFilter and the rule filters all support
+                // an inverted form; wrap by negating each leaf is complex, so we use
+                // the collector's WherePasses with an inverting ElementFilter where
+                // available. ElementCategoryFilter etc. accept an 'inverted' arg, but
+                // a combined filter does not — emulate NOT by excluding the matched ids.
+                var matchedIds = new FilteredElementCollector(doc)
+                    .WherePasses(combined);
+                matchedIds = isElementType
+                    ? matchedIds.WhereElementIsElementType()
+                    : matchedIds.WhereElementIsNotElementType();
+                var excludeIds = matchedIds.ToElementIds();
+                if (excludeIds.Count > 0)
+                    collector = collector.Excluding(excludeIds);
+            }
+            else
+            {
+                collector = collector.WherePasses(combined);
+            }
+        }
 
         // GetElementCount walks the filtered set without wrapping each entry in
         // a managed Element — much cheaper than ToElements() when we only need
@@ -686,5 +737,25 @@ public class AIElementFilterTool : ICortexTool
             if (t != null) return t;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Builds an ElementLevelFilter from {levelId} or {levelName}. Returns null when
+    /// the level cannot be resolved (the caller then simply omits the filter).
+    /// </summary>
+    private static ElementFilter? BuildLevelFilter(Document doc, JObject levelFilter)
+    {
+        Level? level = null;
+
+        var levelIdLong = levelFilter["levelId"]?.Value<long?>();
+        if (levelIdLong.HasValue && levelIdLong.Value > 0)
+            level = doc.GetElement(ToolHelpers.ToElementId(levelIdLong.Value)) as Level;
+
+        var levelName = levelFilter["levelName"]?.Value<string>();
+        if (level == null && !string.IsNullOrEmpty(levelName))
+            level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                .FirstOrDefault(l => l.Name.Equals(levelName, StringComparison.OrdinalIgnoreCase));
+
+        return level != null ? new ElementLevelFilter(level.Id) : null;
     }
 }
