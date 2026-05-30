@@ -396,4 +396,59 @@ public static class StructuralSteelTools
         var p = new JObject { ["connectionId"] = connectionId };
         return (await revit.ExecuteAsync("get_steel_connection_validation", p, ct)).ToString();
     }
+
+    // ── Module 4: fabrication metadata (5 tools) ─────────────────────────────
+
+    [McpServerTool(Name = "add_steel_fabrication_info"), Description("Add steel fabrication information to Revit elements so they participate in steel detailing (SteelElementProperties). Provide elementIds as a JSON array, e.g. [123,456]. Supports dryRun. Returns the ids that received fabrication info plus any skipped ids.")]
+    public static async Task<string> AddSteelFabricationInfo(
+        RevitConnectionManager revit,
+        [Description("JSON array of element ids, e.g. [123,456]")] string elementIds,
+        [Description("Preview without writing. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["elementIds"] = JArray.Parse(elementIds) };
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("add_steel_fabrication_info", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_steel_element_fabrication_properties"), Description("Read the steel fabrication properties of an element: whether it has SteelElementProperties (hasFabricationProperties) and its fabrication unique id (GUID string). Provide elementId.")]
+    public static async Task<string> GetSteelElementFabricationProperties(
+        RevitConnectionManager revit,
+        [Description("Element id")] long elementId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["elementId"] = elementId };
+        return (await revit.ExecuteAsync("get_steel_element_fabrication_properties", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_steel_fabrication_unique_id"), Description("Set the steel fabrication unique id (GUID) of an element's SteelElementProperties. Provide elementId and uniqueId (a GUID). The element must already have steel fabrication properties (run add_steel_fabrication_info first).")]
+    public static async Task<string> SetSteelFabricationUniqueId(
+        RevitConnectionManager revit,
+        [Description("Element id")] long elementId,
+        [Description("Fabrication unique id (GUID), e.g. 00000000-0000-0000-0000-000000000000")] string uniqueId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["elementId"] = elementId, ["uniqueId"] = uniqueId };
+        return (await revit.ExecuteAsync("set_steel_fabrication_unique_id", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_steel_fabrication_unique_id"), Description("Read the steel fabrication unique id (GUID) of an element from its SteelElementProperties. Provide elementId. Returns a note when the element has no steel fabrication properties.")]
+    public static async Task<string> GetSteelFabricationUniqueId(
+        RevitConnectionManager revit,
+        [Description("Element id")] long elementId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["elementId"] = elementId };
+        return (await revit.ExecuteAsync("get_steel_fabrication_unique_id", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_steel_reference_by_fabrication_id"), Description("Resolve the Revit element referenced by a steel fabrication GUID. Provide fabricationGuid (a GUID). Returns found=true with the referenced elementId, or found=false when no element matches.")]
+    public static async Task<string> GetSteelReferenceByFabricationId(
+        RevitConnectionManager revit,
+        [Description("Fabrication unique id (GUID) to resolve")] string fabricationGuid,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["fabricationGuid"] = fabricationGuid };
+        return (await revit.ExecuteAsync("get_steel_reference_by_fabrication_id", p, ct)).ToString();
+    }
 }

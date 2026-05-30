@@ -991,13 +991,35 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 6: Module 4 — Fabrication metadata, materials, warnings (9 write + 4 read)
+## Task 6: Module 4 — Fabrication metadata (5 tools — RE-SCOPED from 13)
+
+> **API VERIFIED 2026-05-30 (reflection R25).** `Autodesk.Revit.DB.Steel.SteelElementProperties`
+> (in RevitAPI.dll) exposes ONLY these public members:
+> - STATIC `IList<ElementId> AddFabricationInformationForRevitElements(Document, IList<ElementId>)`
+> - STATIC `Guid GetFabricationUniqueID(Document, Reference)`
+> - STATIC `Reference GetReference(Document, Guid)`
+> - STATIC `SteelElementProperties GetSteelElementProperties(Element)`
+> - INSTANCE prop `Guid UniqueID {get;set;}`, `bool IsValidObject {get;}`
+>
+> **The plan's other 8 assumed members DO NOT EXIST** and their tools are CUT:
+> `AddToElement`, `GetExternalId`, `GetRevitId`, `RegisterMaterial`, `RemoveLink`,
+> `ClearWarnings`, `CountOfAsyncWarnings`, `GetCurrWarnings`, `PostWarning`,
+> `RemoveWarning`, `FlushWarnings`, `SetChanged` — none are on `SteelElementProperties`
+> (nor is there any public steel warning-queue / external-material / fabrication-link API).
+> Module 4 is therefore **5 tools** built on the 6 real members, NOT 13.
+>
+> The 5 tools:
+> - **`add_steel_fabrication_info`** (write): `elementIds[]` → `AddFabricationInformationForRevitElements(doc, ids)`; returns the ids that received fabrication info (the method returns an `IList<ElementId>`). confirm/tx/rollback + dryRun.
+> - **`get_steel_element_fabrication_properties`** (read): `elementId` → `GetSteelElementProperties(elem)`; return `{ hasFabricationProperties (props!=null && IsValidObject), uniqueId (Guid string or null) }`.
+> - **`set_steel_fabrication_unique_id`** (write): `elementId`, `uniqueId` (Guid, ParseGuid) → `GetSteelElementProperties(elem).UniqueID = guid` in a tx. Fail if the element has no steel properties.
+> - **`get_steel_fabrication_unique_id`** (read): `elementId` → resolve props, return `UniqueID`. (Reference-based `GetFabricationUniqueID(doc, Reference)` is not exposed because we can't fabricate a Reference from JSON; use the element-props path.)
+> - **`get_steel_reference_by_fabrication_id`** (read): `fabricationGuid` (ParseGuid) → `GetReference(doc, guid)`; return the referenced element id (`reference.ElementId`) or a not-found note.
 
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelFabricationTools.cs`
-- Modify: `StructuralSteelTools.cs` (+13 wrappers), `ToolRegistrationTests.cs` (`BASE+33` → `BASE+46`)
+- Modify: `StructuralSteelTools.cs` (+5 wrappers), `ToolRegistrationTests.cs` (165 → 170)
 
-These wrap `SteelElementProperties`. **Reflect it first** — the spec lists `AddFabricationInformationForRevitElements`, `AddToElement`, `GetFabricationUniqueID`, `GetReference`, `GetExternalId`, `GetRevitId`, `RegisterMaterial`, `RemoveLink`, `ClearWarnings`, `CountOfAsyncWarnings`, `GetCurrWarnings`, `PostWarning`, `RemoveWarning`, `FlushWarnings`, `SetChanged` — confirm each.
+Wrap `SteelElementProperties` (verified members only — no warning/material/link/changed API exists).
 
 - [ ] **Step 1: Create the file with `add_steel_fabrication_info` (FULL)**
 
@@ -1082,8 +1104,8 @@ public class AddSteelFabricationInfoTool : ICortexTool
 
   Each warning write tool: note that warnings may be asynchronous — return queued vs current counts so the caller isn't misled. Build R25 + R24 + R26.
 
-- [ ] **Step 4: Add 13 wrappers. Build server.**
-- [ ] **Step 5: Bump threshold `BASE+33` → `BASE+46`; run. PASS.**
+- [ ] **Step 4: Add 5 wrappers. Build server.**
+- [ ] **Step 5: Bump threshold 165 → 170 (Module 4 adds 5); run. PASS.**
 - [ ] **Step 6: Commit**
 ```powershell
 git add src/RevitCortex.Tools/StructuralSteel/StructuralSteelFabricationTools.cs src/RevitCortex.Server/Tools/StructuralSteelTools.cs src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs
