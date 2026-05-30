@@ -884,11 +884,22 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ## Task 5: Module 3 — Connection type & approval administration (6 write + 3 read)
 
+> **API VERIFIED 2026-05-30 (reflection R26 + R27).** Real signatures (differ from the
+> draft below — use these):
+> - `StructuralConnectionType.Create(Document, StructuralConnectionApplyTo applyTo, String name, ElementId familySymbolId)` — needs `applyTo` + `name`, NOT `Create(doc, symId)`.
+> - `StructuralConnectionType.ValidFamilySymbolId(Document, StructuralConnectionApplyTo applyTo, ElementId)` — needs `applyTo`, NOT `(doc, symId)`.
+> - `StructuralConnectionType`: instance `GetFamilySymbolId()`, `SetFamilySymbolId(ElementId)`; prop `ApplyTo {get;}`; static `GetAllStructuralConnectionTypeIds(doc, out ICollection<ElementId>)`.
+> - `enum StructuralConnectionApplyTo`: `BeamsAndBraces`, `ColumnTop`, `ColumnBase`, `Connection`.
+> - `StructuralConnectionHandlerType.Create(doc, name, Guid, familyName[, categoryId][, IList<ConnectionInputPointInfo>])` (3 overloads); `CreateDefaultStructuralConnectionHandlerType(doc)`; `IsTypeNameValidForCustomConnection(doc, name)`; `UpdateCustomConnectionType(handler, addRefs, removeRefs)`.
+> - **R26→R27 gating CONFIRMED:** `AddElementsToCustomConnection` and `RemoveMainSubelementsFromCustomConnection` exist on R23-R26 but are **REMOVED in R27**. `UpdateCustomConnectionType` **survives in R27**. So `manage_custom_steel_connection_type` uses `#if !REVIT2027_OR_GREATER` for the add/remove-subelements actions and routes the generic add/remove-references action through `UpdateCustomConnectionType` on ALL versions (no total Fail on R27).
+> - `StructuralConnectionApprovalType`: only `Create(doc, name)`, `IsValidApprovalTypeName(doc, name)`, `GetAllStructuralConnectionApprovalTypes(doc, out ...)` — **NO rename, NO delete**. So `manage_steel_approval_type` supports `create` + `list`; `rename`/`delete` return a structured Fail.
+> - `ConnectionValidationInfo`: `GetWarning(int)`, `ManyWarnings()`, `IsValidWarningIndex(int)`. `ConnectionValidationWarning`: props `Reason` (`ConnectionWarning`), `Resolution` (`ConnectionResolution`), `GetParts()`. (Reflect how to OBTAIN a `ConnectionValidationInfo` from a handler — likely a validate method on the handler or StructuralConnectionTestUtil; if no public producer exists, `get_steel_connection_validation` returns a documented "not available via public API" Fail.)
+
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelConnectionTypeTools.cs`
-- Modify: `StructuralSteelTools.cs` (+9 wrappers), `ToolRegistrationTests.cs` (`BASE+24` → `BASE+33`)
+- Modify: `StructuralSteelTools.cs` (+9 wrappers), `ToolRegistrationTests.cs` (`BASE+23` (156) → `BASE+32` (165))
 
-`manage_custom_steel_connection_type` is **R27-gated** (`AddElementsToCustomConnection` absent in R27 per spec) and IntPtr-free (summary/documented-member ops only). **Reflect `StructuralConnectionHandlerType`/`StructuralConnectionType`/`StructuralConnectionApprovalType` first.**
+`manage_custom_steel_connection_type` is **R27-gated** (add/remove-subelements absent in R27) and IntPtr-free (documented-member ops only).
 
 - [ ] **Step 1: Create the file with `create_steel_structural_connection_type` (FULL — a clean typed create)**
 
@@ -969,7 +980,7 @@ public class CreateSteelStructuralConnectionTypeTool : ICortexTool
 Build R25 + R24 + R26 + **R27** (R27 exercises the `manage_custom_steel_connection_type` `#else`).
 
 - [ ] **Step 4: Add 9 Module-3 wrappers. Build server.**
-- [ ] **Step 5: Bump threshold `BASE+24` → `BASE+33`; run. PASS.**
+- [ ] **Step 5: Bump threshold 156 → 165 (BASE+32; Module 3 adds 9); run. PASS.**
 - [ ] **Step 6: Commit**
 ```powershell
 git add src/RevitCortex.Tools/StructuralSteel/StructuralSteelConnectionTypeTools.cs src/RevitCortex.Server/Tools/StructuralSteelTools.cs src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs

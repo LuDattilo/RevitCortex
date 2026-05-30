@@ -101,9 +101,10 @@ public class ToolRegistrationTests
     {
         // Update this number when adding new tools to catch accidental omissions
         // 133 = BASE (pre-steel); +15 = Module 1 structural steel discovery tools;
-        // +8 = Module 2 structural steel connection creation & input mutation tools
-        Assert.True(AllToolTypes.Count >= 156,
-            $"Expected at least 156 tools but found {AllToolTypes.Count}. " +
+        // +8 = Module 2 structural steel connection creation & input mutation tools;
+        // +9 = Module 3 structural steel connection type & approval administration tools
+        Assert.True(AllToolTypes.Count >= 165,
+            $"Expected at least 165 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 

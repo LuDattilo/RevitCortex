@@ -281,4 +281,119 @@ public static class StructuralSteelTools
         if (dryRun != null) p["dryRun"] = dryRun;
         return (await revit.ExecuteAsync("delete_steel_connection", p, ct)).ToString();
     }
+
+    // ===== Module 3 — Connection type & approval administration (6 write + 3 read) =====
+
+    [McpServerTool(Name = "create_steel_structural_connection_type"), Description("Create a StructuralConnectionType bound to a family symbol. Provide familySymbolId (a valid connection family symbol); applyTo = BeamsAndBraces | ColumnTop | ColumnBase | Connection (default Connection); optional name. Supports dryRun.")]
+    public static async Task<string> CreateSteelStructuralConnectionType(
+        RevitConnectionManager revit,
+        [Description("Element id of the connection family symbol to bind")] long familySymbolId,
+        [Description("Applicability target: BeamsAndBraces | ColumnTop | ColumnBase | Connection. Default Connection")] string? applyTo = null,
+        [Description("Name for the new connection type. Default 'Steel Connection Type'")] string? name = null,
+        [Description("Preview without creating. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["familySymbolId"] = familySymbolId };
+        if (applyTo != null) p["applyTo"] = applyTo;
+        if (name != null) p["name"] = name;
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("create_steel_structural_connection_type", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "create_steel_connection_handler_type"), Description("Create a StructuralConnectionHandlerType. Provide name; optional familyName (default empty); optional guid (a new GUID is generated when omitted). Supports dryRun. Returns the new type id and its connection GUID.")]
+    public static async Task<string> CreateSteelConnectionHandlerType(
+        RevitConnectionManager revit,
+        [Description("Name for the new connection handler type")] string name,
+        [Description("Optional family name. Default empty")] string? familyName = null,
+        [Description("Optional GUID (00000000-0000-0000-0000-000000000000 form). A new GUID is generated when omitted")] string? guid = null,
+        [Description("Preview without creating. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["name"] = name };
+        if (familyName != null) p["familyName"] = familyName;
+        if (guid != null) p["guid"] = guid;
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("create_steel_connection_handler_type", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "create_default_steel_connection_handler_type"), Description("Create the default StructuralConnectionHandlerType for the document (CreateDefaultStructuralConnectionHandlerType). Returns the new type id. Supports dryRun.")]
+    public static async Task<string> CreateDefaultSteelConnectionHandlerType(
+        RevitConnectionManager revit,
+        [Description("Preview without creating. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("create_default_steel_connection_handler_type", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_steel_connection_type_family_symbol"), Description("Re-bind a StructuralConnectionType to a different family symbol. Provide connectionTypeId and familySymbolId. The new symbol is validated against the type's existing ApplyTo. Supports dryRun.")]
+    public static async Task<string> SetSteelConnectionTypeFamilySymbol(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionType to re-bind")] long connectionTypeId,
+        [Description("Element id of the new connection family symbol")] long familySymbolId,
+        [Description("Preview without changing. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionTypeId"] = connectionTypeId, ["familySymbolId"] = familySymbolId };
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("set_steel_connection_type_family_symbol", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "manage_steel_approval_type"), Description("Administer StructuralConnectionApprovalType definitions. action = create (requires name) | list. The Revit API exposes no rename/delete for approval types, so those actions return a structured error.")]
+    public static async Task<string> ManageSteelApprovalType(
+        RevitConnectionManager revit,
+        [Description("Action: create | list")] string action,
+        [Description("Name for the approval type (required for create)")] string? name = null,
+        [Description("Preview without creating. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["action"] = action };
+        if (name != null) p["name"] = name;
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("manage_steel_approval_type", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "manage_custom_steel_connection_type"), Description("Mutate a custom structural connection (handler). action = add_references | remove_references | add_elements | remove_subelements. NOTE: Revit's custom-connection mutation needs interactively-picked References/Subelements that cannot be built from JSON, so this tool validates inputs and returns a structured error rather than guessing. The legacy add/remove APIs were removed in Revit 2027.")]
+    public static async Task<string> ManageCustomSteelConnectionType(
+        RevitConnectionManager revit,
+        [Description("Element id of the custom StructuralConnectionHandler")] long connectionId,
+        [Description("Action: add_references | remove_references | add_elements | remove_subelements")] string action,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionId"] = connectionId, ["action"] = action };
+        return (await revit.ExecuteAsync("manage_custom_steel_connection_type", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_steel_connection_input_points"), Description("Read the input points of a structural connection handler: each point's id (GUID) and position (x,y,z in mm). Provide connectionId.")]
+    public static async Task<string> GetSteelConnectionInputPoints(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionHandler")] long connectionId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionId"] = connectionId };
+        return (await revit.ExecuteAsync("get_steel_connection_input_points", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_steel_connection_applicability"), Description("Report a StructuralConnectionType's applicability hints. Revit exposes no public 'does this type apply to these elements' predicate, so this returns the type's ApplyTo + family symbol id and, for any supplied elementIds, their categories — clearly labelled as advisory.")]
+    public static async Task<string> GetSteelConnectionApplicability(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionType")] long connectionTypeId,
+        [Description("Optional JSON array of element ids to report categories for, e.g. [123,456]")] string? elementIds = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionTypeId"] = connectionTypeId };
+        if (elementIds != null) p["elementIds"] = JArray.Parse(elementIds);
+        return (await revit.ExecuteAsync("get_steel_connection_applicability", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_steel_connection_validation"), Description("Report validation warnings for a structural connection handler. The Revit API exposes no public producer of ConnectionValidationInfo for a placed handler, so this returns validationAvailable=false with the handler's code-checking status and a note. Use the general get_warnings tool for document-level failures.")]
+    public static async Task<string> GetSteelConnectionValidation(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionHandler")] long connectionId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionId"] = connectionId };
+        return (await revit.ExecuteAsync("get_steel_connection_validation", p, ct)).ToString();
+    }
 }
