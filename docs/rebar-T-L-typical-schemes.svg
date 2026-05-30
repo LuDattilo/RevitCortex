@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="760" viewBox="0 0 1180 760" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="1180" height="760" fill="#ffffff"/>
+  <text x="40" y="42" font-size="26" font-weight="700" fill="#1a3a5c">Armatura tipica travi a T e a L (sezione trasversale)</text>
+  <text x="40" y="68" font-size="14" fill="#555">Schema di principio — staffe chiuse + longitudinali sul perimetro. Conforme a ACI 318-19 / PCI per travi a T e di bordo (spandrel).</text>
+
+  <!-- ============ T-BEAM ============ -->
+  <text x="60" y="120" font-size="20" font-weight="700" fill="#1a3a5c">Trave a T (T-shape)</text>
+
+  <!-- concrete outline: flange on top (wide), web below (narrow) -->
+  <!-- flange -->
+  <rect x="80" y="150" width="320" height="80" fill="#eef2f6" stroke="#9aa7b3" stroke-width="2"/>
+  <!-- web -->
+  <rect x="200" y="230" width="80" height="240" fill="#eef2f6" stroke="#9aa7b3" stroke-width="2"/>
+
+  <!-- main stirrup: closed tie around the WEB, hooked into flange -->
+  <rect x="216" y="172" width="48" height="282" rx="6" fill="none" stroke="#c0392b" stroke-width="3"/>
+  <!-- 135 deg hooks (little tails) -->
+  <path d="M216 176 l-14 -10" stroke="#c0392b" stroke-width="3" fill="none"/>
+  <path d="M264 176 l14 -10" stroke="#c0392b" stroke-width="3" fill="none"/>
+
+  <!-- flange tie (transverse, in the flange) -->
+  <rect x="96" y="166" width="288" height="48" rx="6" fill="none" stroke="#e08e0b" stroke-width="2.5" stroke-dasharray="6 4"/>
+
+  <!-- longitudinal bars (dots) -->
+  <!-- web corners (top of web region near flange + bottom of web) -->
+  <g fill="#1f6fb2">
+    <!-- bottom of web (2) -->
+    <circle cx="222" cy="446" r="7"/><circle cx="258" cy="446" r="7"/>
+    <!-- top of web / in flange corners over web (2) -->
+    <circle cx="222" cy="180" r="7"/><circle cx="258" cy="180" r="7"/>
+  </g>
+  <!-- flange bars (distributed along the wide flange) -->
+  <g fill="#2e8b57">
+    <circle cx="96"  cy="180" r="7"/><circle cx="150" cy="180" r="7"/>
+    <circle cx="330" cy="180" r="7"/><circle cx="384" cy="180" r="7"/>
+  </g>
+  <!-- skin bars on web sides -->
+  <g fill="#7d3c98">
+    <circle cx="222" cy="330" r="5.5"/><circle cx="258" cy="330" r="5.5"/>
+  </g>
+
+  <!-- labels T -->
+  <text x="300" y="120" font-size="13" fill="#c0392b">staffa anima (chiusa, ganci 135°)</text>
+  <text x="300" y="250" font-size="13" fill="#e08e0b">staffa flangia</text>
+  <text x="300" y="300" font-size="13" fill="#2e8b57">correnti di flangia</text>
+  <text x="300" y="350" font-size="13" fill="#1f6fb2">correnti d'angolo anima</text>
+  <text x="300" y="400" font-size="13" fill="#7d3c98">ferri di parete (pelle)</text>
+  <!-- dims -->
+  <text x="225" y="500" font-size="12" fill="#333">b_w (anima)</text>
+  <text x="190" y="145" font-size="12" fill="#333">b_eff (flangia)</text>
+
+  <!-- ============ L-BEAM / EDGE ============ -->
+  <text x="640" y="120" font-size="20" font-weight="700" fill="#1a3a5c">Trave a L / di bordo (spandrel)</text>
+
+  <!-- main body (tall) on the right, seat (ledge) on the lower-left -->
+  <rect x="800" y="150" width="120" height="320" fill="#eef2f6" stroke="#9aa7b3" stroke-width="2"/>
+  <rect x="700" y="370" width="100" height="100" fill="#eef2f6" stroke="#9aa7b3" stroke-width="2"/>
+
+  <!-- closed stirrup around main body (TORSION: must be closed) -->
+  <rect x="816" y="166" width="88" height="288" rx="6" fill="none" stroke="#c0392b" stroke-width="3"/>
+  <path d="M816 170 l-14 -10" stroke="#c0392b" stroke-width="3" fill="none"/>
+  <path d="M904 170 l14 -10" stroke="#c0392b" stroke-width="3" fill="none"/>
+
+  <!-- seat / ledge tie (L-bar) wrapping the corbel -->
+  <path d="M812 452 L716 452 L716 386 L796 386" fill="none" stroke="#e08e0b" stroke-width="2.5" stroke-dasharray="6 4"/>
+
+  <!-- longitudinal bars: perimeter of main body (>=4 corners) + along seat -->
+  <g fill="#1f6fb2">
+    <circle cx="822" cy="180" r="7"/><circle cx="898" cy="180" r="7"/>
+    <circle cx="822" cy="440" r="7"/><circle cx="898" cy="440" r="7"/>
+    <!-- intermediate perimeter bar (spacing <=300mm) -->
+    <circle cx="822" cy="310" r="6"/><circle cx="898" cy="310" r="6"/>
+  </g>
+  <!-- seat bars -->
+  <g fill="#2e8b57">
+    <circle cx="724" cy="398" r="6"/><circle cx="724" cy="440" r="6"/>
+  </g>
+
+  <text x="940" y="200" font-size="13" fill="#c0392b">staffa chiusa corpo (TORSIONE)</text>
+  <text x="640" y="510" font-size="13" fill="#e08e0b">staffa a U del nasello (seat)</text>
+  <text x="940" y="320" font-size="13" fill="#1f6fb2">correnti perimetrali (passo ≤ 300)</text>
+  <text x="640" y="540" font-size="13" fill="#2e8b57">correnti del nasello</text>
+
+  <!-- ============ RULES BOX ============ -->
+  <rect x="60" y="560" width="1060" height="170" rx="10" fill="#f7f9fb" stroke="#cfd8e0"/>
+  <text x="80" y="590" font-size="16" font-weight="700" fill="#1a3a5c">Regole di principio (ACI 318-19 / PCI)</text>
+  <text x="80" y="618" font-size="13.5" fill="#333">• T-beam: staffe nell'ANIMA con ganci 135° attorno ai correnti; armatura di flangia distribuita se la flangia va in trazione (appoggi continui).</text>
+  <text x="80" y="642" font-size="13.5" fill="#333">• Edge/Spandrel beam: TORSIONE dominante → staffe CHIUSE obbligatorie + una barra longitudinale in OGNI angolo; correnti sul perimetro a passo ≤ 300 mm.</text>
+  <text x="80" y="666" font-size="13.5" fill="#333">• Infittimento delle staffe nelle zone critiche d'appoggio (es. passo 75–100 mm) e passo normale in campata (es. 150–200 mm).</text>
+  <text x="80" y="690" font-size="13.5" fill="#333">• Il nasello (seat) della trave di bordo va armato a parte (staffe a U + correnti) — è la mensola che porta il solaio.</text>
+  <text x="80" y="714" font-size="13.5" fill="#333">• Copriferro netto secondo esposizione (qui 38 mm, "Interior - framing/columns"). Ganci 135° = requisito per staffe chiuse.</text>
+</svg>
