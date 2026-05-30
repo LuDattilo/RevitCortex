@@ -101,8 +101,9 @@ public class ToolRegistrationTests
     {
         // Update this number when adding new tools to catch accidental omissions.
         // Rebar Module 1 added 12 discovery tools (133 -> 145).
-        Assert.True(AllToolTypes.Count >= 145,
-            $"Expected at least 145 tools but found {AllToolTypes.Count}. " +
+        // Rebar Module 2 added 12 tools: 3 creation + 9 mutators (145 -> 157).
+        Assert.True(AllToolTypes.Count >= 157,
+            $"Expected at least 157 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 

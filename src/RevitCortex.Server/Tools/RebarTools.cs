@@ -77,4 +77,205 @@ public static class RebarTools
     [McpServerTool(Name = "get_rebar_api_capabilities"), Description("Report which version-gated reinforcement features the running Revit supports.")]
     public static async Task<string> GetRebarApiCapabilities(RevitConnectionManager revit, CancellationToken ct = default)
         => (await revit.ExecuteAsync("get_rebar_api_capabilities", new JObject(), ct)).ToString();
+
+    // ── Module 2: creation & mutation ────────────────────────────────────────
+    [McpServerTool(Name = "create_rebar_from_shape"), Description("Create a shape-driven rebar in a host from a rebar shape. origin/xVec/yVec are JSON {x,y,z} in mm. Optional layout JSON.")]
+    public static async Task<string> CreateRebarFromShape(
+        RevitConnectionManager revit,
+        [Description("Host element id")] long hostId,
+        [Description("Origin point JSON {x,y,z} in mm")] string origin,
+        [Description("Local X direction JSON {x,y,z}")] string xVec,
+        [Description("Local Y direction JSON {x,y,z}")] string yVec,
+        [Description("Rebar shape id")] long? shapeId = null,
+        [Description("Rebar shape name (used if shapeId omitted)")] string? shapeName = null,
+        [Description("Rebar bar type id")] long? barTypeId = null,
+        [Description("Rebar bar type name (used if barTypeId omitted)")] string? barTypeName = null,
+        [Description("Layout JSON {rule, number?, arrayLengthMm?, spacingMm?, barsOnNormalSide?, includeFirstBar?, includeLastBar?}")] string? layout = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["hostId"] = hostId,
+            ["origin"] = JObject.Parse(origin),
+            ["xVec"] = JObject.Parse(xVec),
+            ["yVec"] = JObject.Parse(yVec)
+        };
+        if (shapeId != null) p["shapeId"] = shapeId;
+        if (shapeName != null) p["shapeName"] = shapeName;
+        if (barTypeId != null) p["barTypeId"] = barTypeId;
+        if (barTypeName != null) p["barTypeName"] = barTypeName;
+        if (layout != null) p["layout"] = JObject.Parse(layout);
+        return (await revit.ExecuteAsync("create_rebar_from_shape", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "create_rebar_from_curves"), Description("Create a rebar from explicit coplanar curves (mm) in a host. curves is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}}; normal is JSON {x,y,z}. Optional hooks/layout.")]
+    public static async Task<string> CreateRebarFromCurves(
+        RevitConnectionManager revit,
+        [Description("Host element id")] long hostId,
+        [Description("Curves JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm")] string curves,
+        [Description("Plane normal JSON {x,y,z}")] string normal,
+        [Description("Rebar style: Standard|StirrupTie")] string style = "Standard",
+        [Description("Start hook type id")] long? startHookId = null,
+        [Description("End hook type id")] long? endHookId = null,
+        [Description("Rebar bar type id")] long? barTypeId = null,
+        [Description("Rebar bar type name (used if barTypeId omitted)")] string? barTypeName = null,
+        [Description("Layout JSON {rule, number?, arrayLengthMm?, spacingMm?, ...}")] string? layout = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["hostId"] = hostId,
+            ["curves"] = JArray.Parse(curves),
+            ["normal"] = JObject.Parse(normal),
+            ["style"] = style
+        };
+        if (startHookId != null) p["startHookId"] = startHookId;
+        if (endHookId != null) p["endHookId"] = endHookId;
+        if (barTypeId != null) p["barTypeId"] = barTypeId;
+        if (barTypeName != null) p["barTypeName"] = barTypeName;
+        if (layout != null) p["layout"] = JObject.Parse(layout);
+        return (await revit.ExecuteAsync("create_rebar_from_curves", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "create_free_form_rebar"), Description("Create an unconstrained free-form rebar from curve loops (mm) in a host. loops is a JSON array of loops, each a JSON array of curve specs {type, start, end, mid?}.")]
+    public static async Task<string> CreateFreeFormRebar(
+        RevitConnectionManager revit,
+        [Description("Host element id")] long hostId,
+        [Description("Loops JSON: array of loops, each an array of curve specs {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm")] string loops,
+        [Description("Rebar style: Standard|StirrupTie")] string style = "Standard",
+        [Description("Rebar bar type id")] long? barTypeId = null,
+        [Description("Rebar bar type name (used if barTypeId omitted)")] string? barTypeName = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["hostId"] = hostId,
+            ["loops"] = JArray.Parse(loops),
+            ["style"] = style
+        };
+        if (barTypeId != null) p["barTypeId"] = barTypeId;
+        if (barTypeName != null) p["barTypeName"] = barTypeName;
+        return (await revit.ExecuteAsync("create_free_form_rebar", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_rebar_layout"), Description("Set the distribution layout of a shape-driven rebar. layout is JSON {rule, number?, arrayLengthMm?, spacingMm?, ...}.")]
+    public static async Task<string> SetRebarLayout(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Layout JSON {rule: single|fixed_number|maximum_spacing|number_with_spacing|minimum_clear_spacing, ...}")] string layout,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId, ["layout"] = JObject.Parse(layout) };
+        return (await revit.ExecuteAsync("set_rebar_layout", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_rebar_shape"), Description("Change the shape of a shape-driven rebar. Provide rebarId and shapeId or shapeName.")]
+    public static async Task<string> SetRebarShape(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Rebar shape id")] long? shapeId = null,
+        [Description("Rebar shape name (used if shapeId omitted)")] string? shapeName = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId };
+        if (shapeId != null) p["shapeId"] = shapeId;
+        if (shapeName != null) p["shapeName"] = shapeName;
+        return (await revit.ExecuteAsync("set_rebar_shape", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_rebar_hooks"), Description("Set the hook type at rebar ends. Provide rebarId and startHookId and/or endHookId (pass 0 to clear an end's hook). Works on all Revit versions.")]
+    public static async Task<string> SetRebarHooks(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Start hook type id (0 to clear)")] long? startHookId = null,
+        [Description("End hook type id (0 to clear)")] long? endHookId = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId };
+        if (startHookId != null) p["startHookId"] = startHookId;
+        if (endHookId != null) p["endHookId"] = endHookId;
+        return (await revit.ExecuteAsync("set_rebar_hooks", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_rebar_terminations"), Description("Set rebar end terminations (orientation/rotation). Revit 2026+ only; returns a version error on older targets. Provide rebarId, end (0|1), orientation, rotationDegrees.")]
+    public static async Task<string> SetRebarTerminations(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Rebar end: 0=start, 1=end")] int? end = null,
+        [Description("Termination orientation (e.g. Left|Right)")] string? orientation = null,
+        [Description("Rotation angle in degrees")] double? rotationDegrees = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId };
+        if (end != null) p["end"] = end;
+        if (orientation != null) p["orientation"] = orientation;
+        if (rotationDegrees != null) p["rotationDegrees"] = rotationDegrees;
+        return (await revit.ExecuteAsync("set_rebar_terminations", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_rebar_host"), Description("Reassign a rebar to a new host. Provide rebarId and newHostId (must be a valid rebar host).")]
+    public static async Task<string> SetRebarHost(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("New host element id")] long newHostId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId, ["newHostId"] = newHostId };
+        return (await revit.ExecuteAsync("set_rebar_host", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_rebar_visibility"), Description("Set rebar view presentation. Provide rebarId, viewId, and unobscured (show in front of host).")]
+    public static async Task<string> SetRebarVisibility(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("View id")] long viewId,
+        [Description("Show unobscured (in front of host). Default true")] bool? unobscured = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId, ["viewId"] = viewId };
+        if (unobscured != null) p["unobscured"] = unobscured;
+        return (await revit.ExecuteAsync("set_rebar_visibility", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "move_rebar_in_set"), Description("Move a single bar within a rebar set by a translation vector (mm). Provide rebarId, barPositionIndex, translation JSON {x,y,z}. Pass reset:true to clear a prior move.")]
+    public static async Task<string> MoveRebarInSet(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Bar position index. Default 0")] int? barPositionIndex = null,
+        [Description("Translation JSON {x,y,z} in mm (required unless reset:true)")] string? translation = null,
+        [Description("Reset a prior move on this bar. Default false")] bool? reset = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId };
+        if (barPositionIndex != null) p["barPositionIndex"] = barPositionIndex;
+        if (translation != null) p["translation"] = JObject.Parse(translation);
+        if (reset != null) p["reset"] = reset;
+        return (await revit.ExecuteAsync("move_rebar_in_set", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "include_exclude_rebar_bars"), Description("Show or hide a single bar of a rebar set in a view. Provide rebarId, viewId, barPositionIndex, hidden (true=hide).")]
+    public static async Task<string> IncludeExcludeRebarBars(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("View id")] long viewId,
+        [Description("Bar position index. Default 0")] int? barPositionIndex = null,
+        [Description("Hide the bar. Default true")] bool? hidden = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId, ["viewId"] = viewId };
+        if (barPositionIndex != null) p["barPositionIndex"] = barPositionIndex;
+        if (hidden != null) p["hidden"] = hidden;
+        return (await revit.ExecuteAsync("include_exclude_rebar_bars", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "split_rebar"), Description("Split a shape-driven rebar set into two sets at a given bar position. Provide rebarId and splitAtPosition (1..count-1). Returns the original and new rebar ids.")]
+    public static async Task<string> SplitRebar(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Bar position to split at (1..count-1)")] int splitAtPosition,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId, ["splitAtPosition"] = splitAtPosition };
+        return (await revit.ExecuteAsync("split_rebar", p, ct)).ToString();
+    }
 }
