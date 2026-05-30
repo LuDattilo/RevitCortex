@@ -1,8 +1,18 @@
 # RevitCortex Complete Structural Steel API Design
 
 **Date:** 2026-05-30
-**Status:** Draft design, pending implementation plan
+**Status:** Approved design, pending implementation plan
 **Owner:** RevitCortex
+
+## Design decisions (brainstorm 2026-05-30)
+
+Three decisions were locked in a brainstorming pass before planning:
+
+1. **Scope = full spec (~55 tools, all 6 modules).** The detailed/typed connection surface is built even though it depends on installed third-party structural connection providers (Autodesk Steel Connections, IDEA StatiCa, etc.). Tools that need an unavailable provider return a **structured "provider unavailable" error** at runtime (`CortexResult.Fail(CortexErrorCode.InvalidInput, "...requires an installed structural connection provider...")`), never a fake success and never an unhandled crash. `create_generic_steel_connection` is the always-works baseline; `get_structural_steel_api_capabilities` is the single source of truth callers consult first.
+2. **IntPtr buffer APIs are excluded from all mutation contracts** (confirmed). Detailed/custom connection raw `IntPtr` parameter buffers are never accepted from MCP input (a malformed pointer can crash Revit). They are exposed only as read summaries where meaningful.
+3. **Token shaping = `maxResults` + `summaryOnly` on heavy reads** (confirmed). High-payload read tools (`get_steel_external_id_map`, `get_steel_element_warnings`, `analyze_structural_steel_model`, `get_solid_cut_relationships`, `get_instance_void_cut_relationships`, and the `list_*` discovery tools) expose BOTH `maxResults` and a `summaryOnly`/`compact` counts-first mode. Counters are always truthful — never derived from a trimmed list (the `ToolResponseShaper` invariant).
+
+**API verification mandate:** every Revit steel API claimed in this spec (method families, signatures, the R27 `AddElementsToCustomConnection` change, provider/registry types) MUST be verified by reflecting the actual Nice3point ref assemblies (R23–R27) during implementation — NOT trusted from this spec. (Lesson from the rebar feature: ~half the plan's API assumptions were wrong — e.g. `RebarCouplerType`/`RebarSpliceType` did not exist, `SetHostId` was 2-arg.) Adapt only the offending call site, preserve each tool's name/inputs/return contract, and surface genuine API absence as a structured `Fail`/`MinVersionError`.
 
 ## Goal
 
@@ -293,6 +303,7 @@ Read tools return:
 
 - compact summaries first
 - optional detailed arrays capped by explicit `max*` parameters
+- high-payload read tools (`get_steel_external_id_map`, `get_steel_element_warnings`, `analyze_structural_steel_model`, `get_solid_cut_relationships`, `get_instance_void_cut_relationships`, and the `list_*` discovery tools) additionally accept `summaryOnly`/`compact` to return only counts/identifiers without the full per-item arrays. Counters returned in summary mode are computed over the FULL set, never derived from a trimmed list.
 - all distances in millimeters
 - enum names as strings
 - GUIDs as strings
