@@ -99,9 +99,18 @@ public class ToolRegistrationTests
     [Fact]
     public void ToolCount_MatchesExpected()
     {
-        // Update this number when adding new tools to catch accidental omissions
-        Assert.True(AllToolTypes.Count >= 133,
-            $"Expected at least 133 tools but found {AllToolTypes.Count}. " +
+        // Update this number when adding new tools to catch accidental omissions.
+        // Rebar Module 1 added 12 discovery tools (133 -> 145).
+        // Rebar Module 2 added 12 tools: 3 creation + 9 mutators (145 -> 157).
+        // Rebar Module 3 added 8 tools: 6 area/path writes + 2 reads (157 -> 165).
+        // Rebar Module 4 added 8 fabric tools: 5 writes + 3 reads (165 -> 173).
+        // Rebar Module 5 added 12 tools: couplers/constraints/propagation/annotations/splices
+        //   (8 writes + 4 reads; splice + unify tools are 2025+ gated) (173 -> 185).
+        // Rebar Module 6 added 10 tools: settings/rounding/numbering/bending details
+        //   (6 writes + 4 reads; the 3 bending-detail tools are 2024+ gated) (185 -> 195).
+        // get_element_solid_geometry: real-solid extents for rebar/element placement (195 -> 196).
+        Assert.True(AllToolTypes.Count >= 196,
+            $"Expected at least 196 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 
