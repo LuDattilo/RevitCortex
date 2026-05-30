@@ -35,12 +35,20 @@ public class CreateAreaReinforcementTool : ICortexTool
         if (input["majorDirection"] == null) return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "majorDirection{x,y,z} is required");
         var major = RebarToolHelpers.ParseXyzMm(input["majorDirection"]!).Normalize();
 
-        // AreaReinforcementType: prefer an explicit id, then any existing type, then create the default.
+        // Host validation: area reinforcement only supports walls, floors, and foundations
+        var hostCat = host!.Category?.Id;
+        if (hostCat != null)
+        {
+            var cat = (BuiltInCategory)ToolHelpers.GetElementIdValue(hostCat);
+            if (cat != BuiltInCategory.OST_Walls && cat != BuiltInCategory.OST_Floors && cat != BuiltInCategory.OST_StructuralFoundation)
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    "Area reinforcement only supports walls, floors, and structural foundations as hosts.",
+                    suggestion: $"Element {input["hostId"]} ({host.Category?.Name}) is not a valid area reinforcement host. Use create_rebar_from_shape or create_path_reinforcement for other host types.");
+        }
+
+        // AreaReinforcementType: prefer an explicit id, then any existing type (read-only lookups).
         var areaType = doc!.GetElement(ToolHelpers.ToElementId(input["areaTypeId"]?.Value<long?>() ?? -1)) as AreaReinforcementType
             ?? new FilteredElementCollector(doc).OfClass(typeof(AreaReinforcementType)).Cast<AreaReinforcementType>().FirstOrDefault();
-        var areaTypeId = areaType?.Id ?? AreaReinforcementType.CreateDefaultAreaReinforcementType(doc);
-        if (areaTypeId == null || areaTypeId == ElementId.InvalidElementId)
-            return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No AreaReinforcementType could be resolved or created in document");
 
         var hookId = ElementId.InvalidElementId;
         var hook = RebarToolHelpers.ResolveRebarHookType(doc, input["hookTypeId"]?.Value<long?>(), input["hookTypeName"]?.Value<string>());
@@ -60,6 +68,18 @@ public class CreateAreaReinforcementTool : ICortexTool
         tx.Start();
         try
         {
+            // Resolve or create default AreaReinforcementType inside the transaction
+            ElementId areaTypeId;
+            if (areaType != null)
+                areaTypeId = areaType.Id;
+            else
+                areaTypeId = AreaReinforcementType.CreateDefaultAreaReinforcementType(doc);
+            if (areaTypeId == null || areaTypeId == ElementId.InvalidElementId)
+            {
+                tx.RollBack();
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No AreaReinforcementType could be resolved or created in document");
+            }
+
             // Verified across R23-R27: AreaReinforcement.Create overloads are
             //   (Document, Element host, XYZ major, ElementId areaTypeId, ElementId barTypeId, ElementId hookId) and
             //   (Document, Element host, IList<Curve> curves, XYZ major, ElementId areaTypeId, ElementId barTypeId, ElementId hookId).
@@ -115,12 +135,9 @@ public class CreatePathReinforcementTool : ICortexTool
 
         var flip = input["flip"]?.Value<bool?>() ?? false;
 
-        // PathReinforcementType: prefer an explicit id, then any existing type, then create the default.
+        // PathReinforcementType: prefer an explicit id, then any existing type (read-only lookups).
         var pathType = doc!.GetElement(ToolHelpers.ToElementId(input["pathTypeId"]?.Value<long?>() ?? -1)) as PathReinforcementType
             ?? new FilteredElementCollector(doc).OfClass(typeof(PathReinforcementType)).Cast<PathReinforcementType>().FirstOrDefault();
-        var pathTypeId = pathType?.Id ?? PathReinforcementType.CreateDefaultPathReinforcementType(doc);
-        if (pathTypeId == null || pathTypeId == ElementId.InvalidElementId)
-            return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No PathReinforcementType could be resolved or created in document");
 
         var startHookId = ElementId.InvalidElementId;
         var startHook = RebarToolHelpers.ResolveRebarHookType(doc, input["startHookId"]?.Value<long?>(), input["startHookName"]?.Value<string>());
@@ -136,6 +153,18 @@ public class CreatePathReinforcementTool : ICortexTool
         tx.Start();
         try
         {
+            // Resolve or create default PathReinforcementType inside the transaction
+            ElementId pathTypeId;
+            if (pathType != null)
+                pathTypeId = pathType.Id;
+            else
+                pathTypeId = PathReinforcementType.CreateDefaultPathReinforcementType(doc);
+            if (pathTypeId == null || pathTypeId == ElementId.InvalidElementId)
+            {
+                tx.RollBack();
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No PathReinforcementType could be resolved or created in document");
+            }
+
             // Verified across R23-R27: PathReinforcement.Create(Document, Element host, IList<Curve> curves,
             //   bool flip, ElementId pathTypeId, ElementId barTypeId, ElementId startHookId, ElementId endHookId).
             PathReinforcement path = PathReinforcement.Create(doc, host!, curves, flip, pathTypeId, barType.Id, startHookId, endHookId);
