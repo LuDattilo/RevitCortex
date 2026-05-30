@@ -739,13 +739,34 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 4: Module 2 — Connection creation & input mutation (9 write tools)
+## Task 4: Module 2 — Connection creation & input mutation (8 write tools)
+
+> **API VERIFIED 2026-05-30 (reflection over RevitAPI.dll R25/R26).** The plan
+> originally listed 9 tools; two assumed non-existent API:
+> - `set_steel_connection_disconnected` — **REMOVED**: `StructuralConnectionHandler`
+>   has NO "disconnected" property. Its only settable instance props are
+>   `ApprovalTypeId` (ElementId), `CodeCheckingStatus`
+>   (enum: NotCalculated/OkChecked/CheckingFailed), `OverrideTypeParams` (bool),
+>   `SingleElementEndIndex` (int). No disconnect concept exists.
+> - `set_steel_connection_type` — **RE-SCOPED**: there is no type setter on the
+>   handler. Reimplemented as *change type by recreation*: read the connected
+>   element ids (+ existing input points), delete the old handler, and
+>   `Create(doc, ids, newTypeId)` — preserving the connected elements.
+>
+> Confirmed signatures (R25): `CreateGenericConnection(Document, IList<ElementId>)`;
+> `Create(Document, IList<ElementId> ids, ElementId typeId)`,
+> `Create(Document, IList<ElementId> ids, String typeName)`,
+> `Create(Document, IList<ElementId> ids, ElementId typeId, IList<ConnectionInputPoint> additionalInputPoints)`;
+> instance `AddElementIds(IList<ElementId>)`, `RemoveElementIds(IList<ElementId>)`,
+> `GetConnectedElementIds()`, `AddReferences(Document, IList<Reference>)`,
+> `RemoveReferences(IList<Reference>)`, `GetInputPoints()`, `SetDefaultElementOrder()`.
+> **Net result: 8 write tools, registration BASE+15 → BASE+23.**
 
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelConnectionTools.cs`
-- Modify: `src/RevitCortex.Server/Tools/StructuralSteelTools.cs` (+9 wrappers), `src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs` (`BASE+15` → `BASE+24`)
+- Modify: `src/RevitCortex.Server/Tools/StructuralSteelTools.cs` (+8 wrappers), `src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs` (`BASE+15` → `BASE+23`)
 
-All 9 are write tools (validate → confirm → tx → rollback). `create_generic_steel_connection` is the always-works baseline; typed `create_steel_connection` and approval/status tools gate on provider availability → `ProviderUnavailableError(...)`. **Reflect `StructuralConnectionHandler` first** for the real `Create`/`CreateGenericConnection`/`AddElementIds`/`RemoveElementIds`/`GetConnectedElementIds`/approval-property signatures.
+All 8 are write tools (validate → confirm → tx → rollback). `create_generic_steel_connection` is the always-works baseline; typed `create_steel_connection` and approval/status tools gate on provider availability → `ProviderUnavailableError(...)`.
 
 - [ ] **Step 1: Create the file with `create_generic_steel_connection` (FULL — the safe baseline)**
 
@@ -837,18 +858,19 @@ public class CreateGenericSteelConnectionTool : ICortexTool
 
 - **`create_steel_connection`** (typed, provider-gated): inputs `elementIds[]`, `connectionHandlerTypeId|connectionHandlerTypeName`, optional `inputPoints[]` ({id,x,y,z} mm), `dryRun`. Resolve the handler type; if none / no provider → `ProviderUnavailableError("Typed steel connections")`. Call `StructuralConnectionHandler.Create(doc, ids, typeId)` (confirm signature). Return `connectionId`, connected ids.
 - **`modify_steel_connection_inputs`** (action-based): inputs `connectionId`, `action` (`add_element_ids`|`remove_element_ids`|`add_references`|`remove_references`), `elementIds[]` (for id actions) or reference descriptors (for reference actions — element id + reference hint / selected subelement, NEVER raw Reference strings). Use `ParseConnectionInputAction`. For id actions call `AddElementIds`/`RemoveElementIds`; for reference actions resolve via `ResolveReferences` then `AddReferences`/`RemoveReferences`. Return accepted/skipped.
-- **`set_steel_connection_type`** (provider-gated): inputs `connectionId`, `connectionHandlerTypeId|Name`. Change the handler's type (confirm the setter — may be `ChangeTypeId`/a property). Provider-gate if typed.
-- **`set_steel_connection_approval`** (provider-gated): inputs `connectionId`, `approvalTypeId|approvalTypeName`. Set the approval property (reflect `StructuralConnectionHandler` approval member). Provider-gate.
-- **`set_steel_connection_status`** (provider-gated): inputs `connectionId`, `status` (enum string — reflect the status enum). Set code-checking/status. Provider-gate.
-- **`set_steel_connection_disconnected`**: inputs `connectionId`, `disconnected` (bool). Set the disconnect property.
-- **`set_steel_connection_default_order`**: inputs `connectionId`. Call `SetDefaultElementOrder()`.
+- **`set_steel_connection_type`** (provider-gated, change-by-recreation): inputs `connectionId`, `connectionHandlerTypeId|connectionHandlerTypeName`, optional `dryRun`. Read `handler.GetConnectedElementIds()` and `handler.GetInputPoints()`; resolve the new type id (provider-gate if no provider / type not found → `ProviderUnavailableError`); `RequestConfirmation("change steel connection type", ids.Count)`; in one tx `doc.Delete(handler.Id)` then `StructuralConnectionHandler.Create(doc, ids, newTypeId, inputPoints)`; return the new `connectionId` + connected ids. NOTE: this is recreation, not an in-place setter (no type setter exists on the handler).
+- **`set_steel_connection_approval`** (provider-gated): inputs `connectionId`, `approvalTypeId|approvalTypeName`. Set `handler.ApprovalTypeId = <id>` (resolve approval type id; verify name via `StructuralConnectionApprovalType.IsValidApprovalTypeName`). Provider-gate.
+- **`set_steel_connection_status`** (provider-gated): inputs `connectionId`, `status` (enum string: `NotCalculated`|`OkChecked`|`CheckingFailed`). Set `handler.CodeCheckingStatus = <enum>`. Provider-gate.
+- **`set_steel_connection_default_order`**: inputs `connectionId`. Call `handler.SetDefaultElementOrder()`.
 - **`delete_steel_connection`** (DESTRUCTIVE): inputs `connectionId`, `dryRun`. `RequestConfirmation("delete steel connection", 1)`; `doc.Delete(handler.Id)`. Return deleted id.
+
+(`set_steel_connection_disconnected` removed — no such API; see the box at the top of Task 4.)
 
 Build R25 + R24 + R26 after writing these.
 
-- [ ] **Step 4: Add the 9 Module-2 server wrappers** to `StructuralSteelTools.cs` (names match plugin names; complex inputs `elementIds`/`inputPoints` as JSON strings → `JArray.Parse`; scalars direct; write tools expose `dryRun` where the plugin reads it). Build server.
+- [ ] **Step 4: Add the 8 Module-2 server wrappers** to `StructuralSteelTools.cs` (names match plugin names; complex inputs `elementIds`/`inputPoints` as JSON strings → `JArray.Parse`; scalars direct; write tools expose `dryRun` where the plugin reads it). Build server.
 
-- [ ] **Step 5: Bump registration threshold `BASE+15` → `BASE+24`; run it. PASS.**
+- [ ] **Step 5: Bump registration threshold `BASE+15` (148) → `BASE+23` (156); run it. PASS.**
 
 - [ ] **Step 6: Commit**
 ```powershell

@@ -167,4 +167,118 @@ public static class StructuralSteelTools
         if (summaryOnly != null) p["summaryOnly"] = summaryOnly;
         return (await revit.ExecuteAsync("analyze_structural_steel_model", p, ct)).ToString();
     }
+
+    // ===== Module 2 — Connection creation & input mutation (8 write tools) =====
+
+    [McpServerTool(Name = "create_generic_steel_connection"), Description("Create a generic structural connection between two or more elements (works without an installed connection provider — the safe baseline). Provide elementIds (JSON array of >=2 element ids); optional connectionName. Supports dryRun.")]
+    public static async Task<string> CreateGenericSteelConnection(
+        RevitConnectionManager revit,
+        [Description("JSON array of >=2 element ids to connect, e.g. [123,456]")] string elementIds,
+        [Description("Optional name applied to the connection (best-effort via the Comments parameter)")] string? connectionName = null,
+        [Description("Preview without creating. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["elementIds"] = JArray.Parse(elementIds) };
+        if (connectionName != null) p["connectionName"] = connectionName;
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("create_generic_steel_connection", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "create_steel_connection"), Description("Create a typed structural connection between two or more elements from a connection handler type (connectionHandlerTypeId or connectionHandlerTypeName). Requires an installed connection provider/type. Provide elementIds (JSON array of >=2 ids). Supports dryRun. inputPoints are accepted but not yet wired (Revit exposes no public ConnectionInputPoint constructor).")]
+    public static async Task<string> CreateSteelConnection(
+        RevitConnectionManager revit,
+        [Description("JSON array of >=2 element ids to connect, e.g. [123,456]")] string elementIds,
+        [Description("Element id of the StructuralConnectionHandlerType to apply")] long? connectionHandlerTypeId = null,
+        [Description("Name of the connection handler type to apply (resolved against the document)")] string? connectionHandlerTypeName = null,
+        [Description("Optional JSON array of input points [{x,y,z}] in mm. Currently ignored (no public ConnectionInputPoint constructor)")] string? inputPoints = null,
+        [Description("Preview without creating. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["elementIds"] = JArray.Parse(elementIds) };
+        if (connectionHandlerTypeId != null) p["connectionHandlerTypeId"] = connectionHandlerTypeId;
+        if (connectionHandlerTypeName != null) p["connectionHandlerTypeName"] = connectionHandlerTypeName;
+        if (inputPoints != null) p["inputPoints"] = JArray.Parse(inputPoints);
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("create_steel_connection", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "modify_steel_connection_inputs"), Description("Add or remove connected elements on a structural connection handler. action = add_element_ids | remove_element_ids (provide elementIds[]). add_references / remove_references are not supported via this tool (Revit References cannot be built from JSON ids). Returns accepted/skipped counts.")]
+    public static async Task<string> ModifySteelConnectionInputs(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionHandler")] long connectionId,
+        [Description("Action: add_element_ids | remove_element_ids")] string action,
+        [Description("JSON array of element ids for the *_element_ids actions, e.g. [123,456]")] string elementIds,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["connectionId"] = connectionId,
+            ["action"] = action,
+            ["elementIds"] = JArray.Parse(elementIds)
+        };
+        return (await revit.ExecuteAsync("modify_steel_connection_inputs", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_steel_connection_type"), Description("Change a structural connection's type. Revit exposes no in-place type setter, so this recreates the connection: it reads the connected elements, deletes the old handler, and creates a new one with connectionHandlerTypeId|connectionHandlerTypeName. Requires an installed connection provider/type. Supports dryRun. Existing input points are not preserved.")]
+    public static async Task<string> SetSteelConnectionType(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionHandler to retype")] long connectionId,
+        [Description("Element id of the new StructuralConnectionHandlerType")] long? connectionHandlerTypeId = null,
+        [Description("Name of the new connection handler type (resolved against the document)")] string? connectionHandlerTypeName = null,
+        [Description("Preview without recreating. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionId"] = connectionId };
+        if (connectionHandlerTypeId != null) p["connectionHandlerTypeId"] = connectionHandlerTypeId;
+        if (connectionHandlerTypeName != null) p["connectionHandlerTypeName"] = connectionHandlerTypeName;
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("set_steel_connection_type", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_steel_connection_approval"), Description("Set the approval type of a structural connection handler. Provide connectionId and approvalTypeId or approvalTypeName (verified against the document's StructuralConnectionApprovalType definitions).")]
+    public static async Task<string> SetSteelConnectionApproval(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionHandler")] long connectionId,
+        [Description("Element id of the approval type to apply")] long? approvalTypeId = null,
+        [Description("Name of the approval type to apply (validated then matched by name)")] string? approvalTypeName = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionId"] = connectionId };
+        if (approvalTypeId != null) p["approvalTypeId"] = approvalTypeId;
+        if (approvalTypeName != null) p["approvalTypeName"] = approvalTypeName;
+        return (await revit.ExecuteAsync("set_steel_connection_approval", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_steel_connection_status"), Description("Set the code-checking status of a structural connection handler. status = NotCalculated | OkChecked | CheckingFailed.")]
+    public static async Task<string> SetSteelConnectionStatus(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionHandler")] long connectionId,
+        [Description("Code-checking status: NotCalculated | OkChecked | CheckingFailed")] string status,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionId"] = connectionId, ["status"] = status };
+        return (await revit.ExecuteAsync("set_steel_connection_status", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_steel_connection_default_order"), Description("Reset a structural connection handler to its default element order (SetDefaultElementOrder). Provide connectionId.")]
+    public static async Task<string> SetSteelConnectionDefaultOrder(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionHandler")] long connectionId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionId"] = connectionId };
+        return (await revit.ExecuteAsync("set_steel_connection_default_order", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "delete_steel_connection"), Description("Delete a structural connection handler by connectionId. Destructive — supports dryRun to preview. The connected elements themselves are not deleted.")]
+    public static async Task<string> DeleteSteelConnection(
+        RevitConnectionManager revit,
+        [Description("Element id of the StructuralConnectionHandler to delete")] long connectionId,
+        [Description("Preview without deleting. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["connectionId"] = connectionId };
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("delete_steel_connection", p, ct)).ToString();
+    }
 }
