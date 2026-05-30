@@ -196,4 +196,48 @@ public static class RebarToolHelpers
         => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
             $"{feature} requires Revit {minYear} or newer; the active target does not support it.",
             suggestion: $"Open the model in Revit {minYear}+ to use this feature.");
+
+    /// <summary>
+    /// Resolves a rebar coupler "type". There is NO RebarCouplerType element class in the Revit API
+    /// (verified by reflection across R23-R27). Couplers are family instances of category
+    /// BuiltInCategory.OST_Coupler; their types are FamilySymbols in that category. Resolves by an
+    /// explicit element id first (validated to be an OST_Coupler FamilySymbol), then by name, then the
+    /// first available coupler symbol in the document.
+    /// </summary>
+    public static FamilySymbol? ResolveCouplerType(Document doc, long? typeId, string? typeName)
+    {
+        if (typeId.HasValue && typeId > 0 &&
+            doc.GetElement(ToolHelpers.ToElementId(typeId.Value)) is FamilySymbol byId &&
+            byId.Category != null &&
+            (BuiltInCategory)GetCategoryId(byId.Category) == BuiltInCategory.OST_Coupler)
+            return byId;
+
+        var all = new FilteredElementCollector(doc)
+            .OfClass(typeof(FamilySymbol))
+            .OfCategory(BuiltInCategory.OST_Coupler)
+            .Cast<FamilySymbol>()
+            .ToList();
+        if (!string.IsNullOrWhiteSpace(typeName))
+        {
+            var byName = all.FirstOrDefault(t => t.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase));
+            if (byName != null) return byName;
+        }
+        return all.FirstOrDefault();
+    }
+
+    private static long GetCategoryId(Category cat)
+    {
+#if REVIT2024_OR_GREATER
+        return cat.Id.Value;
+#else
+        return cat.Id.IntegerValue;
+#endif
+    }
+
+    /// <summary>Resolves the 'end' value for coupler/splice operations: accepts 0 or 1 (default 0).</summary>
+    public static int ParseBarEnd(JToken? token, int fallback = 0)
+    {
+        var v = token?.Value<int?>() ?? fallback;
+        return v == 1 ? 1 : 0;
+    }
 }

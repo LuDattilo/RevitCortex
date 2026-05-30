@@ -479,4 +479,137 @@ public static class RebarTools
         if (maxWires != null) p["maxWires"] = maxWires;
         return (await revit.ExecuteAsync("get_fabric_wire_data", p, ct)).ToString();
     }
+
+    // ── Module 5: couplers, constraints, propagation, annotations, splices ───
+    [McpServerTool(Name = "create_rebar_coupler"), Description("Create a rebar coupler connecting two bar ends, or cap one. Provide couplerTypeId or couplerTypeName (a Coupler-category family type), end1 (JSON {rebarId,end}) and optional end2 (JSON {rebarId,end}). 'end' is 0 or 1.")]
+    public static async Task<string> CreateRebarCoupler(
+        RevitConnectionManager revit,
+        [Description("end1 JSON descriptor {rebarId,end} (end is 0 or 1)")] string end1,
+        [Description("Coupler type id (a FamilySymbol of category OST_Coupler)")] long? couplerTypeId = null,
+        [Description("Coupler type name (used if couplerTypeId omitted)")] string? couplerTypeName = null,
+        [Description("end2 JSON descriptor {rebarId,end} (omit to cap a single bar)")] string? end2 = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["end1"] = JObject.Parse(end1) };
+        if (couplerTypeId != null) p["couplerTypeId"] = couplerTypeId;
+        if (couplerTypeName != null) p["couplerTypeName"] = couplerTypeName;
+        if (end2 != null) p["end2"] = JObject.Parse(end2);
+        return (await revit.ExecuteAsync("create_rebar_coupler", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_rebar_coupler_visibility"), Description("Set a coupler unobscured (solid) or obscured in a view. Provide couplerId, viewId, unobscured (bool).")]
+    public static async Task<string> SetRebarCouplerVisibility(
+        RevitConnectionManager revit,
+        [Description("Coupler element id")] long couplerId,
+        [Description("View element id")] long viewId,
+        [Description("True = unobscured (solid); false = obscured")] bool unobscured,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("set_rebar_coupler_visibility",
+            new JObject { ["couplerId"] = couplerId, ["viewId"] = viewId, ["unobscured"] = unobscured }, ct)).ToString();
+
+    [McpServerTool(Name = "manage_rebar_constraints"), Description("Inspect/edit rebar constraints. Provide rebarId and action: list_handles | list_candidates (with handleIndex) | set_preferred (with handleIndex, candidateIndex) | remove_preferred (with handleIndex) | recompute (2025+). list_* actions are read-only.")]
+    public static async Task<string> ManageRebarConstraints(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Action: list_handles | list_candidates | set_preferred | remove_preferred | recompute")] string action,
+        [Description("Handle index from action=list_handles (required for list_candidates/set_preferred/remove_preferred)")] int? handleIndex = null,
+        [Description("Candidate index from action=list_candidates (required for set_preferred)")] int? candidateIndex = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId, ["action"] = action };
+        if (handleIndex != null) p["handleIndex"] = handleIndex;
+        if (candidateIndex != null) p["candidateIndex"] = candidateIndex;
+        return (await revit.ExecuteAsync("manage_rebar_constraints", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "propagate_rebar"), Description("Propagate rebar to similar hosts. NOTE: the Revit API exposes no rebar-propagation method on any supported version; this returns a structured 'unsupported' result. Provide rebarId, optional targetHostIds JSON array.")]
+    public static async Task<string> PropagateRebar(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Optional target host ids JSON array (e.g. [123,456])")] string? targetHostIds = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId };
+        if (targetHostIds != null) p["targetHostIds"] = JArray.Parse(targetHostIds);
+        return (await revit.ExecuteAsync("propagate_rebar", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "unify_rebars"), Description("Unify compatible standalone bars into one (Revit 2025+). Provide rebarIds (JSON array of >=2 ids); bars are unified pairwise into a single rebar. Returns a version error on older targets.")]
+    public static async Task<string> UnifyRebars(
+        RevitConnectionManager revit,
+        [Description("Rebar ids JSON array (>=2 ids, e.g. [123,456])")] string rebarIds,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("unify_rebars", new JObject { ["rebarIds"] = JArray.Parse(rebarIds) }, ct)).ToString();
+
+    [McpServerTool(Name = "transfer_rebar_annotations"), Description("Transfer rebar annotations between views by recreating MultiReferenceAnnotations over the rebars visible in the source view. Provide sourceViewId, targetViewId. Per-element issues are reported in warnings[].")]
+    public static async Task<string> TransferRebarAnnotations(
+        RevitConnectionManager revit,
+        [Description("Source view element id (views from which rebar are read)")] long sourceViewId,
+        [Description("Target view element id (where annotations are created)")] long targetViewId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("transfer_rebar_annotations",
+            new JObject { ["sourceViewId"] = sourceViewId, ["targetViewId"] = targetViewId }, ct)).ToString();
+
+    [McpServerTool(Name = "get_rebar_coupler_data"), Description("Read a rebar coupler: couplerMark, quantity, type id/name, and each linked reinforcement descriptor {rebarId, end}. Provide couplerId.")]
+    public static async Task<string> GetRebarCouplerData(
+        RevitConnectionManager revit,
+        [Description("Coupler element id")] long couplerId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_rebar_coupler_data", new JObject { ["couplerId"] = couplerId }, ct)).ToString();
+
+    [McpServerTool(Name = "get_rebar_constraint_candidates"), Description("List the constraint candidates for one rebar handle. Provide rebarId and handleIndex (from manage_rebar_constraints action=list_handles). Read-only.")]
+    public static async Task<string> GetRebarConstraintCandidates(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Handle index from manage_rebar_constraints action=list_handles")] int handleIndex,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_rebar_constraint_candidates",
+            new JObject { ["rebarId"] = rebarId, ["handleIndex"] = handleIndex }, ct)).ToString();
+
+    [McpServerTool(Name = "splice_rebar"), Description("Splice a rebar by rules at a position (Revit 2025+). Provide rebarId, optional spliceTypeId, position (End1|Middle|End2). Returns the resulting rebar ids, or a version error on older targets.")]
+    public static async Task<string> SpliceRebar(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Splice type id (optional; resolved/created if omitted)")] long? spliceTypeId = null,
+        [Description("Splice position: End1 | Middle | End2 (default Middle)")] string? position = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId };
+        if (spliceTypeId != null) p["spliceTypeId"] = spliceTypeId;
+        if (position != null) p["position"] = position;
+        return (await revit.ExecuteAsync("splice_rebar", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "remove_rebar_splice"), Description("Remove a rebar splice at a bar end (Revit 2025+). Provide rebarId and optional barEnd (0 or 1; default 0). Returns a version error on older targets.")]
+    public static async Task<string> RemoveRebarSplice(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Bar end: 0 or 1 (default 0)")] int? barEnd = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId };
+        if (barEnd != null) p["barEnd"] = barEnd;
+        return (await revit.ExecuteAsync("remove_rebar_splice", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_rebar_splice_data"), Description("Read rebar splice data (Revit 2025+): for each bar end, lap length (mm), stagger (mm), splice position, connected rebar id/end, plus the splice chain. Provide rebarId. Returns a version error on older targets.")]
+    public static async Task<string> GetRebarSpliceData(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_rebar_splice_data", new JObject { ["rebarId"] = rebarId }, ct)).ToString();
+
+    [McpServerTool(Name = "get_rebar_splice_candidates"), Description("Report candidate splice geometries for a rebar by rules (Revit 2025+, read-only). Provide rebarId, optional spliceTypeId, position (End1|Middle|End2). Returns a version error on older targets.")]
+    public static async Task<string> GetRebarSpliceCandidates(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Splice type id (optional; first existing type used if omitted)")] long? spliceTypeId = null,
+        [Description("Splice position: End1 | Middle | End2 (default Middle)")] string? position = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId };
+        if (spliceTypeId != null) p["spliceTypeId"] = spliceTypeId;
+        if (position != null) p["position"] = position;
+        return (await revit.ExecuteAsync("get_rebar_splice_candidates", p, ct)).ToString();
+    }
 }
