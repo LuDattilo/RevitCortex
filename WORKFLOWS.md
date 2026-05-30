@@ -799,6 +799,21 @@ ColorByCategory =
 
 ---
 
+### Rebar: Diagnosi "outside of host"
+
+**Sequenza:** `get_warnings(maxWarnings: 50)` -> filtrare descrizioni contenenti `outside of its host` -> per ogni failing element usare `get_rebar_element_data` / `get_rebar_geometry` -> confrontare bbox della centerline con bbox dell'host -> correggere assi locali e `arrayLengthMm` prima di riprovare.
+**Regola operativa:** non generare curve usando offset globali fissi (`new XYZ(0, y, z)`) se l'host può essere una colonna verticale, una trave lungo Y o un elemento ruotato. Derivare sempre una terna locale host: asse longitudinale, asse sezione U, asse sezione V. Le curve devono essere costruite come `center + axisLong*t + axisU*u + axisV*v`.
+**Cause tipiche nel modello Snowdon Towers:**
+- Colonne: asse lungo Z, staffe in piano XY, normale Z, distribuzione Z.
+- Travi lungo X: staffe in piano YZ, normale X, distribuzione X.
+- Travi lungo Y: staffe in piano XZ, normale Y, distribuzione Y.
+- Layout `fixed_number`, `maximum_spacing`, `minimum_clear_spacing`: `arrayLengthMm` deve essere positivo e coerente con la lunghezza utile dell'host; ometterlo porta a `arrayLength isn't acceptable`.
+**NON fare:** Non affidarsi solo a `RebarHostData.IsValidHost`: valida l'idoneità dell'host, non che le curve candidate siano dentro il solido. Non usare lo stesso `normal` per host con orientamenti diversi. Non mischiare colonne e travi in una routine batch basata su bounding box globali.
+
+**Fonte:** indagine `docs/rebar-outside-host-analysis-2026-05-30.md`, audit RevitCortex e API Revit Structure.
+
+---
+
 ### Rebar: Sistemi Area / Percorso / Rete
 
 **Sequenza:** `get_rebar_host_data` (valida l'ospite) -> `create_area_reinforcement` / `create_path_reinforcement` / `create_fabric_area` -> (opzionale) `set_area_reinforcement_layers` / `set_path_reinforcement_options` -> `get_area_reinforcement_data` / `get_path_reinforcement_data` / `get_fabric_area_data` (verifica) -> (opzionale) `convert_rebar_system_to_rebars` per esplodere in barre singole
@@ -808,5 +823,6 @@ ColorByCategory =
 - `create_fabric_area`: `hostId!`, `majorDirection!`, `fabricSheetTypeId`/`fabricSheetTypeName`, `fabricAreaTypeId`
 - `convert_rebar_system_to_rebars` / `remove_rebar_system` / `remove_fabric_reinforcement_system` sono distruttivi (conferma -> `Cancelled` se annullato)
 **NON fare:** Non omettere `majorDirection` per area/fabric -- è obbligatorio. Non convertire un sistema in barre singole se serve mantenerlo come sistema parametrico (la conversione è distruttiva). Non assumere che `propagate_rebar` funzioni: l'API Revit non espone la propagazione -- il tool restituisce un errore "non supportato" che rimanda al comando interattivo Propagate di Revit.
+**Nota (memberCount):** `create_area_reinforcement` / `create_path_reinforcement` rigenerano il documento prima di leggere le barre del sistema, quindi `memberCount`/`memberIds` nella risposta di creazione sono veritieri. Se compare `memberCountNote` (conteggio ancora 0 dopo la rigenerazione), le barre si materializzano solo dopo il commit: rileggere con `get_area_reinforcement_data` / `get_path_reinforcement_data` per il conteggio definitivo.
 
 **Fonte:** API Revit Structure — AreaReinforcement / PathReinforcement / FabricArea + limitazione propagate documentata in implementazione

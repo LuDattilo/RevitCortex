@@ -280,7 +280,7 @@ public static class RebarTools
     }
 
     // ── Module 3: area / path reinforcement ──────────────────────────────────
-    [McpServerTool(Name = "create_area_reinforcement"), Description("Create an area reinforcement system on a host (wall/floor/foundation). majorDirection is JSON {x,y,z}; optional curves is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm for an explicit boundary.")]
+    [McpServerTool(Name = "create_area_reinforcement"), Description("Create an area reinforcement system on a host (wall/floor/foundation). majorDirection is JSON {x,y,z}; optional curves is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm for an explicit boundary. memberCount/memberIds reflect the bars after regeneration; if memberCountNote is present the count was still 0 — re-read with get_area_reinforcement_data.")]
     public static async Task<string> CreateAreaReinforcement(
         RevitConnectionManager revit,
         [Description("Host element id")] long hostId,
@@ -301,7 +301,7 @@ public static class RebarTools
         return (await revit.ExecuteAsync("create_area_reinforcement", p, ct)).ToString();
     }
 
-    [McpServerTool(Name = "create_path_reinforcement"), Description("Create a path reinforcement system on a host. curves is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm (required). Optional flip, pathTypeId, startHookId, endHookId.")]
+    [McpServerTool(Name = "create_path_reinforcement"), Description("Create a path reinforcement system on a host. curves is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm (required). Optional flip, pathTypeId, startHookId, endHookId. memberCount/memberIds reflect the bars after regeneration; if memberCountNote is present the count was still 0 — re-read with get_path_reinforcement_data.")]
     public static async Task<string> CreatePathReinforcement(
         RevitConnectionManager revit,
         [Description("Host element id")] long hostId,
