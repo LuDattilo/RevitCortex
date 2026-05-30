@@ -103,7 +103,7 @@ Read-only tools:
 - `list_rebar_hook_types`
 - `list_rebar_shapes`
 - `list_rebar_cover_types`
-- `list_rebar_crank_types`
+- ~~`list_rebar_crank_types`~~ — **dropped during implementation**: the Revit API exposes no `RebarCrankType` element class (cranks exist only as the 2026+ `suppressHooksAndCranks` geometry option and the `supportsCrankApi` capability flag). Final tool count is **62**, not 63.
 - `list_rebar_splice_types`
 - `list_rebar_fabric_types`
 - `get_rebar_host_data`
