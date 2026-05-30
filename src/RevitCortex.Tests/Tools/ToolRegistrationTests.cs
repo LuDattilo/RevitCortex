@@ -106,8 +106,10 @@ public class ToolRegistrationTests
         // Rebar Module 4 added 8 fabric tools: 5 writes + 3 reads (165 -> 173).
         // Rebar Module 5 added 12 tools: couplers/constraints/propagation/annotations/splices
         //   (8 writes + 4 reads; splice + unify tools are 2025+ gated) (173 -> 185).
-        Assert.True(AllToolTypes.Count >= 185,
-            $"Expected at least 185 tools but found {AllToolTypes.Count}. " +
+        // Rebar Module 6 added 10 tools: settings/rounding/numbering/bending details
+        //   (6 writes + 4 reads; the 3 bending-detail tools are 2024+ gated) (185 -> 195).
+        Assert.True(AllToolTypes.Count >= 195,
+            $"Expected at least 195 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 

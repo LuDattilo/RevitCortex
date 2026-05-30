@@ -612,4 +612,134 @@ public static class RebarTools
         if (position != null) p["position"] = position;
         return (await revit.ExecuteAsync("get_rebar_splice_candidates", p, ct)).ToString();
     }
+
+    // ── Module 6: settings, rounding, numbering, bending details ─────────────
+    [McpServerTool(Name = "set_reinforcement_settings"), Description("Set document-level reinforcement settings. Provide any of hostStructuralRebar, rebarShapeDefinesHooks, rebarShapeDefinesEndTreatments (bools). Some toggles only apply when the document has no reinforcement; blocked changes are reported in warnings.")]
+    public static async Task<string> SetReinforcementSettings(
+        RevitConnectionManager revit,
+        [Description("Host structural rebar (bool)")] bool? hostStructuralRebar = null,
+        [Description("Rebar shape defines hooks (bool)")] bool? rebarShapeDefinesHooks = null,
+        [Description("Rebar shape defines end treatments (bool)")] bool? rebarShapeDefinesEndTreatments = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (hostStructuralRebar != null) p["hostStructuralRebar"] = hostStructuralRebar;
+        if (rebarShapeDefinesHooks != null) p["rebarShapeDefinesHooks"] = rebarShapeDefinesHooks;
+        if (rebarShapeDefinesEndTreatments != null) p["rebarShapeDefinesEndTreatments"] = rebarShapeDefinesEndTreatments;
+        return (await revit.ExecuteAsync("set_reinforcement_settings", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_rebar_rounding"), Description("Read rebar length-rounding rules. Without rebarId returns the document default; with rebarId returns that bar's effective rounding. Method is Nearest|Up|Down. There is no volume rounding in the Revit API.")]
+    public static async Task<string> GetRebarRounding(
+        RevitConnectionManager revit,
+        [Description("Rebar element id (optional; document default if omitted)")] long? rebarId = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (rebarId != null) p["rebarId"] = rebarId;
+        return (await revit.ExecuteAsync("get_rebar_rounding", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_fabric_rounding"), Description("Read the document fabric length-rounding rules (apply flag, segment/total length rounding in mm and method Nearest|Up|Down).")]
+    public static async Task<string> GetFabricRounding(RevitConnectionManager revit, CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_fabric_rounding", new JObject(), ct)).ToString();
+
+    [McpServerTool(Name = "manage_rebar_rounding"), Description("Set rebar length-rounding rules. Without rebarId edits the document default; with rebarId edits that bar. Fields: applyRules (bool), lengthRoundingMm (double), lengthRoundingMethod (Nearest|Up|Down). volumeRounding is unsupported by the API and reported in warnings.")]
+    public static async Task<string> ManageRebarRounding(
+        RevitConnectionManager revit,
+        [Description("Rebar element id (optional; document default if omitted)")] long? rebarId = null,
+        [Description("Apply rounding rules (bool)")] bool? applyRules = null,
+        [Description("Segment (cut) length rounding in mm")] double? lengthRoundingMm = null,
+        [Description("Length rounding method: Nearest|Up|Down")] string? lengthRoundingMethod = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (rebarId != null) p["rebarId"] = rebarId;
+        if (applyRules != null) p["applyRules"] = applyRules;
+        if (lengthRoundingMm != null) p["lengthRoundingMm"] = lengthRoundingMm;
+        if (lengthRoundingMethod != null) p["lengthRoundingMethod"] = lengthRoundingMethod;
+        return (await revit.ExecuteAsync("manage_rebar_rounding", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "manage_fabric_rounding"), Description("Set the document fabric length-rounding rules. Fields: applyRules (bool), lengthRoundingMm (double), lengthRoundingMethod (Nearest|Up|Down). volumeRounding is unsupported by the API and reported in warnings.")]
+    public static async Task<string> ManageFabricRounding(
+        RevitConnectionManager revit,
+        [Description("Apply rounding rules (bool)")] bool? applyRules = null,
+        [Description("Segment (cut) length rounding in mm")] double? lengthRoundingMm = null,
+        [Description("Length rounding method: Nearest|Up|Down")] string? lengthRoundingMethod = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (applyRules != null) p["applyRules"] = applyRules;
+        if (lengthRoundingMm != null) p["lengthRoundingMm"] = lengthRoundingMm;
+        if (lengthRoundingMethod != null) p["lengthRoundingMethod"] = lengthRoundingMethod;
+        return (await revit.ExecuteAsync("manage_fabric_rounding", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_rebar_numbering"), Description("Read rebar numbering. With rebarId returns that bar's schedule mark; without it returns every rebar's schedule mark plus the count of blank marks (a proxy for numbering gaps). The document-wide list is capped by maxResults (truncated/returnedCount flag a cut) and summaryOnly returns only the counts.")]
+    public static async Task<string> GetRebarNumbering(
+        RevitConnectionManager revit,
+        [Description("Rebar element id (optional; category-wide if omitted)")] long? rebarId = null,
+        [Description("Max rebars to return in the document-wide list. Default 100")] int? maxResults = null,
+        [Description("Return only count + blankMarkCount, no per-rebar list. Default false")] bool? summaryOnly = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (rebarId != null) p["rebarId"] = rebarId;
+        if (maxResults != null) p["maxResults"] = maxResults;
+        if (summaryOnly != null) p["summaryOnly"] = summaryOnly;
+        return (await revit.ExecuteAsync("get_rebar_numbering", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "manage_rebar_numbering"), Description("Manage rebar numbering. action=set_number writes a single bar's schedule mark (needs rebarId + newNumber). action=renumber|remove_gaps are not exposed by the Revit API and return a structured 'unsupported' result. A read-only target surfaces the issue in warnings rather than failing.")]
+    public static async Task<string> ManageRebarNumbering(
+        RevitConnectionManager revit,
+        [Description("Action: set_number | renumber | remove_gaps")] string action,
+        [Description("Rebar element id (required for set_number)")] long? rebarId = null,
+        [Description("New schedule mark/number (required for set_number)")] string? newNumber = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["action"] = action };
+        if (rebarId != null) p["rebarId"] = rebarId;
+        if (newNumber != null) p["newNumber"] = newNumber;
+        return (await revit.ExecuteAsync("manage_rebar_numbering", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "create_rebar_bending_detail"), Description("Create a rebar bending detail for a rebar in a view (Revit 2024+). Provide rebarId and viewId (a drafting/detail view); optional bendingDetailTypeId, position JSON {x,y,z} in mm, rotationDegrees. Returns a version error on Revit 2023.")]
+    public static async Task<string> CreateRebarBendingDetail(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("View id (drafting/detail view) to host the bending detail")] long viewId,
+        [Description("Bending detail type id (optional; first existing type used if omitted)")] long? bendingDetailTypeId = null,
+        [Description("Position JSON {x,y,z} in mm (optional, default origin)")] string? position = null,
+        [Description("Rotation in degrees (optional, default 0)")] double? rotationDegrees = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId, ["viewId"] = viewId };
+        if (bendingDetailTypeId != null) p["bendingDetailTypeId"] = bendingDetailTypeId;
+        if (position != null) p["position"] = JObject.Parse(position);
+        if (rotationDegrees != null) p["rotationDegrees"] = rotationDegrees;
+        return (await revit.ExecuteAsync("create_rebar_bending_detail", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "modify_rebar_bending_detail"), Description("Modify a rebar bending detail (Revit 2024+). Provide bendingDetailId and any of position JSON {x,y,z} in mm, rotationDegrees. Returns a version error on Revit 2023.")]
+    public static async Task<string> ModifyRebarBendingDetail(
+        RevitConnectionManager revit,
+        [Description("Bending detail element id")] long bendingDetailId,
+        [Description("Position JSON {x,y,z} in mm (optional)")] string? position = null,
+        [Description("Rotation in degrees (optional)")] double? rotationDegrees = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["bendingDetailId"] = bendingDetailId };
+        if (position != null) p["position"] = JObject.Parse(position);
+        if (rotationDegrees != null) p["rotationDegrees"] = rotationDegrees;
+        return (await revit.ExecuteAsync("modify_rebar_bending_detail", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_rebar_bending_detail_data"), Description("Read a rebar bending detail (Revit 2024+): host rebar id, owner view id, position (mm) and rotation (degrees). Provide bendingDetailId. Returns a version error on Revit 2023.")]
+    public static async Task<string> GetRebarBendingDetailData(
+        RevitConnectionManager revit,
+        [Description("Bending detail element id")] long bendingDetailId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_rebar_bending_detail_data", new JObject { ["bendingDetailId"] = bendingDetailId }, ct)).ToString();
 }
