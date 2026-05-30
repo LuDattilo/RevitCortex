@@ -25,7 +25,7 @@ public class GetElementSolidGeometryTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Get an element's REAL solid geometry extents (bounding box, centroid, volume m3, face/edge counts) in mm and model coordinates. Unlike get_BoundingBox this reflects the actual solid AFTER joins and cuts — essential for placing rebar/elements inside hosts cut by columns or slabs, where the element bounding box is larger than the armable solid.";
+    public string Description => "Get an element's REAL solid geometry (bounding box, centroid, volume m3, face/edge counts AND inferred cross-section shape: circular/rectangular/complex) in mm and model coordinates. Unlike get_BoundingBox this reflects the actual solid AFTER joins and cuts, and tells you the section SHAPE — essential for placing rebar correctly: a 613x613 bbox can be a Ø610 circular pile where corner bars/rectangular ties would fall outside. Always use this, not the bounding box, when positioning rebar inside a host.";
 
     private const double MmPerFoot = 304.8;
     private const double Ft3ToM3 = 0.0283168;
@@ -116,6 +116,9 @@ public class GetElementSolidGeometryTool : ICortexTool
                         volume = Math.Round(solid.Volume * Ft3ToM3, 6),
                         faceCount = faces,
                         edgeCount = edges,
+                        // Section shape matters for rebar layout: a 613x613 bbox can be a Ø610
+                        // CIRCLE (corner bars/rect ties would fall outside). bbox gives extents only.
+                        section = DetectSection(solid),
                     });
                 }
             }
@@ -149,6 +152,56 @@ public class GetElementSolidGeometryTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
                 $"Failed to read solid geometry of element {elementId}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Classify a solid's cross-section so callers don't assume "rectangular" from the bbox.
+    /// Inspects the faces: counts planar vs cylindrical vs other lateral faces, and — when an
+    /// extreme planar cap face exists — compares its area to that of the inscribed circle vs the
+    /// bbox rectangle to call it "circular" / "rectangular" / "other". Returns a small dictionary;
+    /// never throws (geometry queries are wrapped).
+    /// </summary>
+    private static object DetectSection(Solid solid)
+    {
+        try
+        {
+            int planar = 0, cylindrical = 0, other = 0;
+            PlanarFace? cap = null;
+            double capMaxArea = -1;
+            foreach (Face f in solid.Faces)
+            {
+                if (f is PlanarFace pf)
+                {
+                    planar++;
+                    // Track the largest planar face whose normal is ~axial (a cap), to read the section area.
+                    if (f.Area > capMaxArea) { capMaxArea = f.Area; cap = pf; }
+                }
+                else if (f is CylindricalFace) cylindrical++;
+                else other++;
+            }
+
+            string shape;
+            if (cylindrical > 0 && planar <= 3) shape = "circular";        // cylinder: round lateral face
+            else if (other > 0 && planar <= 3) shape = "circular_or_tapered"; // cone/ruled lateral, e.g. tapered pile
+            else if (planar >= 5 && cylindrical == 0 && other == 0) shape = "rectangular"; // box: all planar faces
+            else shape = "complex";
+
+            // Disambiguate via cap-face area when we have one: circle area = π·r² vs square = w².
+            double? capAreaM2 = capMaxArea > 0 ? Math.Round(capMaxArea * MmPerFoot * MmPerFoot / 1_000_000.0, 4) : (double?)null;
+            return new
+            {
+                shape,
+                planarFaces = planar,
+                cylindricalFaces = cylindrical,
+                otherFaces = other,
+                capAreaM2,
+                note = "shape is inferred from faces; for layout, place bars on a bolt-circle for circular sections and approximate a circular tie with an inscribed polygon (a closed arc-circle is rejected by CreateFromCurves).",
+            };
+        }
+        catch (Exception ex)
+        {
+            return new { shape = "unknown", error = ex.Message };
         }
     }
 

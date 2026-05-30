@@ -25,7 +25,7 @@ public static class ElementTools
         return ToolResponseShaper.Shape("get_element_parameters", result, compact, summaryOnly: false).ToString();
     }
 
-    [McpServerTool(Name = "get_element_solid_geometry"), Description("Get an element's REAL solid geometry extents (bounding box, centroid, volume m3, face/edge counts) in mm and model coordinates. Unlike get_BoundingBox this reflects the actual solid AFTER joins and cuts — essential for placing rebar/elements inside hosts cut by columns or slabs, where the element bounding box is larger than the armable solid.")]
+    [McpServerTool(Name = "get_element_solid_geometry"), Description("Get an element's REAL solid geometry (bounding box, centroid, volume m3, face/edge counts AND inferred cross-section shape: circular/rectangular/complex) in mm and model coordinates. Unlike get_BoundingBox this reflects the actual solid AFTER joins and cuts, and reports the section SHAPE — essential for rebar: a 613x613 bbox can be a Ø610 circular pile where corner bars/rectangular ties fall outside. Always use this, not the bounding box, to position rebar inside a host.")]
     public static async Task<string> GetElementSolidGeometry(
         RevitConnectionManager revit,
         [Description("Revit element ID to inspect")] long elementId,
