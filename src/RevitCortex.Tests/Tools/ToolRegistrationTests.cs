@@ -108,8 +108,9 @@ public class ToolRegistrationTests
         //   (8 writes + 4 reads; splice + unify tools are 2025+ gated) (173 -> 185).
         // Rebar Module 6 added 10 tools: settings/rounding/numbering/bending details
         //   (6 writes + 4 reads; the 3 bending-detail tools are 2024+ gated) (185 -> 195).
-        Assert.True(AllToolTypes.Count >= 195,
-            $"Expected at least 195 tools but found {AllToolTypes.Count}. " +
+        // get_element_solid_geometry: real-solid extents for rebar/element placement (195 -> 196).
+        Assert.True(AllToolTypes.Count >= 196,
+            $"Expected at least 196 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 

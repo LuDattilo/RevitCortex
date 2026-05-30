@@ -192,6 +192,7 @@ Default: `compact: false` (payload pieno). Chiedere a Claude esplicitamente "in 
 | Strumento | Scopo |
 |-----------|-------|
 | `get_element_parameters` | Legge i parametri di uno o più elementi |
+| `get_element_solid_geometry` | Estensione del solido REALE di un elemento (bounding box, baricentro, volume, conteggio facce/spigoli) in mm e coordinate modello — riflette il solido dopo giunzioni/tagli, a differenza del bounding box dell'elemento |
 | `get_current_view_elements` | Lista tutti gli elementi nella vista attiva |
 | `filter_by_parameter_value` | Filtra elementi per valore di parametro |
 | `get_room_openings` | Porte e finestre di una stanza |
@@ -395,6 +396,8 @@ Categoria **`Rebar`** — 62 strumenti per l'armatura strutturale (barre, sistem
 ### Esempi pratici
 
 > I parametri vettoriali (`origin`, `xVec`, `yVec`, `majorDirection`, `normal`, `translation`) sono **oggetti JSON** `{"x":..,"y":..,"z":..}` con coordinate in millimetri (non array). Le curve (`curves`/`bendProfile`) sono **array JSON** di `{"type":"line"|"arc","start":{x,y,z},"end":{x,y,z},"mid"?:{x,y,z}}`; `loops` è un array di array di curve. Il `layout` è un **oggetto JSON** `{"rule":"single|fixed_number|maximum_spacing|number_with_spacing|minimum_clear_spacing", "number"?, "arrayLengthMm"?, "spacingMm"?, "barsOnNormalSide"?, "includeFirstBar"?, "includeLastBar"?}`. Far prima `get_project_info` per i livelli e individuare l'`hostId` (l'ID dell'elemento strutturale ospite).
+
+> **Posizionare le barre dentro il solido REALE dell'ospite.** Per calcolare le coordinate (specialmente staffe e copriferro) usare `get_element_solid_geometry` sull'`hostId`, **non** il bounding box dell'elemento. Travi e pilastri vengono tagliati/uniti da pilastri e solette: il solido armabile è più piccolo e spesso traslato rispetto al bounding box dell'elemento. Posando le barre dal bounding box si finisce in parte nel vuoto → Revit segnala *"Rebar is placed completely outside of its host"*. Inserire le coordinate dal `boundingBox`/`centroid` (in mm, coordinate modello) restituiti da `get_element_solid_geometry`, poi rientrare del copriferro (`commonCover` da `get_rebar_host_data`) più Ø staffa + metà Ø barra. Verificare ogni barra con `get_rebar_geometry` prima di scalare a N elementi.
 
 **(a) Discovery del setup di armatura**
 ```

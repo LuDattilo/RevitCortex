@@ -139,6 +139,30 @@ namespace RevitCortex.Tests.Server
         }
 
         [Fact]
+        public void GetElementSolidGeometry_ExposesElementIdAndMaxSolids()
+        {
+            var method = GetMethod(typeof(ElementTools), nameof(ElementTools.GetElementSolidGeometry));
+            var parameters = method.GetParameters();
+
+            Assert.Collection(
+                parameters.Select(p => p.Name),
+                name => Assert.Equal("revit", name),
+                name => Assert.Equal("elementId", name),
+                name => Assert.Equal("maxSolids", name),
+                name => Assert.Equal("ct", name));
+
+            Assert.Equal(typeof(RevitConnectionManager), GetParameter(method, "revit").ParameterType);
+            Assert.Equal(typeof(long), GetParameter(method, "elementId").ParameterType);
+            Assert.Equal(typeof(int), GetParameter(method, "maxSolids").ParameterType);
+            Assert.Equal(typeof(CancellationToken), GetParameter(method, "ct").ParameterType);
+
+            Assert.True(GetParameter(method, "maxSolids").HasDefaultValue);
+            Assert.Equal(20, GetParameter(method, "maxSolids").DefaultValue);
+
+            Assert.NotNull(method.GetCustomAttribute<DescriptionAttribute>());
+        }
+
+        [Fact]
         public void ResolveElementsByUniqueId_ExposesBatchUniqueIds()
         {
             var method = GetMethod(typeof(ElementTools), nameof(ElementTools.ResolveElementsByUniqueId));
