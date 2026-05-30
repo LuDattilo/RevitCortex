@@ -126,4 +126,18 @@ public static class StructuralSteelToolHelpers
         => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
             $"{feature} requires an installed structural steel connection provider (e.g. Autodesk Steel Connections, IDEA StatiCa) and steel-compatible content.",
             suggestion: "Use create_generic_steel_connection when provider availability is unknown, or check get_structural_steel_api_capabilities.");
+
+    /// <summary>
+    /// Best-effort detection of whether any structural connection provider is installed.
+    /// Reflected against Nice3point RevitAPI.dll 2023-2027: <c>StructuralConnectionsProviderRegistry</c>
+    /// exposes NO public query method and NO public constructor (only <c>Dispose()</c> / <c>IsValidObject</c>),
+    /// and <c>IStructuralConnectionsProvider</c> is a provider-implemented interface, not a queryable list.
+    /// There is therefore no public API to enumerate or test for installed providers, so this returns
+    /// <c>false</c>. The capabilities tool treats the flag as advisory only.
+    /// </summary>
+    public static bool AnyConnectionProviderInstalled()
+    {
+        // No queryable public registry exists; cannot affirm a provider is installed.
+        return false;
+    }
 }
