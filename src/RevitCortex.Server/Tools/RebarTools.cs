@@ -158,7 +158,7 @@ public static class RebarTools
         return (await revit.ExecuteAsync("create_free_form_rebar", p, ct)).ToString();
     }
 
-    [McpServerTool(Name = "set_rebar_layout"), Description("Set the distribution layout of a shape-driven rebar. layout is JSON {rule, number?, arrayLengthMm?, spacingMm?, ...}.")]
+    [McpServerTool(Name = "set_rebar_layout"), Description("Set the distribution layout of a shape-driven rebar. layout is JSON {rule, number?, arrayLengthMm?, spacingMm?, barsOnNormalSide?, includeFirstBar?, includeLastBar?}. Required numerics per rule: fixed_number -> number 1..1002 + arrayLengthMm>0; maximum_spacing / minimum_clear_spacing -> spacingMm>0 + arrayLengthMm>0; number_with_spacing -> number 1..1002 + spacingMm>0; single -> none. Invalid values return InvalidInput before the transaction.")]
     public static async Task<string> SetRebarLayout(
         RevitConnectionManager revit,
         [Description("Rebar element id")] long rebarId,

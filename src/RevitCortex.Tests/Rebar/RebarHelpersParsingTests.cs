@@ -38,6 +38,93 @@ public class RebarHelpersParsingTests
     }
 
     [Fact]
+    public void ParseLayoutSpec_FixedNumber_MissingArrayLength_ReturnsError()
+    {
+        // The exact failure cluster from the live test: fixed_number / maximum_spacing without
+        // arrayLengthMm used to reach Revit and throw an opaque "arrayLength isn't acceptable".
+        var json = JObject.Parse(@"{""rule"":""fixed_number"",""number"":4}");
+        RebarToolHelpers.ParseLayoutSpec(json, out var err);
+        Assert.NotNull(err);
+        Assert.Contains("arrayLengthMm", err);
+    }
+
+    [Fact]
+    public void ParseLayoutSpec_MaximumSpacing_MissingArrayLength_ReturnsError()
+    {
+        var json = JObject.Parse(@"{""rule"":""maximum_spacing"",""spacingMm"":300}");
+        RebarToolHelpers.ParseLayoutSpec(json, out var err);
+        Assert.NotNull(err);
+        Assert.Contains("arrayLengthMm", err);
+    }
+
+    [Fact]
+    public void ParseLayoutSpec_MaximumSpacing_MissingSpacing_ReturnsError()
+    {
+        var json = JObject.Parse(@"{""rule"":""maximum_spacing"",""arrayLengthMm"":3000}");
+        RebarToolHelpers.ParseLayoutSpec(json, out var err);
+        Assert.NotNull(err);
+        Assert.Contains("spacingMm", err);
+    }
+
+    [Fact]
+    public void ParseLayoutSpec_NumberWithSpacing_MissingSpacing_ReturnsError()
+    {
+        var json = JObject.Parse(@"{""rule"":""number_with_spacing"",""number"":5}");
+        RebarToolHelpers.ParseLayoutSpec(json, out var err);
+        Assert.NotNull(err);
+        Assert.Contains("spacingMm", err);
+    }
+
+    [Fact]
+    public void ParseLayoutSpec_Single_NoNumericInputs_NoError()
+    {
+        var json = JObject.Parse(@"{""rule"":""single""}");
+        var spec = RebarToolHelpers.ParseLayoutSpec(json, out var err);
+        Assert.Null(err);
+        Assert.Equal(RebarToolHelpers.LayoutRuleKind.Single, spec.Rule);
+    }
+
+    [Fact]
+    public void ParseLayoutSpec_MaximumSpacing_Valid_NoError()
+    {
+        var json = JObject.Parse(@"{""rule"":""maximum_spacing"",""spacingMm"":200,""arrayLengthMm"":3000}");
+        var spec = RebarToolHelpers.ParseLayoutSpec(json, out var err);
+        Assert.Null(err);
+        Assert.Equal(200, spec.SpacingMm, 6);
+        Assert.Equal(3000, spec.ArrayLengthMm, 6);
+    }
+
+    [Fact]
+    public void ParseLayoutSpec_FixedNumber_One_IsAccepted()
+    {
+        // Revit's documented range for numberOfBarPositions is 1..1002 — a single-position set is
+        // valid. The validator must NOT reject number==1 (an earlier >=2 guard was wrong).
+        var json = JObject.Parse(@"{""rule"":""fixed_number"",""number"":1,""arrayLengthMm"":1500}");
+        var spec = RebarToolHelpers.ParseLayoutSpec(json, out var err);
+        Assert.Null(err);
+        Assert.Equal(1, spec.Number);
+    }
+
+    [Fact]
+    public void ParseLayoutSpec_FixedNumber_Over1002_ReturnsError()
+    {
+        // Documented upper bound: numberOfBarPositions <= 1002.
+        var json = JObject.Parse(@"{""rule"":""fixed_number"",""number"":1003,""arrayLengthMm"":1500}");
+        RebarToolHelpers.ParseLayoutSpec(json, out var err);
+        Assert.NotNull(err);
+        Assert.Contains("1002", err);
+    }
+
+    [Fact]
+    public void ParseLayoutSpec_NumberWithSpacing_One_IsAccepted()
+    {
+        var json = JObject.Parse(@"{""rule"":""number_with_spacing"",""number"":1,""spacingMm"":200}");
+        var spec = RebarToolHelpers.ParseLayoutSpec(json, out var err);
+        Assert.Null(err);
+        Assert.Equal(1, spec.Number);
+    }
+
+    [Fact]
     public void ParseEnum_Valid_And_Invalid()
     {
         var ok = RebarToolHelpers.ParseEnum<RebarLayoutKindProbe>("FixedNumber", "rule", out var err1);

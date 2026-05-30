@@ -66,6 +66,44 @@ public static class RebarToolHelpers
         spec.BarsOnNormalSide = json["barsOnNormalSide"]?.Value<bool?>() ?? true;
         spec.IncludeFirstBar = json["includeFirstBar"]?.Value<bool?>() ?? true;
         spec.IncludeLastBar = json["includeLastBar"]?.Value<bool?>() ?? true;
+
+        // Validate the numeric inputs each rule requires, BEFORE any transaction, so a bad value
+        // surfaces as a clear InvalidInput instead of Revit's opaque ArgumentOutOfRangeException.
+        // Bounds are taken from the documented SetLayoutAs* exception contract (RebarShapeDrivenAccessor,
+        // revitapidocs 2024/2025):
+        //   - numberOfBarPositions: documented valid range is 1..1002 (NOT >= 2).
+        //   - spacing: documented to throw when "isn't bigger than 0.0" => require > 0.
+        //   - arrayLength: docs only say "isn't acceptable" with NO numeric threshold, so > 0 here is a
+        //     defensive guard, not a documented requirement (a 0/negative length is never meaningful).
+        switch (spec.Rule)
+        {
+            case LayoutRuleKind.FixedNumber:
+                if (spec.Number < 1 || spec.Number > 1002)
+                    error = "layout 'fixed_number' requires 'number' between 1 and 1002.";
+                else if (spec.ArrayLengthMm <= 0)
+                    error = "layout 'fixed_number' requires 'arrayLengthMm' > 0 (the total length the bars span, in mm).";
+                break;
+            case LayoutRuleKind.MaximumSpacing:
+                if (spec.SpacingMm <= 0)
+                    error = "layout 'maximum_spacing' requires 'spacingMm' > 0 (the maximum spacing, in mm).";
+                else if (spec.ArrayLengthMm <= 0)
+                    error = "layout 'maximum_spacing' requires 'arrayLengthMm' > 0 (the total length the bars span, in mm).";
+                break;
+            case LayoutRuleKind.MinimumClearSpacing:
+                if (spec.SpacingMm <= 0)
+                    error = "layout 'minimum_clear_spacing' requires 'spacingMm' > 0 (the minimum clear spacing, in mm).";
+                else if (spec.ArrayLengthMm <= 0)
+                    error = "layout 'minimum_clear_spacing' requires 'arrayLengthMm' > 0 (the total length the bars span, in mm).";
+                break;
+            case LayoutRuleKind.NumberWithSpacing:
+                if (spec.Number < 1 || spec.Number > 1002)
+                    error = "layout 'number_with_spacing' requires 'number' between 1 and 1002.";
+                else if (spec.SpacingMm <= 0)
+                    error = "layout 'number_with_spacing' requires 'spacingMm' > 0 (the spacing between bars, in mm).";
+                break;
+            case LayoutRuleKind.Single:
+                break; // no numeric inputs required
+        }
         return spec;
     }
 
