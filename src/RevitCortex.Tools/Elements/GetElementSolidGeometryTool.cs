@@ -25,7 +25,7 @@ public class GetElementSolidGeometryTool : ICortexTool
     public string Category => "Elements";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Get an element's REAL solid geometry (bounding box, centroid, volume m3, face/edge counts AND inferred cross-section shape: circular/rectangular/complex) in mm and model coordinates. Unlike get_BoundingBox this reflects the actual solid AFTER joins and cuts, and tells you the section SHAPE — essential for placing rebar correctly: a 613x613 bbox can be a Ø610 circular pile where corner bars/rectangular ties would fall outside. Always use this, not the bounding box, when positioning rebar inside a host.";
+    public string Description => "Get an element's REAL solid geometry (bounding box, centroid, volume m3, face/edge counts AND inferred cross-section shape) in mm and model coordinates. Unlike get_BoundingBox this reflects the actual solid AFTER joins and cuts, and tells you the section SHAPE: 'rectangular', 'non_rectangular_polygonal' (T/L/I/U/channel — bbox lies, the real outline is concave), 'circular', or 'circular_or_tapered'. Reports capVertexCount and fillRatio so you can tell a box (4 verts, fill≈1.0) from a T/L (more verts and/or low fill). Essential for placing rebar correctly: a 613x613 bbox can be a Ø610 circular pile, and a T-beam's bbox includes empty space above the web — corner bars/rectangular ties placed from the bbox fall outside the concrete. Always use this, not the bounding box, when positioning rebar inside a host.";
 
     private const double MmPerFoot = 304.8;
     private const double Ft3ToM3 = 0.0283168;
@@ -157,9 +157,13 @@ public class GetElementSolidGeometryTool : ICortexTool
 
     /// <summary>
     /// Classify a solid's cross-section so callers don't assume "rectangular" from the bbox.
-    /// Inspects the faces: counts planar vs cylindrical vs other lateral faces, and — when an
-    /// extreme planar cap face exists — compares its area to that of the inscribed circle vs the
-    /// bbox rectangle to call it "circular" / "rectangular" / "other". Returns a small dictionary;
+    ///
+    /// The cross-section CAP is the planar face of SMALLEST area (the two end caps of an extruded
+    /// member are the smallest planar faces; the long lateral faces are larger). We read the cap's
+    /// OUTER loop: a rectangular box cap has exactly 4 vertices and fills its own 2D bbox
+    /// (fillRatio≈1.0). A T/L/I/U/channel profile is still all-planar but its cap has MORE than 4
+    /// vertices and/or fills only part of its 2D bbox — so it must NOT be called "rectangular".
+    /// A round/tapered pile has cylindrical/other lateral faces. Returns a small dictionary;
     /// never throws (geometry queries are wrapped).
     /// </summary>
     private static object DetectSection(Solid solid)
@@ -168,41 +172,101 @@ public class GetElementSolidGeometryTool : ICortexTool
         {
             int planar = 0, cylindrical = 0, other = 0;
             PlanarFace? cap = null;
-            double capMaxArea = -1;
+            double capMinArea = double.MaxValue;
             foreach (Face f in solid.Faces)
             {
                 if (f is PlanarFace pf)
                 {
                     planar++;
-                    // Track the largest planar face whose normal is ~axial (a cap), to read the section area.
-                    if (f.Area > capMaxArea) { capMaxArea = f.Area; cap = pf; }
+                    // The cross-section is the SMALLEST planar face (end cap), not the largest
+                    // (a long lateral face). Reading the largest face was the bug that made a
+                    // T-beam's flank look "rectangular".
+                    if (f.Area > 0 && f.Area < capMinArea) { capMinArea = f.Area; cap = pf; }
                 }
                 else if (f is CylindricalFace) cylindrical++;
                 else other++;
             }
 
-            string shape;
-            if (cylindrical > 0 && planar <= 3) shape = "circular";        // cylinder: round lateral face
-            else if (other > 0 && planar <= 3) shape = "circular_or_tapered"; // cone/ruled lateral, e.g. tapered pile
-            else if (planar >= 5 && cylindrical == 0 && other == 0) shape = "rectangular"; // box: all planar faces
-            else shape = "complex";
+            int capVertexCount = cap != null ? CountOuterLoopVertices(cap) : 0;
+            double? fillRatio = cap != null ? CapFillRatio(cap) : (double?)null;
+            string shape = ClassifyShape(planar, cylindrical, other, capVertexCount, fillRatio);
 
-            // Disambiguate via cap-face area when we have one: circle area = π·r² vs square = w².
-            double? capAreaM2 = capMaxArea > 0 ? Math.Round(capMaxArea * MmPerFoot * MmPerFoot / 1_000_000.0, 4) : (double?)null;
-            return new
-            {
-                shape,
-                planarFaces = planar,
-                cylindricalFaces = cylindrical,
-                otherFaces = other,
-                capAreaM2,
-                note = "shape is inferred from faces; for layout, place bars on a bolt-circle for circular sections and approximate a circular tie with an inscribed polygon (a closed arc-circle is rejected by CreateFromCurves).",
-            };
+            return SectionResult(shape, planar, cylindrical, other, CapAreaM2(capMinArea), capVertexCount, fillRatio);
         }
         catch (Exception ex)
         {
             return new { shape = "unknown", error = ex.Message };
         }
+    }
+
+    /// <summary>
+    /// Pure cross-section classifier (no Revit types, so it is unit-testable without a Revit host).
+    /// Decides the shape label from face counts and the cap's outer-loop vertex count + fill ratio.
+    /// A curved lateral face wins (round/tapered pile). Otherwise a 4-vertex cap that fills its 2D
+    /// bbox is a box; a cap with more vertices and/or a low fill ratio is a T/L/I/U/channel.
+    /// </summary>
+    public static string ClassifyShape(int planar, int cylindrical, int other, int capVertexCount, double? fillRatio)
+    {
+        if (cylindrical > 0 && planar <= 3) return "circular";
+        if (other > 0 && planar <= 3) return "circular_or_tapered";
+        if (capVertexCount == 4 && (fillRatio == null || fillRatio.Value >= 0.95)) return "rectangular";
+        if (capVertexCount >= 4 && cylindrical == 0 && other == 0) return "non_rectangular_polygonal";
+        if (capVertexCount > 0) return "non_rectangular_polygonal";
+        return "complex";
+    }
+
+    private static object SectionResult(string shape, int planar, int cylindrical, int other,
+        double? capAreaM2, int? capVertexCount, double? fillRatio) => new
+        {
+            shape,
+            planarFaces = planar,
+            cylindricalFaces = cylindrical,
+            otherFaces = other,
+            capAreaM2,
+            capVertexCount,
+            fillRatio,
+            note = "shape from the smallest planar face (the cross-section cap). 'rectangular' = 4-vertex cap filling its bbox; 'non_rectangular_polygonal' = T/L/I/U/channel — bars/ties must follow the real outline (get the cap vertex loop), NOT the bbox; 'circular'/'circular_or_tapered' = place bars on a bolt-circle and approximate ties with an inscribed polygon.",
+        };
+
+    private static double? CapAreaM2(double areaFt2) =>
+        areaFt2 > 0 && areaFt2 < double.MaxValue
+            ? Math.Round(areaFt2 * MmPerFoot * MmPerFoot / 1_000_000.0, 4)
+            : (double?)null;
+
+    /// <summary>Count vertices on a planar face's longest (outer) edge loop.</summary>
+    private static int CountOuterLoopVertices(PlanarFace cap)
+    {
+        try
+        {
+            var loops = cap.EdgeLoops;
+            int best = 0;
+            for (int i = 0; i < loops.Size; i++)
+            {
+                int n = 0;
+                foreach (Edge _ in loops.get_Item(i)) n++;
+                if (n > best) best = n;   // outer loop has the most edges; holes are smaller
+            }
+            return best;
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>
+    /// Ratio of the cap's true area to the area of its 2D bounding rectangle (in the face's UV
+    /// frame). ≈1.0 for a filled rectangle; markedly less for an L/T/U whose outline is concave.
+    /// </summary>
+    private static double? CapFillRatio(PlanarFace cap)
+    {
+        try
+        {
+            var bb = cap.GetBoundingBox();   // UV bbox of the face's parametric domain
+            double du = bb.Max.U - bb.Min.U;
+            double dv = bb.Max.V - bb.Min.V;
+            double rect = du * dv;
+            if (rect <= 1e-9) return null;
+            return Math.Round(cap.Area / rect, 3);
+        }
+        catch { return null; }
     }
 
     /// <summary>
