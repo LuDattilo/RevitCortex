@@ -278,4 +278,111 @@ public static class RebarTools
         var p = new JObject { ["rebarId"] = rebarId, ["splitAtPosition"] = splitAtPosition };
         return (await revit.ExecuteAsync("split_rebar", p, ct)).ToString();
     }
+
+    // ── Module 3: area / path reinforcement ──────────────────────────────────
+    [McpServerTool(Name = "create_area_reinforcement"), Description("Create an area reinforcement system on a host (wall/floor/foundation). majorDirection is JSON {x,y,z}; optional curves is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm for an explicit boundary.")]
+    public static async Task<string> CreateAreaReinforcement(
+        RevitConnectionManager revit,
+        [Description("Host element id")] long hostId,
+        [Description("Major bar direction JSON {x,y,z}")] string majorDirection,
+        [Description("Boundary curves JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm (omit to cover the host boundary)")] string? curves = null,
+        [Description("Rebar bar type id")] long? barTypeId = null,
+        [Description("Rebar bar type name (used if barTypeId omitted)")] string? barTypeName = null,
+        [Description("Area reinforcement type id (default type used if omitted)")] long? areaTypeId = null,
+        [Description("Rebar hook type id (no hook if omitted)")] long? hookTypeId = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["hostId"] = hostId, ["majorDirection"] = JObject.Parse(majorDirection) };
+        if (curves != null) p["curves"] = JArray.Parse(curves);
+        if (barTypeId != null) p["barTypeId"] = barTypeId;
+        if (barTypeName != null) p["barTypeName"] = barTypeName;
+        if (areaTypeId != null) p["areaTypeId"] = areaTypeId;
+        if (hookTypeId != null) p["hookTypeId"] = hookTypeId;
+        return (await revit.ExecuteAsync("create_area_reinforcement", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "create_path_reinforcement"), Description("Create a path reinforcement system on a host. curves is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm (required). Optional flip, pathTypeId, startHookId, endHookId.")]
+    public static async Task<string> CreatePathReinforcement(
+        RevitConnectionManager revit,
+        [Description("Host element id")] long hostId,
+        [Description("Path curves JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm")] string curves,
+        [Description("Flip the reinforcement side. Default false")] bool? flip = null,
+        [Description("Rebar bar type id")] long? barTypeId = null,
+        [Description("Rebar bar type name (used if barTypeId omitted)")] string? barTypeName = null,
+        [Description("Path reinforcement type id (default type used if omitted)")] long? pathTypeId = null,
+        [Description("Start hook type id")] long? startHookId = null,
+        [Description("End hook type id")] long? endHookId = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["hostId"] = hostId, ["curves"] = JArray.Parse(curves) };
+        if (flip != null) p["flip"] = flip;
+        if (barTypeId != null) p["barTypeId"] = barTypeId;
+        if (barTypeName != null) p["barTypeName"] = barTypeName;
+        if (pathTypeId != null) p["pathTypeId"] = pathTypeId;
+        if (startHookId != null) p["startHookId"] = startHookId;
+        if (endHookId != null) p["endHookId"] = endHookId;
+        return (await revit.ExecuteAsync("create_path_reinforcement", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_area_reinforcement_layers"), Description("Activate or deactivate a layer of an area reinforcement system. Provide areaReinforcementId, layer (top_major|top_minor|bottom_major|bottom_minor) and active.")]
+    public static async Task<string> SetAreaReinforcementLayers(
+        RevitConnectionManager revit,
+        [Description("Area reinforcement element id")] long areaReinforcementId,
+        [Description("Layer: top_major|top_minor|bottom_major|bottom_minor")] string layer,
+        [Description("Activate (true) or deactivate (false) the layer")] bool active,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["areaReinforcementId"] = areaReinforcementId, ["layer"] = layer, ["active"] = active };
+        return (await revit.ExecuteAsync("set_area_reinforcement_layers", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_path_reinforcement_options"), Description("Set options on a path reinforcement system. Provide pathReinforcementId and any of additionalOffsetMm, primaryBarOrientation (TopOrExterior|BottomOrInterior|NearSide|FarSide), alternatingBarOrientation. Unsupported keys are reported in warnings.")]
+    public static async Task<string> SetPathReinforcementOptions(
+        RevitConnectionManager revit,
+        [Description("Path reinforcement element id")] long pathReinforcementId,
+        [Description("Additional offset in mm")] double? additionalOffsetMm = null,
+        [Description("Primary bar orientation: TopOrExterior|BottomOrInterior|NearSide|FarSide")] string? primaryBarOrientation = null,
+        [Description("Alternating bar orientation: TopOrExterior|BottomOrInterior|NearSide|FarSide")] string? alternatingBarOrientation = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["pathReinforcementId"] = pathReinforcementId };
+        if (additionalOffsetMm != null) p["additionalOffsetMm"] = additionalOffsetMm;
+        if (primaryBarOrientation != null) p["primaryBarOrientation"] = primaryBarOrientation;
+        if (alternatingBarOrientation != null) p["alternatingBarOrientation"] = alternatingBarOrientation;
+        return (await revit.ExecuteAsync("set_path_reinforcement_options", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "convert_rebar_system_to_rebars"), Description("Convert an area or path reinforcement system into standalone rebars (destructive). Provide systemId. Returns the resulting standalone rebar ids.")]
+    public static async Task<string> ConvertRebarSystemToRebars(
+        RevitConnectionManager revit,
+        [Description("Area or path reinforcement element id")] long systemId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["systemId"] = systemId };
+        return (await revit.ExecuteAsync("convert_rebar_system_to_rebars", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "remove_rebar_system"), Description("Remove an area or path reinforcement system (destructive). Provide systemId.")]
+    public static async Task<string> RemoveRebarSystem(
+        RevitConnectionManager revit,
+        [Description("Area or path reinforcement element id")] long systemId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["systemId"] = systemId };
+        return (await revit.ExecuteAsync("remove_rebar_system", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_area_reinforcement_data"), Description("Read an area reinforcement system: major direction (mm vector), type id/name, host id, member rebar ids, boundary curve ids, member count.")]
+    public static async Task<string> GetAreaReinforcementData(
+        RevitConnectionManager revit,
+        [Description("Area reinforcement element id")] long areaReinforcementId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_area_reinforcement_data", new JObject { ["areaReinforcementId"] = areaReinforcementId }, ct)).ToString();
+
+    [McpServerTool(Name = "get_path_reinforcement_data"), Description("Read a path reinforcement system: type id/name, host id, member rebar ids, curve element ids, additional offset (mm), primary bar orientation.")]
+    public static async Task<string> GetPathReinforcementData(
+        RevitConnectionManager revit,
+        [Description("Path reinforcement element id")] long pathReinforcementId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_path_reinforcement_data", new JObject { ["pathReinforcementId"] = pathReinforcementId }, ct)).ToString();
 }
