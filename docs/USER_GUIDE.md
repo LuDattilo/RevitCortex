@@ -13,10 +13,11 @@
 3. [Efficienza dei token](#efficienza-dei-token)
 4. [Discipline di progetto e categorie Revit](#discipline-di-progetto-e-categorie-revit)
 5. [Strumenti principali](#strumenti-principali)
-6. [Workflow consigliati](#workflow-consigliati)
-7. [Impostazioni di progetto avanzate](#impostazioni-di-progetto-avanzate)
-8. [Esecuzione di codice personalizzato](#esecuzione-di-codice-personalizzato)
-9. [Risoluzione dei problemi comuni](#risoluzione-dei-problemi-comuni)
+6. [Rebar / Reinforcement](#rebar--reinforcement)
+7. [Workflow consigliati](#workflow-consigliati)
+8. [Impostazioni di progetto avanzate](#impostazioni-di-progetto-avanzate)
+9. [Esecuzione di codice personalizzato](#esecuzione-di-codice-personalizzato)
+10. [Risoluzione dei problemi comuni](#risoluzione-dei-problemi-comuni)
 
 ---
 
@@ -292,6 +293,182 @@ Comunica via HTTP POST su `localhost:27016` (4 endpoint: `/pbi-select`, `/pbi-co
 - Il binding documento→dataset è salvato in `~/.revitcortex/powerbi-live.json` (chiave stabile: UniqueId o SHA256 del path)
 - I dataset push sono ottimizzati per Power BI Service (browser); su Power BI Desktop limitare a qualche centinaia di righe con `categoryFilter` o `maxElements`
 - `AllowExternalWrites` deve essere `true` in `powerbi-live.json` (o `false` ma `readOnlyMode=false` nelle impostazioni generali)
+
+---
+
+## Rebar / Reinforcement
+
+Categoria **`Rebar`** — 62 strumenti per l'armatura strutturale (barre, sistemi area/percorso, rete elettrosaldata, accoppiatori, sovrapposizioni, impostazioni). Coprono Revit 2023→2027. Tutti gli input dimensionali sono in **millimetri** e gli angoli in **gradi**; ID, codici `OST_*` e nomi enum sono **indipendenti dalla lingua** (non usare nomi di parametro localizzati). Prima di posare qualsiasi armatura, verificare sempre due cose: chiamare `get_rebar_host_data` sull'elemento ospite e controllare `isValidHost: true` (l'armatura può essere posata **solo in ospiti in calcestruzzo strutturale** — travi, pilastri, muri, pavimenti, fondazioni), e chiamare `get_rebar_api_capabilities` per sapere quali strumenti la versione di Revit in esecuzione supporta (alcuni sono gated per versione, vedi sotto). Gli strumenti di scrittura mostrano un dialog di conferma nativo: se l'utente annulla, restituiscono `CortexErrorCode.Cancelled`.
+
+### Discovery (lettura)
+
+| Strumento | Scopo |
+|-----------|-------|
+| `list_rebar_bar_types` | Tipi di barra disponibili nel modello |
+| `list_rebar_hook_types` | Tipi di uncino |
+| `list_rebar_shapes` | Forme barra (Rebar Shape) |
+| `list_rebar_cover_types` | Tipi di copriferro |
+| `list_rebar_splice_types` | Tipi di sovrapposizione/giunzione |
+| `list_rebar_fabric_types` | Tipi di rete elettrosaldata (fabric) |
+| `get_rebar_host_data` | Valida l'ospite (`isValidHost`) e ne legge i dati di armatura |
+| `get_rebar_element_data` | Dati di una singola barra / set |
+| `get_rebar_geometry` | Geometria delle barre (con/senza uncini, raggio di piega) |
+| `get_rebar_constraints` | Vincoli correnti di una barra |
+| `get_reinforcement_settings` | Impostazioni globali di armatura del documento |
+| `get_rebar_api_capabilities` | Quali funzioni l'API supporta sulla versione Revit attiva |
+
+### Barre (scrittura)
+
+| Strumento | Scopo |
+|-----------|-------|
+| `create_rebar_from_shape` | Crea barre da una forma + sistema di assi (origin/xVec/yVec) |
+| `create_rebar_from_curves` | Crea barre da curve esplicite |
+| `create_free_form_rebar` | Crea armatura free-form da loop |
+| `set_rebar_layout` | Imposta il layout del set (Single, FixedNumber, MaximumSpacing, ...) |
+| `set_rebar_shape` | Cambia la forma della barra |
+| `set_rebar_hooks` | Imposta uncino iniziale/finale |
+| `set_rebar_terminations` | Imposta le terminazioni di estremità *(Revit 2026+)* |
+| `set_rebar_host` | Sposta la barra su un nuovo ospite |
+| `set_rebar_visibility` | Visibilità della barra in una vista |
+| `move_rebar_in_set` | Trasla una singola barra all'interno del set |
+| `include_exclude_rebar_bars` | Includi/escludi singole barre del set in una vista |
+| `split_rebar` | Divide un set a una posizione |
+
+### Sistemi Area / Percorso (scrittura + lettura)
+
+| Strumento | Scopo |
+|-----------|-------|
+| `create_area_reinforcement` | Armatura ad area su un ospite (richiede `majorDirection`) |
+| `create_path_reinforcement` | Armatura a percorso lungo curve |
+| `set_area_reinforcement_layers` | Attiva/disattiva i layer dell'armatura ad area |
+| `set_path_reinforcement_options` | Opzioni dell'armatura a percorso (offset, orientamento barre) |
+| `convert_rebar_system_to_rebars` | Converte un sistema in barre singole |
+| `remove_rebar_system` | Rimuove un sistema area/percorso |
+| `get_area_reinforcement_data` | Dati di un'armatura ad area |
+| `get_path_reinforcement_data` | Dati di un'armatura a percorso |
+
+### Rete elettrosaldata / Fabric (scrittura + lettura)
+
+| Strumento | Scopo |
+|-----------|-------|
+| `create_fabric_area` | Crea un'area di rete elettrosaldata sull'ospite |
+| `create_fabric_sheet` | Crea un foglio di rete |
+| `place_fabric_sheet` | Posiziona un foglio di rete su un ospite |
+| `set_fabric_sheet_bend_profile` | Imposta il profilo di piega del foglio |
+| `remove_fabric_reinforcement_system` | Rimuove un sistema di rete |
+| `get_fabric_area_data` | Dati di un'area di rete |
+| `get_fabric_sheet_data` | Dati di un foglio di rete |
+| `get_fabric_wire_data` | Dati dei fili di un foglio (per direzione) |
+
+### Avanzati: accoppiatori, vincoli, sovrapposizioni (scrittura + lettura)
+
+| Strumento | Scopo |
+|-----------|-------|
+| `create_rebar_coupler` | Crea un accoppiatore tra estremità barra |
+| `set_rebar_coupler_visibility` | Visibilità dell'accoppiatore in una vista |
+| `manage_rebar_constraints` | Gestisce i vincoli di una barra (handle/candidate) |
+| `propagate_rebar` | Propaga l'armatura ad altri ospiti — **vedi Limitazioni note** |
+| `unify_rebars` | Unifica più barre in un set *(Revit 2025+)* |
+| `transfer_rebar_annotations` | Ricrea le annotazioni dell'armatura tra viste (best-effort) |
+| `get_rebar_coupler_data` | Dati di un accoppiatore |
+| `get_rebar_constraint_candidates` | Candidati di vincolo per un handle |
+| `splice_rebar` | Crea una sovrapposizione *(Revit 2025+)* |
+| `remove_rebar_splice` | Rimuove una sovrapposizione *(Revit 2025+)* |
+| `get_rebar_splice_data` | Dati di una sovrapposizione *(Revit 2025+)* |
+| `get_rebar_splice_candidates` | Candidati di sovrapposizione *(Revit 2025+)* |
+
+### Impostazioni, numerazione, dettagli di piega (scrittura + lettura)
+
+| Strumento | Scopo |
+|-----------|-------|
+| `set_reinforcement_settings` | Imposta le opzioni globali di armatura del documento |
+| `manage_rebar_rounding` | Arrotondamento lunghezza barre (vedi Limitazioni note) |
+| `manage_fabric_rounding` | Arrotondamento lunghezza rete (vedi Limitazioni note) |
+| `manage_rebar_numbering` | Numerazione barre — solo `set_number` (vedi Limitazioni note) |
+| `create_rebar_bending_detail` | Crea un dettaglio di piega in una vista *(Revit 2024+)* |
+| `modify_rebar_bending_detail` | Modifica un dettaglio di piega *(Revit 2024+)* |
+| `get_rebar_rounding` | Regole di arrotondamento barre correnti |
+| `get_fabric_rounding` | Regole di arrotondamento rete correnti |
+| `get_rebar_numbering` | Numeri/marche di numerazione correnti |
+| `get_rebar_bending_detail_data` | Dati di un dettaglio di piega *(Revit 2024+)* |
+
+### Esempi pratici
+
+> I parametri vettoriali (`origin`, `xVec`, `yVec`, `majorDirection`, `normal`, `translation`) sono **oggetti JSON** `{"x":..,"y":..,"z":..}` con coordinate in millimetri (non array). Le curve (`curves`/`bendProfile`) sono **array JSON** di `{"type":"line"|"arc","start":{x,y,z},"end":{x,y,z},"mid"?:{x,y,z}}`; `loops` è un array di array di curve. Il `layout` è un **oggetto JSON** `{"rule":"single|fixed_number|maximum_spacing|number_with_spacing|minimum_clear_spacing", "number"?, "arrayLengthMm"?, "spacingMm"?, "barsOnNormalSide"?, "includeFirstBar"?, "includeLastBar"?}`. Far prima `get_project_info` per i livelli e individuare l'`hostId` (l'ID dell'elemento strutturale ospite).
+
+**(a) Discovery del setup di armatura**
+```
+"Elenca i tipi di barra disponibili"
+→ list_rebar_bar_types()
+
+"Elenca le forme di armatura disponibili"
+→ list_rebar_shapes()
+
+"Verifica se la trave con id 998877 può ospitare armatura"
+→ get_rebar_host_data con hostId: 998877
+   (controllare isValidHost: true nella risposta; se false, l'elemento
+    non è in calcestruzzo strutturale → marcarlo strutturale o assegnare
+    un materiale calcestruzzo prima di procedere)
+
+"Quali funzioni rebar supporta questa versione di Revit?"
+→ get_rebar_api_capabilities()
+```
+
+**(b) Posa di una barra da forma (shape-driven)**
+```
+"Crea barre nella trave 998877 usando la forma 1234 e il tipo barra 5678,
+ con origine (0,0,0), asse X (1,0,0), asse Y (0,1,0), spaziatura max 200 mm"
+→ create_rebar_from_shape con
+   hostId: 998877,
+   shapeId: 1234,
+   barTypeId: 5678,
+   origin: "{\"x\":0,\"y\":0,\"z\":0}",
+   xVec: "{\"x\":1,\"y\":0,\"z\":0}",
+   yVec: "{\"x\":0,\"y\":1,\"z\":0}",
+   layout: "{\"rule\":\"maximum_spacing\",\"spacingMm\":200,\"arrayLengthMm\":3000}"
+```
+(in alternativa a `shapeId`/`barTypeId` si possono usare `shapeName`/`barTypeName`)
+
+**(c) Armatura ad area su un pavimento/muro**
+```
+"Crea un'armatura ad area sul pavimento 445566 con direzione principale
+ (1,0,0) e tipo barra 5678"
+→ create_area_reinforcement con
+   hostId: 445566,
+   majorDirection: "{\"x\":1,\"y\":0,\"z\":0}",
+   barTypeId: 5678
+```
+(opzionali: `curves`, `areaTypeId`, `hookTypeId`; se l'ospite non è valido la chiamata viene rifiutata)
+
+**(d) Ispezione di una barra creata**
+```
+"Mostrami i dati della barra 778899"
+→ get_rebar_element_data con rebarId: 778899
+
+"Dammi la geometria della barra 778899 senza uncini"
+→ get_rebar_geometry con rebarId: 778899, suppressHooks: true
+```
+
+### Funzioni gated per versione
+
+Chiamare sempre `get_rebar_api_capabilities` per confermare la versione di Revit attiva. Su target più vecchi questi strumenti restituiscono un **errore strutturato che indica la versione minima** richiesta:
+
+| Funzione | Versione minima | Strumenti |
+|----------|-----------------|-----------|
+| Sovrapposizioni (splice) | **Revit 2025+** | `splice_rebar`, `remove_rebar_splice`, `get_rebar_splice_data`, `get_rebar_splice_candidates` |
+| Unificazione barre | **Revit 2025+** | `unify_rebars` |
+| Terminazioni di estremità | **Revit 2026+** | `set_rebar_terminations` |
+| Dettagli di piega | **Revit 2024+** | `create_rebar_bending_detail`, `modify_rebar_bending_detail`, `get_rebar_bending_detail_data` |
+
+### Limitazioni note
+
+Queste sono limitazioni reali dell'API Revit emerse in fase di implementazione — non sono difetti aggirabili lato RevitCortex:
+
+- **`propagate_rebar`**: l'API Revit **non espone** la propagazione dell'armatura in nessuna versione. Lo strumento restituisce un errore strutturato "non supportato" che rimanda al comando interattivo **Propagate** di Revit. Da considerare una limitazione nota, non una funzione operativa.
+- **`manage_rebar_numbering`**: solo l'azione `set_number` funziona (scrive la marca/numero a schedario). Le azioni `renumber` e `remove_gaps` **non sono supportate** (nessuna API per lo schema di numerazione) e restituiscono un errore strutturato.
+- **`transfer_rebar_annotations`**: **ricrea** (best-effort) le annotazioni dell'armatura tra viste, **non** copia gli stili di tag esatti. Gli elementi saltati sono riportati in un array `warnings` nella risposta.
+- **`create_rebar_bending_detail` / `create_rebar_coupler`**: richiedono un tipo di dettaglio di piega / un tipo di famiglia accoppiatore **già presente nel modello**. Lo strumento ne risolve uno; se non ne esiste alcuno fallisce con un messaggio chiaro → caricare prima la famiglia/tipo appropriato.
+- **Arrotondamento (`manage_rebar_rounding` / `manage_fabric_rounding`)**: esiste solo l'arrotondamento della **lunghezza** (length-rounding); non c'è un'opzione di arrotondamento del volume. Un eventuale input `volumeRounding` viene riportato in `warnings`, non applicato.
 
 ---
 

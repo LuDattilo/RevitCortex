@@ -763,3 +763,50 @@ ColorByCategory =
 **Porta:** Il listener si apre sulla porta `27016` (una sopra il TCP bridge su `27015`). Se due istanze Revit sono aperte, la seconda salta il listener silenziosamente.
 
 **Documentazione tecnica completa:** `docs/powerbi-live-phase2c-handoff.md` — architettura, threading model, sicurezza, cronologia commit, sintesi per post WIP.
+
+---
+
+## Reinforcement (Rebar) Workflows
+
+> **Avviso operativo (vale per tutti i flussi seguenti):** passare SEMPRE ID espliciti e input in millimetri (angoli in gradi); vettori/curve come stringhe JSON di coordinate in mm. Non assumere MAI nomi di parametro di armatura localizzati — usare ID, codici `OST_*` e nomi enum, indipendenti dalla lingua. Un ospite **non strutturale o non in calcestruzzo viene rifiutato**: marcarlo come strutturale (o assegnargli un materiale calcestruzzo) prima di posare armatura.
+
+---
+
+### Rebar: Discovery del Setup
+
+**Sequenza:** `get_rebar_host_data` (verificare `isValidHost: true` sull'ospite scelto) -> `get_rebar_api_capabilities` (verificare le funzioni supportate dalla versione Revit attiva) -> `list_rebar_bar_types` / `list_rebar_shapes` / `list_rebar_hook_types` (scoprire gli ID di tipo barra, forma, uncino disponibili)
+**Parametri chiave:**
+- `get_rebar_host_data`: `hostId` dell'elemento strutturale; se `isValidHost: false` l'elemento non è in calcestruzzo strutturale -> marcarlo strutturale prima di continuare
+- `get_rebar_api_capabilities`: splice/`unify_rebars` richiedono Revit 2025+, `set_rebar_terminations` 2026+, i dettagli di piega 2024+
+- `list_rebar_*`: gli ID restituiti (barTypeId, shapeId, hookTypeId) servono come input per i tool di creazione
+**NON fare:** Non posare armatura senza prima aver verificato `isValidHost`. Non usare strumenti gated su una versione che non li supporta -- restituiscono un errore strutturato con la versione minima. Non indovinare gli ID di tipo/forma -- ricavarli dai tool `list_rebar_*`.
+
+**Fonte:** API Revit Structure (Autodesk.Revit.DB.Structure), gate ospite calcestruzzo strutturale + capability per versione
+
+---
+
+### Rebar: Posa di Barre
+
+**Sequenza:** discovery (vedi sopra) -> `create_rebar_from_shape` (oppure `create_rebar_from_curves` / `create_free_form_rebar`) -> (opzionale) `set_rebar_layout` / `set_rebar_hooks` -> `get_rebar_element_data` o `get_rebar_geometry` (verifica)
+**Parametri chiave:**
+- `create_rebar_from_shape`: `hostId!`, `origin!`, `xVec!`, `yVec!` (oggetti JSON `{"x":..,"y":..,"z":..}` in mm), più `shapeId`/`shapeName` e `barTypeId`/`barTypeName`, e `layout` (oggetto JSON con `rule` snake_case: `single` / `fixed_number` / `maximum_spacing` / `number_with_spacing` / `minimum_clear_spacing`, più `number`/`spacingMm`/`arrayLengthMm` secondo la regola)
+- `create_rebar_from_curves`: `hostId!`, `curves!`, `normal!`; `create_free_form_rebar`: `hostId!`, `loops!`
+- `set_rebar_layout`: cambia il layout del set dopo la creazione; `set_rebar_hooks`: `startHookId`/`endHookId`
+- Tutti i tool di scrittura mostrano un dialog di conferma -> se l'utente annulla, restituiscono `Cancelled`
+**NON fare:** Non passare coordinate in piedi/pollici -- l'input è in millimetri. Non chiamare `set_rebar_terminations` su Revit < 2026 (gated). Verificare con `get_rebar_geometry` solo se serve la geometria; per i metadati base basta `get_rebar_element_data`.
+
+**Fonte:** API Revit Structure — Rebar.CreateFromRebarShape / CreateFromCurves / CreateFreeForm
+
+---
+
+### Rebar: Sistemi Area / Percorso / Rete
+
+**Sequenza:** `get_rebar_host_data` (valida l'ospite) -> `create_area_reinforcement` / `create_path_reinforcement` / `create_fabric_area` -> (opzionale) `set_area_reinforcement_layers` / `set_path_reinforcement_options` -> `get_area_reinforcement_data` / `get_path_reinforcement_data` / `get_fabric_area_data` (verifica) -> (opzionale) `convert_rebar_system_to_rebars` per esplodere in barre singole
+**Parametri chiave:**
+- `create_area_reinforcement`: `hostId!`, `majorDirection!` (oggetto JSON `{"x":..,"y":..,"z":..}` in mm), `barTypeId`/`barTypeName`; opzionali `curves` (array JSON di `{type,start,end,mid?}`), `areaTypeId`, `hookTypeId`
+- `create_path_reinforcement`: `hostId!`, `curves!`, più `barTypeId`/`barTypeName`, `pathTypeId`, `startHookId`/`endHookId`, `flip`
+- `create_fabric_area`: `hostId!`, `majorDirection!`, `fabricSheetTypeId`/`fabricSheetTypeName`, `fabricAreaTypeId`
+- `convert_rebar_system_to_rebars` / `remove_rebar_system` / `remove_fabric_reinforcement_system` sono distruttivi (conferma -> `Cancelled` se annullato)
+**NON fare:** Non omettere `majorDirection` per area/fabric -- è obbligatorio. Non convertire un sistema in barre singole se serve mantenerlo come sistema parametrico (la conversione è distruttiva). Non assumere che `propagate_rebar` funzioni: l'API Revit non espone la propagazione -- il tool restituisce un errore "non supportato" che rimanda al comando interattivo Propagate di Revit.
+
+**Fonte:** API Revit Structure — AreaReinforcement / PathReinforcement / FabricArea + limitazione propagate documentata in implementazione
