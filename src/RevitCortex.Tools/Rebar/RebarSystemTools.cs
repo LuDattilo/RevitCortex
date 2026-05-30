@@ -21,7 +21,7 @@ public class CreateAreaReinforcementTool : ICortexTool
     public string Category => "Rebar";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Create an area reinforcement system on a host (wall/floor/foundation). Provide hostId, majorDirection{x,y,z}, barTypeId|barTypeName; optional curves[] (mm) for an explicit boundary, areaTypeId, hookTypeId.";
+    public string Description => "Create an area reinforcement system on a host (wall/floor/foundation). Provide hostId, majorDirection{x,y,z}, barTypeId|barTypeName; optional curves[] (mm) for an explicit boundary, areaTypeId, hookTypeId. memberCount/memberIds reflect the bars after a regeneration; if memberCountNote is present the count was still 0 — re-read with get_area_reinforcement_data.";
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
@@ -87,16 +87,24 @@ public class CreateAreaReinforcementTool : ICortexTool
                 ? AreaReinforcement.Create(doc, host!, curves, major, areaTypeId, barType.Id, hookId)
                 : AreaReinforcement.Create(doc, host!, major, areaTypeId, barType.Id, hookId);
             if (area == null) { tx.RollBack(); return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed, "Revit returned no area reinforcement"); }
+            // The in-system bars are materialized during regeneration; regen before reading their ids
+            // so memberCount/memberIds are truthful (otherwise Create reports a misleading 0 — the bars
+            // only appear after commit). Same pattern as create_fabric_area.
+            doc.Regenerate();
             var memberIds = area.GetRebarInSystemIds().Select(i => ToolHelpers.GetElementIdValue(i)).ToList();
             var id = ToolHelpers.GetElementIdValue(area);
             tx.Commit();
+            string? memberCountNote = memberIds.Count == 0
+                ? "Bar system members are still 0 after regeneration; they may finish materializing after commit. Re-read with get_area_reinforcement_data to get the final member count."
+                : null;
             return CortexResult<object>.Ok(new
             {
                 message = $"Created area reinforcement {id} with {memberIds.Count} bar system member(s)",
                 areaReinforcementId = id,
                 hostId = ToolHelpers.GetElementIdValue(host!),
                 memberCount = memberIds.Count,
-                memberIds
+                memberIds,
+                memberCountNote
             });
         }
         catch (Exception ex)
@@ -117,7 +125,7 @@ public class CreatePathReinforcementTool : ICortexTool
     public string Category => "Rebar";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Create a path reinforcement system on a host. Provide hostId, curves[] (mm, required), barTypeId|barTypeName; optional flip (bool), pathTypeId, startHookId, endHookId.";
+    public string Description => "Create a path reinforcement system on a host. Provide hostId, curves[] (mm, required), barTypeId|barTypeName; optional flip (bool), pathTypeId, startHookId, endHookId. memberCount/memberIds reflect the bars after a regeneration; if memberCountNote is present the count was still 0 — re-read with get_path_reinforcement_data.";
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
@@ -169,9 +177,16 @@ public class CreatePathReinforcementTool : ICortexTool
             //   bool flip, ElementId pathTypeId, ElementId barTypeId, ElementId startHookId, ElementId endHookId).
             PathReinforcement path = PathReinforcement.Create(doc, host!, curves, flip, pathTypeId, barType.Id, startHookId, endHookId);
             if (path == null) { tx.RollBack(); return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed, "Revit returned no path reinforcement"); }
+            // The in-system bars are materialized during regeneration; regen before reading their ids
+            // so memberCount/memberIds are truthful (otherwise Create reports a misleading 0 — the bars
+            // only appear after commit). Same pattern as create_fabric_area.
+            doc.Regenerate();
             var memberIds = path.GetRebarInSystemIds().Select(i => ToolHelpers.GetElementIdValue(i)).ToList();
             var id = ToolHelpers.GetElementIdValue(path);
             tx.Commit();
+            string? memberCountNote = memberIds.Count == 0
+                ? "Bar system members are still 0 after regeneration; they may finish materializing after commit. Re-read with get_path_reinforcement_data to get the final member count."
+                : null;
             return CortexResult<object>.Ok(new
             {
                 message = $"Created path reinforcement {id} with {memberIds.Count} bar system member(s)",
@@ -179,7 +194,8 @@ public class CreatePathReinforcementTool : ICortexTool
                 hostId = ToolHelpers.GetElementIdValue(host!),
                 flip,
                 memberCount = memberIds.Count,
-                memberIds
+                memberIds,
+                memberCountNote
             });
         }
         catch (Exception ex)
