@@ -385,4 +385,98 @@ public static class RebarTools
         [Description("Path reinforcement element id")] long pathReinforcementId,
         CancellationToken ct = default)
         => (await revit.ExecuteAsync("get_path_reinforcement_data", new JObject { ["pathReinforcementId"] = pathReinforcementId }, ct)).ToString();
+
+    // ── Module 4: fabric reinforcement ───────────────────────────────────────
+    [McpServerTool(Name = "create_fabric_area"), Description("Create a fabric area system on a host (wall/floor/foundation). majorDirection is JSON {x,y,z}; optional curves is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm forming a closed loop.")]
+    public static async Task<string> CreateFabricArea(
+        RevitConnectionManager revit,
+        [Description("Host element id")] long hostId,
+        [Description("Major direction JSON {x,y,z}")] string majorDirection,
+        [Description("Boundary curves JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm forming a closed loop (omit to cover the host boundary)")] string? curves = null,
+        [Description("Fabric sheet type id")] long? fabricSheetTypeId = null,
+        [Description("Fabric sheet type name (used if fabricSheetTypeId omitted)")] string? fabricSheetTypeName = null,
+        [Description("Fabric area type id (default type used if omitted)")] long? fabricAreaTypeId = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["hostId"] = hostId, ["majorDirection"] = JObject.Parse(majorDirection) };
+        if (curves != null) p["curves"] = JArray.Parse(curves);
+        if (fabricSheetTypeId != null) p["fabricSheetTypeId"] = fabricSheetTypeId;
+        if (fabricSheetTypeName != null) p["fabricSheetTypeName"] = fabricSheetTypeName;
+        if (fabricAreaTypeId != null) p["fabricAreaTypeId"] = fabricAreaTypeId;
+        return (await revit.ExecuteAsync("create_fabric_area", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "create_fabric_sheet"), Description("Create a single fabric sheet in a host. Provide hostId and fabricSheetTypeId or fabricSheetTypeName; optional bendProfile is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm forming a closed loop (makes the sheet bent).")]
+    public static async Task<string> CreateFabricSheet(
+        RevitConnectionManager revit,
+        [Description("Host element id")] long hostId,
+        [Description("Fabric sheet type id")] long? fabricSheetTypeId = null,
+        [Description("Fabric sheet type name (used if fabricSheetTypeId omitted)")] string? fabricSheetTypeName = null,
+        [Description("Bend profile JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm forming a closed loop (omit for a flat sheet)")] string? bendProfile = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["hostId"] = hostId };
+        if (fabricSheetTypeId != null) p["fabricSheetTypeId"] = fabricSheetTypeId;
+        if (fabricSheetTypeName != null) p["fabricSheetTypeName"] = fabricSheetTypeName;
+        if (bendProfile != null) p["bendProfile"] = JArray.Parse(bendProfile);
+        return (await revit.ExecuteAsync("create_fabric_sheet", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "place_fabric_sheet"), Description("Place an existing fabric sheet into a host. Provide fabricSheetId and hostId; optional transform is JSON {translation:{x,y,z}} in mm (default identity).")]
+    public static async Task<string> PlaceFabricSheet(
+        RevitConnectionManager revit,
+        [Description("Fabric sheet element id")] long fabricSheetId,
+        [Description("Host element id")] long hostId,
+        [Description("Transform JSON {translation:{x,y,z}} in mm (default identity)")] string? transform = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["fabricSheetId"] = fabricSheetId, ["hostId"] = hostId };
+        if (transform != null) p["transform"] = JObject.Parse(transform);
+        return (await revit.ExecuteAsync("place_fabric_sheet", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_fabric_sheet_bend_profile"), Description("Set the bend profile of a bent fabric sheet. Provide fabricSheetId and bendProfile (a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm forming a closed loop). Only valid when the sheet is bent.")]
+    public static async Task<string> SetFabricSheetBendProfile(
+        RevitConnectionManager revit,
+        [Description("Fabric sheet element id")] long fabricSheetId,
+        [Description("Bend profile JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm forming a closed loop")] string bendProfile,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["fabricSheetId"] = fabricSheetId, ["bendProfile"] = JArray.Parse(bendProfile) };
+        return (await revit.ExecuteAsync("set_fabric_sheet_bend_profile", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "remove_fabric_reinforcement_system"), Description("Remove a fabric area reinforcement system (destructive). Provide fabricAreaId.")]
+    public static async Task<string> RemoveFabricReinforcementSystem(
+        RevitConnectionManager revit,
+        [Description("Fabric area element id")] long fabricAreaId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("remove_fabric_reinforcement_system", new JObject { ["fabricAreaId"] = fabricAreaId }, ct)).ToString();
+
+    [McpServerTool(Name = "get_fabric_area_data"), Description("Read a fabric area system: type id/name, host id, sheet ids, sheet count, major direction (mm vector).")]
+    public static async Task<string> GetFabricAreaData(
+        RevitConnectionManager revit,
+        [Description("Fabric area element id")] long fabricAreaId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_fabric_area_data", new JObject { ["fabricAreaId"] = fabricAreaId }, ct)).ToString();
+
+    [McpServerTool(Name = "get_fabric_sheet_data"), Description("Read a fabric sheet: type id/name, isBent, fabricNumber, cut overall length and width (mm).")]
+    public static async Task<string> GetFabricSheetData(
+        RevitConnectionManager revit,
+        [Description("Fabric sheet element id")] long fabricSheetId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_fabric_sheet_data", new JObject { ["fabricSheetId"] = fabricSheetId }, ct)).ToString();
+
+    [McpServerTool(Name = "get_fabric_wire_data"), Description("Read the wire items of a fabric sheet in one direction. Provide fabricSheetId and direction (major|minor); optional maxWires (default 200). Returns per-wire diameter (mm), distance (mm), wire length (mm).")]
+    public static async Task<string> GetFabricWireData(
+        RevitConnectionManager revit,
+        [Description("Fabric sheet element id")] long fabricSheetId,
+        [Description("Wire direction: major|minor")] string direction,
+        [Description("Maximum wires to return. Default 200")] int? maxWires = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["fabricSheetId"] = fabricSheetId, ["direction"] = direction };
+        if (maxWires != null) p["maxWires"] = maxWires;
+        return (await revit.ExecuteAsync("get_fabric_wire_data", p, ct)).ToString();
+    }
 }

@@ -103,8 +103,9 @@ public class ToolRegistrationTests
         // Rebar Module 1 added 12 discovery tools (133 -> 145).
         // Rebar Module 2 added 12 tools: 3 creation + 9 mutators (145 -> 157).
         // Rebar Module 3 added 8 tools: 6 area/path writes + 2 reads (157 -> 165).
-        Assert.True(AllToolTypes.Count >= 165,
-            $"Expected at least 165 tools but found {AllToolTypes.Count}. " +
+        // Rebar Module 4 added 8 fabric tools: 5 writes + 3 reads (165 -> 173).
+        Assert.True(AllToolTypes.Count >= 173,
+            $"Expected at least 173 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 
