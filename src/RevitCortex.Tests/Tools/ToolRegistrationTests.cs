@@ -99,15 +99,23 @@ public class ToolRegistrationTests
     [Fact]
     public void ToolCount_MatchesExpected()
     {
-        // Update this number when adding new tools to catch accidental omissions
-        // 133 = BASE (pre-steel); +15 = Module 1 structural steel discovery tools;
-        // +8 = Module 2 structural steel connection creation & input mutation tools;
-        // +9 = Module 3 structural steel connection type & approval administration tools;
-        // +5 = Module 4 structural steel fabrication metadata tools (re-scoped from 13);
-        // +8 = Module 5 solid & instance-void cut tools (5 write + 3 read);
-        // +3 = Module 6 provider & validation reporting tools (3 read)
-        Assert.True(AllToolTypes.Count >= 181,
-            $"Expected at least 181 tools but found {AllToolTypes.Count}. " +
+        // Update this number when adding new tools to catch accidental omissions.
+        // === Rebar (merged from main) ===
+        // Rebar Module 1 added 12 discovery tools (133 -> 145).
+        // Rebar Module 2 added 12 tools: 3 creation + 9 mutators (145 -> 157).
+        // Rebar Module 3 added 8 tools: 6 area/path writes + 2 reads (157 -> 165).
+        // Rebar Module 4 added 8 fabric tools: 5 writes + 3 reads (165 -> 173).
+        // Rebar Module 5 added 12 tools: couplers/constraints/propagation/annotations/splices
+        //   (8 writes + 4 reads; splice + unify tools are 2025+ gated) (173 -> 185).
+        // Rebar Module 6 added 10 tools: settings/rounding/numbering/bending details
+        //   (6 writes + 4 reads; the 3 bending-detail tools are 2024+ gated) (185 -> 195).
+        // get_element_solid_geometry: real-solid extents for rebar/element placement (195 -> 196).
+        // === Structural Steel (this branch) ===
+        // Steel Module 1 discovery (+15 -> 211); Module 2 connections (+8 -> 219);
+        // Module 3 type/approval (+9 -> 228); Module 4 fabrication (+5, re-scoped from 13 -> 233);
+        // Module 5 solid & instance-void cuts (+8 -> 241); Module 6 provider/validation (+3 -> 244).
+        Assert.True(AllToolTypes.Count >= 244,
+            $"Expected at least 244 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 

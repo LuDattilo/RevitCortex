@@ -25,6 +25,22 @@ public static class ElementTools
         return ToolResponseShaper.Shape("get_element_parameters", result, compact, summaryOnly: false).ToString();
     }
 
+    [McpServerTool(Name = "get_element_solid_geometry"), Description("Get an element's REAL solid geometry (bounding box, centroid, volume m3, face/edge counts AND inferred cross-section shape: circular/rectangular/complex) in mm and model coordinates. Unlike get_BoundingBox this reflects the actual solid AFTER joins and cuts, and reports the section SHAPE — essential for rebar: a 613x613 bbox can be a Ø610 circular pile where corner bars/rectangular ties fall outside. Always use this, not the bounding box, to position rebar inside a host.")]
+    public static async Task<string> GetElementSolidGeometry(
+        RevitConnectionManager revit,
+        [Description("Revit element ID to inspect")] long elementId,
+        [Description("Max solids to detail individually. Default: 20")] int maxSolids = 20,
+        CancellationToken ct = default)
+    {
+        var p = new JObject
+        {
+            ["elementId"] = elementId,
+            ["maxSolids"] = maxSolids,
+        };
+        var result = await revit.ExecuteAsync("get_element_solid_geometry", p, ct);
+        return result.ToString();
+    }
+
     [McpServerTool(Name = "ai_element_filter"), Description("Query elements by category, element class, family symbol, bounding box, or level. Filters combine with AND (default) or OR, and the whole set can be inverted (NOT). Supports type and instance filtering. For parameter-VALUE filtering use filter_by_parameter_value.")]
     public static async Task<string> AIElementFilter(
         RevitConnectionManager revit,
