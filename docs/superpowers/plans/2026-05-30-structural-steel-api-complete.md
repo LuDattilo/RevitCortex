@@ -1270,11 +1270,20 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ## Task 8: Module 6 — Provider & extension reporting (3 read tools)
 
+> **API VERIFIED 2026-05-30 (reflection R25). The provider infra is NOT publicly queryable** — these
+> tools are honest "not available via public API" reporters, exactly as the contracts already allow:
+> - `StructuralConnectionsProviderRegistry`: only `Dispose()` + `IsValidObject` — NO public query method, NO public ctor. Cannot enumerate providers.
+> - `StructuralConnectionsProviderData`: only `Dispose()` + `IsValidObject` — opaque, provider-filled via callback, not readable by us.
+> - `IStructuralConnectionsProvider`: provider-implemented interface (`GetAvailableConnectionTypes`, `GetTypeInfo`, ...), not a queryable list.
+> - `ConnectionValidationInfo`: has a public `.ctor()` + `GetWarning(int)`, `ManyWarnings()`, `IsValidWarningIndex(int)` — BUT no public method produces a populated instance from a placed handler (Revit fills it internally during provider validation). `ConnectionValidationWarning`: props `Reason` (`ConnectionWarning` enum: Unknown/Alignment/Size/Shape/Connectivity), `Resolution` (`ConnectionResolution` enum), `GetParts()`.
+>
+> So all 3 tools return `Ok` with `{ available:false, note:"..." }` (or, for validation, the handler's `CodeCheckingStatus` + the empty `ManyWarnings()` of a fresh info object) — never throw, never fabricate. This mirrors `StructuralSteelToolHelpers.AnyConnectionProviderInstalled()` which already returns false for the same reason.
+
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelProviderTools.cs`
-- Modify: `StructuralSteelTools.cs` (+3 wrappers), `ToolRegistrationTests.cs` (`BASE+54` → `BASE+57`)
+- Modify: `StructuralSteelTools.cs` (+3 wrappers), `ToolRegistrationTests.cs` (178 → 181)
 
-All read-only. RevitCortex does NOT compile provider implementations from MCP input — these are discovery/reporting only. **Reflect `StructuralConnectionsProviderRegistry`/`IStructuralConnectionsProvider`/`ConnectionValidationInfo` first.**
+All read-only. RevitCortex does NOT compile provider implementations from MCP input — these are discovery/reporting only.
 
 - [ ] **Step 1: Create the file with all 3 tools.** Contracts:
   - **`get_structural_connection_provider_registry`** (read): enumerate registered providers via `StructuralConnectionsProviderRegistry` → ids/names/availability. If the registry can't be enumerated safely, return `{ count: 0, available: false, note: "..." }` (never throw).
@@ -1285,7 +1294,7 @@ All read-only. RevitCortex does NOT compile provider implementations from MCP in
 
 - [ ] **Step 2: Build R25 + R24 + R26.**
 - [ ] **Step 3: Add 3 wrappers. Build server.**
-- [ ] **Step 4: Bump threshold `BASE+54` → `BASE+57`; run. PASS.**
+- [ ] **Step 4: Bump threshold 178 → 181 (Module 6 adds 3); run. PASS.**
 - [ ] **Step 5: Commit**
 ```powershell
 git add src/RevitCortex.Tools/StructuralSteel/StructuralSteelProviderTools.cs src/RevitCortex.Server/Tools/StructuralSteelTools.cs src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs

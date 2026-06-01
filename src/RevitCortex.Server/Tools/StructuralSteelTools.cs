@@ -556,4 +556,28 @@ public static class StructuralSteelTools
         if (summaryOnly != null) p["summaryOnly"] = summaryOnly;
         return (await revit.ExecuteAsync("get_instance_void_cut_relationships", p, ct)).ToString();
     }
+
+    // --- Module 6: provider & extension reporting (3 read) ---
+
+    [McpServerTool(Name = "get_structural_connection_provider_registry"), Description("Report registered structural connection providers (Autodesk Steel Connections, IDEA StatiCa, etc.). The Revit API exposes no public query on the provider registry, so this reports availability=false with a note rather than fabricating a list.")]
+    public static async Task<string> GetStructuralConnectionProviderRegistry(RevitConnectionManager revit, CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_structural_connection_provider_registry", new JObject(), ct)).ToString();
+
+    [McpServerTool(Name = "get_structural_connection_provider_data"), Description("Report a structural connection provider's metadata/capabilities by id/key. StructuralConnectionsProviderData is an opaque provider-filled buffer with no public reader, so this reports available=false with a note.")]
+    public static async Task<string> GetStructuralConnectionProviderData(
+        RevitConnectionManager revit,
+        [Description("Provider id/key")] string? providerId = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject();
+        if (providerId != null) p["providerId"] = providerId;
+        return (await revit.ExecuteAsync("get_structural_connection_provider_data", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_structural_connection_validation_info"), Description("Report validation detail for a placed structural connection (connectionId). No public API produces a populated ConnectionValidationInfo for an existing handler, so this returns the handler's CodeCheckingStatus and a note.")]
+    public static async Task<string> GetStructuralConnectionValidationInfo(
+        RevitConnectionManager revit,
+        [Description("Connection handler element id")] long connectionId,
+        CancellationToken ct = default)
+        => (await revit.ExecuteAsync("get_structural_connection_validation_info", new JObject { ["connectionId"] = connectionId }, ct)).ToString();
 }
