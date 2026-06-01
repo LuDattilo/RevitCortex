@@ -1118,11 +1118,28 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ## Task 7: Module 5 — Solid & instance-void cuts (5 write + 3 read)
 
+> **API VERIFIED 2026-05-30 (reflection R25). Both util classes are SOLID — all methods real.**
+> `Autodesk.Revit.DB.SolidSolidCutUtils` (STATIC):
+> - `void AddCutBetweenSolids(Document, Element solidToBeCut, Element cuttingSolid, bool splitFacesOfCuttingSolid)` and 3-arg `(Document, solidToBeCut, cuttingSolid)`. **ARG ORDER: (cuttee, cutter)** — the draft below passes them REVERSED. "cutElementId cuts targetElementId" ⇒ `AddCutBetweenSolids(doc, target, cutter, splitFaces)` (target = solidToBeCut, cutter = cuttingSolid).
+> - `bool CanElementCutElement(Element cuttingElement, Element cutElement, out CutFailureReason reason)` — (cutter, cuttee). So `CanElementCutElement(cutter, target, out reason)` is correct.
+> - `bool CutExistsBetweenElements(Element first, Element second, out bool firstCutsSecond)`
+> - `ICollection<ElementId> GetCuttingSolids(Element)`, `ICollection<ElementId> GetSolidsBeingCut(Element)`
+> - `bool IsAllowedForSolidCut(Element)`, `bool IsElementFromAppropriateContext(Element)`
+> - `void RemoveCutBetweenSolids(Document, Element first, Element second)`
+> - `void SplitFacesOfCuttingSolid(Element first, Element second, bool split)`
+> `Autodesk.Revit.DB.InstanceVoidCutUtils` (STATIC):
+> - `void AddInstanceVoidCut(Document, Element element, Element cuttingInstance)` — **(cuttee, voidInstance)**. So `AddInstanceVoidCut(doc, target, voidInstance)`.
+> - `bool CanBeCutWithVoid(Element)` — arg is the CUTTEE (the element to be cut).
+> - `ICollection<ElementId> GetCuttingVoidInstances(Element element)`, `ICollection<ElementId> GetElementsBeingCut(Element cuttingInstance)`
+> - `bool InstanceVoidCutExists(Element element, Element cuttingInstance)`, `bool IsVoidInstanceCuttingElement(Element)`
+> - `void RemoveInstanceVoidCut(Document, Element element, Element cuttingInstance)`
+> `CutFailureReason` is an enum (report `reason.ToString()` when a pair is ineligible).
+
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelCutTools.cs`
-- Modify: `StructuralSteelTools.cs` (+8 wrappers), `ToolRegistrationTests.cs` (`BASE+46` → `BASE+54`)
+- Modify: `StructuralSteelTools.cs` (+8 wrappers), `ToolRegistrationTests.cs` (170 → 178)
 
-These wrap `SolidSolidCutUtils` + `InstanceVoidCutUtils` (generic Revit APIs — results MUST state whether the op was steel-specific or generic geometry, per spec). **Reflect both util classes first.**
+These wrap `SolidSolidCutUtils` + `InstanceVoidCutUtils` (generic Revit APIs — results MUST state the cut is generic geometry, not steel-specific).
 
 - [ ] **Step 1: Create the file with `add_steel_solid_cut` (FULL) + `check_steel_cut_eligibility` (FULL read)**
 
@@ -1240,7 +1257,7 @@ public class CheckSteelCutEligibilityTool : ICortexTool
   Build R25 + R24 + R26.
 
 - [ ] **Step 4: Add 8 wrappers. Build server.**
-- [ ] **Step 5: Bump threshold `BASE+46` → `BASE+54`; run. PASS.**
+- [ ] **Step 5: Bump threshold 170 → 178 (Module 5 adds 8); run. PASS.**
 - [ ] **Step 6: Commit**
 ```powershell
 git add src/RevitCortex.Tools/StructuralSteel/StructuralSteelCutTools.cs src/RevitCortex.Server/Tools/StructuralSteelTools.cs src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs

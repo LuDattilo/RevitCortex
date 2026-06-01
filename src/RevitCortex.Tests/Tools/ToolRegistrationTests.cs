@@ -103,9 +103,10 @@ public class ToolRegistrationTests
         // 133 = BASE (pre-steel); +15 = Module 1 structural steel discovery tools;
         // +8 = Module 2 structural steel connection creation & input mutation tools;
         // +9 = Module 3 structural steel connection type & approval administration tools;
-        // +5 = Module 4 structural steel fabrication metadata tools (re-scoped from 13)
-        Assert.True(AllToolTypes.Count >= 170,
-            $"Expected at least 170 tools but found {AllToolTypes.Count}. " +
+        // +5 = Module 4 structural steel fabrication metadata tools (re-scoped from 13);
+        // +8 = Module 5 solid & instance-void cut tools (5 write + 3 read)
+        Assert.True(AllToolTypes.Count >= 178,
+            $"Expected at least 178 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 

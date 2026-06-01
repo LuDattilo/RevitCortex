@@ -451,4 +451,109 @@ public static class StructuralSteelTools
         var p = new JObject { ["fabricationGuid"] = fabricationGuid };
         return (await revit.ExecuteAsync("get_steel_reference_by_fabrication_id", p, ct)).ToString();
     }
+
+    // ── Module 5: solid & instance-void cuts (5 write + 3 read) ──────────────
+    // These wrap the GENERIC Revit cut utilities (SolidSolidCutUtils + InstanceVoidCutUtils),
+    // not a steel-specific API; every response says so.
+
+    [McpServerTool(Name = "add_steel_solid_cut"), Description("Add a solid cut so one element cuts another (SolidSolidCutUtils). Provide cutElementId (the cutter) and targetElementId (the element to be cut). Optional splitFaces (default false). Supports dryRun. Note: this is a generic Revit geometry cut, not steel-specific.")]
+    public static async Task<string> AddSteelSolidCut(
+        RevitConnectionManager revit,
+        [Description("Element id of the cutter")] long cutElementId,
+        [Description("Element id of the element to be cut")] long targetElementId,
+        [Description("Split the cutting solid's faces. Default false")] bool? splitFaces = null,
+        [Description("Preview without cutting. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["cutElementId"] = cutElementId, ["targetElementId"] = targetElementId };
+        if (splitFaces != null) p["splitFaces"] = splitFaces;
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("add_steel_solid_cut", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "check_steel_cut_eligibility"), Description("Check whether one element can cut another via a solid cut and/or an instance void cut, without mutating. Provide cutElementId (the cutter) and targetElementId (the element to be cut). Returns solidCutEligible (+ solidCutFailureReason when false) and instanceVoidCutEligible.")]
+    public static async Task<string> CheckSteelCutEligibility(
+        RevitConnectionManager revit,
+        [Description("Element id of the cutter")] long cutElementId,
+        [Description("Element id of the element to be cut")] long targetElementId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["cutElementId"] = cutElementId, ["targetElementId"] = targetElementId };
+        return (await revit.ExecuteAsync("check_steel_cut_eligibility", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "remove_steel_solid_cut"), Description("Remove a solid cut between two elements (SolidSolidCutUtils). Provide cutElementId and targetElementId. Generic Revit geometry op, not steel-specific.")]
+    public static async Task<string> RemoveSteelSolidCut(
+        RevitConnectionManager revit,
+        [Description("Element id of the cutter")] long cutElementId,
+        [Description("Element id of the element to be cut")] long targetElementId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["cutElementId"] = cutElementId, ["targetElementId"] = targetElementId };
+        return (await revit.ExecuteAsync("remove_steel_solid_cut", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "set_steel_solid_cut_face_splitting"), Description("Set whether the cutting solid's faces are split at an existing solid cut (SolidSolidCutUtils.SplitFacesOfCuttingSolid). Provide cutElementId, targetElementId and split (bool, required). Generic Revit geometry op, not steel-specific.")]
+    public static async Task<string> SetSteelSolidCutFaceSplitting(
+        RevitConnectionManager revit,
+        [Description("Element id of the cutter")] long cutElementId,
+        [Description("Element id of the element being cut")] long targetElementId,
+        [Description("Whether to split the cutting solid's faces")] bool split,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["cutElementId"] = cutElementId, ["targetElementId"] = targetElementId, ["split"] = split };
+        return (await revit.ExecuteAsync("set_steel_solid_cut_face_splitting", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "add_steel_instance_void_cut"), Description("Add an instance void cut so a void family instance cuts another element (InstanceVoidCutUtils). Provide voidInstanceId (the cutting void instance) and targetElementId (the element to be cut). Supports dryRun. Note: this is a generic Revit geometry cut, not steel-specific.")]
+    public static async Task<string> AddSteelInstanceVoidCut(
+        RevitConnectionManager revit,
+        [Description("Element id of the cutting void family instance")] long voidInstanceId,
+        [Description("Element id of the element to be cut")] long targetElementId,
+        [Description("Preview without cutting. Default false")] bool? dryRun = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["voidInstanceId"] = voidInstanceId, ["targetElementId"] = targetElementId };
+        if (dryRun != null) p["dryRun"] = dryRun;
+        return (await revit.ExecuteAsync("add_steel_instance_void_cut", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "remove_steel_instance_void_cut"), Description("Remove an instance void cut between a void family instance and another element (InstanceVoidCutUtils). Provide voidInstanceId and targetElementId. Generic Revit geometry op, not steel-specific.")]
+    public static async Task<string> RemoveSteelInstanceVoidCut(
+        RevitConnectionManager revit,
+        [Description("Element id of the cutting void family instance")] long voidInstanceId,
+        [Description("Element id of the element being cut")] long targetElementId,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["voidInstanceId"] = voidInstanceId, ["targetElementId"] = targetElementId };
+        return (await revit.ExecuteAsync("remove_steel_instance_void_cut", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_solid_cut_relationships"), Description("Read the solid-solid cut relationships of an element (SolidSolidCutUtils): cuttingSolids (solids that cut this element) and solidsBeingCut (solids this element cuts). Counts are always returned; arrays unless summaryOnly, truncated to maxResults (default 100). Generic Revit geometry, not steel-specific.")]
+    public static async Task<string> GetSolidCutRelationships(
+        RevitConnectionManager revit,
+        [Description("Revit element id")] long elementId,
+        [Description("Maximum ids per array. Default 100")] int? maxResults = null,
+        [Description("Return only counts, no id arrays. Default false")] bool? summaryOnly = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["elementId"] = elementId };
+        if (maxResults != null) p["maxResults"] = maxResults;
+        if (summaryOnly != null) p["summaryOnly"] = summaryOnly;
+        return (await revit.ExecuteAsync("get_solid_cut_relationships", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_instance_void_cut_relationships"), Description("Read the instance-void cut relationships of an element (InstanceVoidCutUtils): cuttingVoidInstances (void instances that cut this element) and elementsBeingCut (elements this element cuts when it is itself a cutting void instance). Counts are always returned; arrays unless summaryOnly, truncated to maxResults (default 100). Generic Revit geometry, not steel-specific.")]
+    public static async Task<string> GetInstanceVoidCutRelationships(
+        RevitConnectionManager revit,
+        [Description("Revit element id")] long elementId,
+        [Description("Maximum ids per array. Default 100")] int? maxResults = null,
+        [Description("Return only counts, no id arrays. Default false")] bool? summaryOnly = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["elementId"] = elementId };
+        if (maxResults != null) p["maxResults"] = maxResults;
+        if (summaryOnly != null) p["summaryOnly"] = summaryOnly;
+        return (await revit.ExecuteAsync("get_instance_void_cut_relationships", p, ct)).ToString();
+    }
 }
