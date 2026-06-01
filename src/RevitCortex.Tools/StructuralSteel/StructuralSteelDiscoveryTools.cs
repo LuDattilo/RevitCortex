@@ -90,9 +90,21 @@ public class GetStructuralSteelApiCapabilitiesTool : ICortexTool
             supportsInstanceVoidCutUtils = true,
             // The legacy AddElementsToCustomConnection / RemoveMainSubelementsFromCustomConnection static
             // mutators exist R23-R26 and are REMOVED in R27 (replaced by UpdateCustomConnectionType).
+            // NOTE (back-compat): supportsCustomConnectionMutation is kept but is misleading on its own
+            // (true reads as "can mutate"); supportsCustomConnectionMutationFromJson is the honest field.
             supportsCustomConnectionMutation = year <= 2026,
+            // NOTE (back-compat): connectionProviderInstalled is kept but the public registry exposes no
+            // query method — false means "not queryable", NOT "provider absent". Use the explicit fields below.
             connectionProviderInstalled = providerInstalled,
-            note = "Steel fabrication external-id, material-link and per-element warning APIs assumed in the design are NOT present in the public Revit SDK (Autodesk.Revit.DB.Steel exposes only SteelElementProperties). Provider availability is not queryable via the public registry."
+            connectionProviderDetection = "not_queryable_public_api",
+            connectionProviderState = "unknown",
+            customConnectionMutationApiMembersExist = (year <= 2026),   // legacy add/remove statics
+            supportsCustomConnectionMutationFromJson = false,           // never, on any version
+            customConnectionMutationReason = (year >= 2027
+                ? "legacy add/remove APIs removed in R27; UpdateCustomConnectionType still requires interactive Reference objects"
+                : "requires interactive Reference/Subelement objects not expressible as JSON"),
+            supportsSetSteelFabricationUniqueId = "best_effort_non_public_setter",
+            note = "Steel fabrication external-id, material-link and per-element warning APIs assumed in the design are NOT present in the public Revit SDK (Autodesk.Revit.DB.Steel exposes only SteelElementProperties). Structural connection provider availability is NOT queryable via the public registry (connectionProviderState is unknown, not 'absent'). Custom-connection mutation is not expressible from JSON on any version (supportsCustomConnectionMutationFromJson=false)."
         });
     }
 }

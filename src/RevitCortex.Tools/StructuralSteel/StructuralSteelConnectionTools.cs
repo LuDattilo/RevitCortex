@@ -288,7 +288,7 @@ public class SetSteelConnectionTypeTool : ICortexTool
     public string Category => "StructuralSteel";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Change a structural connection's type. Revit exposes no in-place type setter, so this recreates the connection: it reads the connected elements, deletes the old handler, and creates a new one with connectionHandlerTypeId|connectionHandlerTypeName. Requires an installed connection provider/type. Supports dryRun. Existing input points are not preserved (no public ConnectionInputPoint constructor).";
+    public string Description => "Change a structural connection's type. Revit exposes no in-place type setter, so this recreates the connection: it reads the connected elements, deletes the old handler, and creates a new one with connectionHandlerTypeId|connectionHandlerTypeName. Writable state (approvalTypeId, codeCheckingStatus, overrideTypeParams, singleElementEndIndex) is best-effort restored and reported via restoredFields/lostFields. Requires an installed connection provider/type. Supports dryRun (returns willPreserve/willLose + a stateSnapshot). Existing input points/references are NOT preserved (no public ConnectionInputPoint/Reference constructor).";
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {
@@ -313,6 +313,29 @@ public class SetSteelConnectionTypeTool : ICortexTool
         var oldId = ToolHelpers.GetElementIdValue(handler);
         var connectedValues = ids.Select(i => ToolHelpers.GetElementIdValue(i)).ToList();
 
+        // Snapshot every readable handler property BEFORE deletion so we can restore the simple writable
+        // ones on the recreated handler. Each read is isolated: a single throwing getter must not abort
+        // the whole snapshot (provider-dependent fields can throw on bare/generic handlers).
+        ElementId oldApprovalTypeId = ElementId.InvalidElementId;
+        try { oldApprovalTypeId = handler!.ApprovalTypeId ?? ElementId.InvalidElementId; } catch { oldApprovalTypeId = ElementId.InvalidElementId; }
+        StructuralConnectionCodeCheckingStatus oldStatus = StructuralConnectionCodeCheckingStatus.NotCalculated;
+        try { oldStatus = handler!.CodeCheckingStatus; } catch { oldStatus = StructuralConnectionCodeCheckingStatus.NotCalculated; }
+        bool oldOverrideTypeParams = false;
+        try { oldOverrideTypeParams = handler!.OverrideTypeParams; } catch { oldOverrideTypeParams = false; }
+        int oldSingleElementEndIndex = 0;
+        try { oldSingleElementEndIndex = handler!.SingleElementEndIndex; } catch { oldSingleElementEndIndex = 0; }
+        int inputPointCount = 0;
+        try { inputPointCount = handler!.GetInputPoints()?.Count ?? 0; } catch { inputPointCount = 0; }
+        int inputReferenceCount = 0;
+        try { inputReferenceCount = handler!.GetInputReferences()?.Count ?? 0; } catch { inputReferenceCount = 0; }
+
+        // What the recreation will best-effort restore vs. inherently drop.
+        var willPreserve = new List<string> { "connectedElementIds", "codeCheckingStatus", "overrideTypeParams", "singleElementEndIndex" };
+        if (oldApprovalTypeId != ElementId.InvalidElementId) willPreserve.Insert(1, "approvalTypeId");
+        var willLose = new List<string>();
+        if (inputPointCount > 0) willLose.Add("inputPoints");
+        if (inputReferenceCount > 0) willLose.Add("inputReferences");
+
         if (input["dryRun"]?.Value<bool?>() == true)
             return CortexResult<object>.Ok(new
             {
@@ -320,7 +343,20 @@ public class SetSteelConnectionTypeTool : ICortexTool
                 connectionId = oldId,
                 newConnectionHandlerTypeId = ToolHelpers.GetElementIdValue(typeId),
                 connectedElementIds = connectedValues,
-                note = "Would delete the existing handler and recreate it with the new type."
+                willPreserve,
+                willLose,
+                stateSnapshot = new
+                {
+                    approvalTypeId = oldApprovalTypeId != ElementId.InvalidElementId
+                        ? (long?)ToolHelpers.GetElementIdValue(oldApprovalTypeId)
+                        : null,
+                    codeCheckingStatus = oldStatus.ToString(),
+                    overrideTypeParams = oldOverrideTypeParams,
+                    singleElementEndIndex = oldSingleElementEndIndex,
+                    inputPointCount,
+                    inputReferenceCount
+                },
+                note = "Would delete the existing handler and recreate it with the new type, restoring writable state."
             });
 
         if (!session.RequestConfirmation("change steel connection type", ids.Count))
@@ -337,15 +373,42 @@ public class SetSteelConnectionTypeTool : ICortexTool
                 tx.RollBack();
                 return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed, "Revit returned no connection handler after recreation; rolled back.");
             }
+
+            // Best-effort restore of writable state. Each assignment is isolated so one rejected
+            // property does not abort the rest (or the commit).
+            var restoredFields = new List<string>();
+            var lostFields = new List<string>();
+            if (oldApprovalTypeId != ElementId.InvalidElementId)
+            {
+                try { created.ApprovalTypeId = oldApprovalTypeId; restoredFields.Add("approvalTypeId"); }
+                catch { lostFields.Add("approvalTypeId"); }
+            }
+            try { created.CodeCheckingStatus = oldStatus; restoredFields.Add("codeCheckingStatus"); }
+            catch { lostFields.Add("codeCheckingStatus"); }
+            try { created.OverrideTypeParams = oldOverrideTypeParams; restoredFields.Add("overrideTypeParams"); }
+            catch { lostFields.Add("overrideTypeParams"); }
+            try { created.SingleElementEndIndex = oldSingleElementEndIndex; restoredFields.Add("singleElementEndIndex"); }
+            catch { lostFields.Add("singleElementEndIndex"); }
+            if (inputPointCount > 0) lostFields.Add("inputPoints");
+            if (inputReferenceCount > 0) lostFields.Add("inputReferences");
+
             var newId = ToolHelpers.GetElementIdValue(created);
             tx.Commit();
+
+            var warnings = new List<string>();
+            if (inputPointCount > 0 || inputReferenceCount > 0)
+                warnings.Add("input points/references are not recreated (Revit exposes no public ConnectionInputPoint/Reference constructor reachable from JSON).");
+
             return CortexResult<object>.Ok(new
             {
                 message = $"Recreated connection {oldId} as {newId} with type {ToolHelpers.GetElementIdValue(typeId)}",
                 previousConnectionId = oldId,
                 connectionId = newId,
                 connectionHandlerTypeId = ToolHelpers.GetElementIdValue(typeId),
-                connectedElementIds = connectedValues
+                connectedElementIds = connectedValues,
+                restoredFields,
+                lostFields,
+                warnings
             });
         }
         catch (Exception ex)

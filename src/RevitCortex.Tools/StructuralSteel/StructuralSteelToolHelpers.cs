@@ -124,8 +124,8 @@ public static class StructuralSteelToolHelpers
 
     public static CortexResult<object> ProviderUnavailableError(string feature)
         => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-            $"{feature} requires an installed structural steel connection provider (e.g. Autodesk Steel Connections, IDEA StatiCa) and steel-compatible content.",
-            suggestion: "Use create_generic_steel_connection when provider availability is unknown, or check get_structural_steel_api_capabilities.");
+            $"{feature} could not be resolved: no matching connection type/provider definition is present in this document, and structural steel connection provider state is NOT queryable through the public Revit API (it may or may not be installed). A provider such as Autodesk Steel Connections or IDEA StatiCa plus steel-compatible content is required.",
+            suggestion: "Use create_generic_steel_connection when provider availability is unknown, or check get_structural_steel_api_capabilities (connectionProviderState).");
 
     /// <summary>
     /// Best-effort detection of whether any structural connection provider is installed.

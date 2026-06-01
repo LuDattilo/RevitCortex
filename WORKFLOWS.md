@@ -795,9 +795,11 @@ ColorByCategory =
 
 **Avvertenze operative:**
 - Le connessioni **tipizzate** (`create_steel_connection`) e le approvazioni dipendono da un **provider installato** + famiglie compatibili → senza provider restituiscono un errore "provider non disponibile". Quando il provider è incerto, usa `create_generic_steel_connection`.
-- `set_steel_connection_type` **ricrea** la connessione (l'API non ha un setter di tipo): preserva gli elementi connessi ma cambia il `connectionId`.
+- `set_steel_connection_type` **ricrea** la connessione (l'API non ha un setter di tipo): preserva gli elementi connessi e fa un restore best-effort dello stato scrivibile (`approvalTypeId`, `codeCheckingStatus`, `overrideTypeParams`, `singleElementEndIndex`, vedi `restoredFields`/`lostFields`), ma cambia il `connectionId` e **non** ricrea punti/riferimenti di input. Con `dryRun:true` ritorna `willPreserve`/`willLose` + `stateSnapshot`.
 - I tool di taglio sono geometria Revit generica (SolidSolidCutUtils / InstanceVoidCutUtils): la risposta lo segnala. Verifica sempre l'idoneità prima con `check_steel_cut_eligibility`.
-- `get_structural_connection_provider_registry/_data` e `get_structural_connection_validation_info` riportano `available:false` con nota: l'infrastruttura provider non è interrogabile via API pubblica.
+- `get_structural_connection_provider_registry/_data` e `get_structural_connection_validation_info` riportano `available:false` con nota: l'infrastruttura provider non è interrogabile via API pubblica (stato "unknown", non "assente").
+- **`dryRun` non è universale.** Lo supportano solo: `create_generic_steel_connection`, `create_steel_connection`, `set_steel_connection_type`, `delete_steel_connection`, `create_steel_structural_connection_type`, `create_steel_connection_handler_type`, `create_default_steel_connection_handler_type`, `set_steel_connection_type_family_symbol`, `manage_steel_approval_type` (create), `add_steel_fabrication_info`, `add_steel_solid_cut`, `add_steel_instance_void_cut`. I mutatori `modify_steel_connection_inputs`, `set_steel_connection_approval`, `set_steel_connection_status`, `set_steel_connection_default_order`, `remove_steel_solid_cut`, `set_steel_solid_cut_face_splitting`, `remove_steel_instance_void_cut`, `set_steel_fabrication_unique_id` **non** offrono anteprima: confermano (TaskDialog) e poi scrivono.
+- `set_steel_fabrication_unique_id` è **sperimentale** (`experimental:true`): scrive `UniqueID` via setter non pubblico per reflection; può rompersi su Revit futuri.
 
 **NON fare:**
 - Non assumere che esista un'API di code-warning / link-materiali / "external id" sugli elementi steel: `SteelElementProperties` espone solo `UniqueID` + l'associazione di fabbricazione.
