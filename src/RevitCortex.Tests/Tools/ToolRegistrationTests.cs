@@ -100,6 +100,7 @@ public class ToolRegistrationTests
     public void ToolCount_MatchesExpected()
     {
         // Update this number when adding new tools to catch accidental omissions.
+        // === Rebar (merged from main) ===
         // Rebar Module 1 added 12 discovery tools (133 -> 145).
         // Rebar Module 2 added 12 tools: 3 creation + 9 mutators (145 -> 157).
         // Rebar Module 3 added 8 tools: 6 area/path writes + 2 reads (157 -> 165).
@@ -109,8 +110,12 @@ public class ToolRegistrationTests
         // Rebar Module 6 added 10 tools: settings/rounding/numbering/bending details
         //   (6 writes + 4 reads; the 3 bending-detail tools are 2024+ gated) (185 -> 195).
         // get_element_solid_geometry: real-solid extents for rebar/element placement (195 -> 196).
-        Assert.True(AllToolTypes.Count >= 196,
-            $"Expected at least 196 tools but found {AllToolTypes.Count}. " +
+        // === Structural Steel (this branch) ===
+        // Steel Module 1 discovery (+15 -> 211); Module 2 connections (+8 -> 219);
+        // Module 3 type/approval (+9 -> 228); Module 4 fabrication (+5, re-scoped from 13 -> 233);
+        // Module 5 solid & instance-void cuts (+8 -> 241); Module 6 provider/validation (+3 -> 244).
+        Assert.True(AllToolTypes.Count >= 244,
+            $"Expected at least 244 tools but found {AllToolTypes.Count}. " +
             $"If you removed tools intentionally, update this test.");
     }
 

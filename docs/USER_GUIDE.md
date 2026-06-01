@@ -629,6 +629,60 @@ return new { typeId = newType.Id.Value, name = newType.Name };
 
 ---
 
+## Acciaio Strutturale (Structural Steel)
+
+48 strumenti nella categoria `StructuralSteel` per connessioni strutturali, tipi/approvazioni, metadati di fabbricazione e tagli geometrici. Coordinate sempre in **millimetri**, angoli in gradi.
+
+**Prima di iniziare:** chiama `get_structural_steel_api_capabilities` (nessun parametro) per sapere cosa supporta il Revit in esecuzione (versione, API custom-connection, presenza provider). Quando non sai se è installato un provider di connessioni (Autodesk Steel Connections, IDEA StatiCa), preferisci `create_generic_steel_connection`: funziona sempre, senza provider.
+
+### Strumenti per modulo
+
+| Modulo | Strumenti |
+|--------|-----------|
+| **1 – Discovery** (15, sola lettura) | `get_structural_steel_api_capabilities`, `list_steel_connection_handlers`, `list_steel_connection_types`, `list_steel_connection_handler_types`, `list_steel_approval_types`, `list_steel_connection_providers`, `get_steel_connection_data`, `get_steel_connection_type_data`, `get_steel_connection_settings`, `get_steel_element_properties`, `get_steel_external_id_map`, `get_steel_material_links`, `get_steel_element_warnings`, `get_steel_cut_data`, `analyze_structural_steel_model` |
+| **2 – Connessioni** (8, scrittura) | `create_generic_steel_connection`, `create_steel_connection`, `modify_steel_connection_inputs`, `set_steel_connection_type`, `set_steel_connection_approval`, `set_steel_connection_status`, `set_steel_connection_default_order`, `delete_steel_connection` |
+| **3 – Tipi & approvazioni** (9) | `create_steel_structural_connection_type`, `create_steel_connection_handler_type`, `create_default_steel_connection_handler_type`, `set_steel_connection_type_family_symbol`, `manage_steel_approval_type`, `manage_custom_steel_connection_type`, `get_steel_connection_input_points`, `get_steel_connection_applicability`, `get_steel_connection_validation` |
+| **4 – Fabbricazione** (5) | `add_steel_fabrication_info`, `get_steel_element_fabrication_properties`, `set_steel_fabrication_unique_id`, `get_steel_fabrication_unique_id`, `get_steel_reference_by_fabrication_id` |
+| **5 – Tagli** (8) | `add_steel_solid_cut`, `remove_steel_solid_cut`, `set_steel_solid_cut_face_splitting`, `add_steel_instance_void_cut`, `remove_steel_instance_void_cut`, `check_steel_cut_eligibility`, `get_solid_cut_relationships`, `get_instance_void_cut_relationships` |
+| **6 – Provider/validazione** (3, sola lettura) | `get_structural_connection_provider_registry`, `get_structural_connection_provider_data`, `get_structural_connection_validation_info` |
+
+### Esempi
+
+**Capacità + elenco connessioni esistenti:**
+```json
+get_structural_steel_api_capabilities {}
+list_steel_connection_handlers {"maxResults": 50, "summaryOnly": false}
+```
+
+**Connessione generica fra due o più elementi** (`elementIds` è un array JSON di interi):
+```json
+create_generic_steel_connection {"elementIds": [606883, 606885], "connectionName": "Giunto trave-pilastro"}
+```
+
+**Leggere le proprietà di fabbricazione di un elemento:**
+```json
+get_steel_element_properties {"elementId": 606883, "summaryOnly": false}
+```
+
+**Aggiungere un taglio solido** (l'elemento `cutElementId` taglia `targetElementId`):
+```json
+add_steel_solid_cut {"cutElementId": 700100, "targetElementId": 700200, "splitFaces": false, "dryRun": true}
+```
+
+**Forma degli input:** i parametri-array (`elementIds`) sono array JSON di interi; gli `inputPoints` (in `create_steel_connection`) sono oggetti `{"x":..,"y":..,"z":..}` in mm, **non** array piatti. Gli strumenti di scrittura accettano `dryRun: true` per un'anteprima senza modifiche.
+
+### Limitazioni note (verificate sull'API Revit reale)
+
+- **Connessioni tipizzate** (`create_steel_connection`) e approvazioni dipendono da un **provider installato** e da famiglie compatibili: senza provider restituiscono un errore strutturato "provider non disponibile". Usa `create_generic_steel_connection` quando il provider è incerto.
+- **`set_steel_connection_type`** non è un setter in-place (l'API non lo espone): **ricrea** la connessione (elimina + ricrea con il nuovo tipo, preservando gli elementi connessi).
+- **`manage_custom_steel_connection_type`**: la mutazione delle connessioni custom richiede Reference/Subelement selezionati interattivamente (non esprimibili via JSON) → lo strumento valida e restituisce un Fail onesto; in **Revit 2027** le API legacy `AddElementsToCustomConnection`/`RemoveMainSubelementsFromCustomConnection` sono state rimosse.
+- **`manage_steel_approval_type`** supporta solo `create` e `list`: l'API non espone rename/delete.
+- **Metadati di fabbricazione**: l'API `SteelElementProperties` espone solo `UniqueID` + l'associazione fabbricazione/Reference. **Non esistono** API pubbliche per code di warning, link materiali o "external id" sugli elementi steel.
+- **Validazione/provider** (`get_structural_connection_validation_info`, `get_structural_connection_provider_registry/_data`): l'infrastruttura provider non è interrogabile pubblicamente → questi strumenti riportano `available: false` con una nota e, per la validazione, lo `CodeCheckingStatus` dell'handler (NotCalculated/OkChecked/CheckingFailed).
+- **Tagli** (`add_steel_solid_cut`, `add_steel_instance_void_cut`, ...): sono operazioni di **geometria Revit generica** (SolidSolidCutUtils / InstanceVoidCutUtils), non specifiche dell'acciaio; la risposta lo segnala esplicitamente.
+
+---
+
 ## Risoluzione dei problemi comuni
 
 ### Il plugin non si connette

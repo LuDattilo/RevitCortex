@@ -739,13 +739,34 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 4: Module 2 — Connection creation & input mutation (9 write tools)
+## Task 4: Module 2 — Connection creation & input mutation (8 write tools)
+
+> **API VERIFIED 2026-05-30 (reflection over RevitAPI.dll R25/R26).** The plan
+> originally listed 9 tools; two assumed non-existent API:
+> - `set_steel_connection_disconnected` — **REMOVED**: `StructuralConnectionHandler`
+>   has NO "disconnected" property. Its only settable instance props are
+>   `ApprovalTypeId` (ElementId), `CodeCheckingStatus`
+>   (enum: NotCalculated/OkChecked/CheckingFailed), `OverrideTypeParams` (bool),
+>   `SingleElementEndIndex` (int). No disconnect concept exists.
+> - `set_steel_connection_type` — **RE-SCOPED**: there is no type setter on the
+>   handler. Reimplemented as *change type by recreation*: read the connected
+>   element ids (+ existing input points), delete the old handler, and
+>   `Create(doc, ids, newTypeId)` — preserving the connected elements.
+>
+> Confirmed signatures (R25): `CreateGenericConnection(Document, IList<ElementId>)`;
+> `Create(Document, IList<ElementId> ids, ElementId typeId)`,
+> `Create(Document, IList<ElementId> ids, String typeName)`,
+> `Create(Document, IList<ElementId> ids, ElementId typeId, IList<ConnectionInputPoint> additionalInputPoints)`;
+> instance `AddElementIds(IList<ElementId>)`, `RemoveElementIds(IList<ElementId>)`,
+> `GetConnectedElementIds()`, `AddReferences(Document, IList<Reference>)`,
+> `RemoveReferences(IList<Reference>)`, `GetInputPoints()`, `SetDefaultElementOrder()`.
+> **Net result: 8 write tools, registration BASE+15 → BASE+23.**
 
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelConnectionTools.cs`
-- Modify: `src/RevitCortex.Server/Tools/StructuralSteelTools.cs` (+9 wrappers), `src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs` (`BASE+15` → `BASE+24`)
+- Modify: `src/RevitCortex.Server/Tools/StructuralSteelTools.cs` (+8 wrappers), `src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs` (`BASE+15` → `BASE+23`)
 
-All 9 are write tools (validate → confirm → tx → rollback). `create_generic_steel_connection` is the always-works baseline; typed `create_steel_connection` and approval/status tools gate on provider availability → `ProviderUnavailableError(...)`. **Reflect `StructuralConnectionHandler` first** for the real `Create`/`CreateGenericConnection`/`AddElementIds`/`RemoveElementIds`/`GetConnectedElementIds`/approval-property signatures.
+All 8 are write tools (validate → confirm → tx → rollback). `create_generic_steel_connection` is the always-works baseline; typed `create_steel_connection` and approval/status tools gate on provider availability → `ProviderUnavailableError(...)`.
 
 - [ ] **Step 1: Create the file with `create_generic_steel_connection` (FULL — the safe baseline)**
 
@@ -837,18 +858,19 @@ public class CreateGenericSteelConnectionTool : ICortexTool
 
 - **`create_steel_connection`** (typed, provider-gated): inputs `elementIds[]`, `connectionHandlerTypeId|connectionHandlerTypeName`, optional `inputPoints[]` ({id,x,y,z} mm), `dryRun`. Resolve the handler type; if none / no provider → `ProviderUnavailableError("Typed steel connections")`. Call `StructuralConnectionHandler.Create(doc, ids, typeId)` (confirm signature). Return `connectionId`, connected ids.
 - **`modify_steel_connection_inputs`** (action-based): inputs `connectionId`, `action` (`add_element_ids`|`remove_element_ids`|`add_references`|`remove_references`), `elementIds[]` (for id actions) or reference descriptors (for reference actions — element id + reference hint / selected subelement, NEVER raw Reference strings). Use `ParseConnectionInputAction`. For id actions call `AddElementIds`/`RemoveElementIds`; for reference actions resolve via `ResolveReferences` then `AddReferences`/`RemoveReferences`. Return accepted/skipped.
-- **`set_steel_connection_type`** (provider-gated): inputs `connectionId`, `connectionHandlerTypeId|Name`. Change the handler's type (confirm the setter — may be `ChangeTypeId`/a property). Provider-gate if typed.
-- **`set_steel_connection_approval`** (provider-gated): inputs `connectionId`, `approvalTypeId|approvalTypeName`. Set the approval property (reflect `StructuralConnectionHandler` approval member). Provider-gate.
-- **`set_steel_connection_status`** (provider-gated): inputs `connectionId`, `status` (enum string — reflect the status enum). Set code-checking/status. Provider-gate.
-- **`set_steel_connection_disconnected`**: inputs `connectionId`, `disconnected` (bool). Set the disconnect property.
-- **`set_steel_connection_default_order`**: inputs `connectionId`. Call `SetDefaultElementOrder()`.
+- **`set_steel_connection_type`** (provider-gated, change-by-recreation): inputs `connectionId`, `connectionHandlerTypeId|connectionHandlerTypeName`, optional `dryRun`. Read `handler.GetConnectedElementIds()` and `handler.GetInputPoints()`; resolve the new type id (provider-gate if no provider / type not found → `ProviderUnavailableError`); `RequestConfirmation("change steel connection type", ids.Count)`; in one tx `doc.Delete(handler.Id)` then `StructuralConnectionHandler.Create(doc, ids, newTypeId, inputPoints)`; return the new `connectionId` + connected ids. NOTE: this is recreation, not an in-place setter (no type setter exists on the handler).
+- **`set_steel_connection_approval`** (provider-gated): inputs `connectionId`, `approvalTypeId|approvalTypeName`. Set `handler.ApprovalTypeId = <id>` (resolve approval type id; verify name via `StructuralConnectionApprovalType.IsValidApprovalTypeName`). Provider-gate.
+- **`set_steel_connection_status`** (provider-gated): inputs `connectionId`, `status` (enum string: `NotCalculated`|`OkChecked`|`CheckingFailed`). Set `handler.CodeCheckingStatus = <enum>`. Provider-gate.
+- **`set_steel_connection_default_order`**: inputs `connectionId`. Call `handler.SetDefaultElementOrder()`.
 - **`delete_steel_connection`** (DESTRUCTIVE): inputs `connectionId`, `dryRun`. `RequestConfirmation("delete steel connection", 1)`; `doc.Delete(handler.Id)`. Return deleted id.
+
+(`set_steel_connection_disconnected` removed — no such API; see the box at the top of Task 4.)
 
 Build R25 + R24 + R26 after writing these.
 
-- [ ] **Step 4: Add the 9 Module-2 server wrappers** to `StructuralSteelTools.cs` (names match plugin names; complex inputs `elementIds`/`inputPoints` as JSON strings → `JArray.Parse`; scalars direct; write tools expose `dryRun` where the plugin reads it). Build server.
+- [ ] **Step 4: Add the 8 Module-2 server wrappers** to `StructuralSteelTools.cs` (names match plugin names; complex inputs `elementIds`/`inputPoints` as JSON strings → `JArray.Parse`; scalars direct; write tools expose `dryRun` where the plugin reads it). Build server.
 
-- [ ] **Step 5: Bump registration threshold `BASE+15` → `BASE+24`; run it. PASS.**
+- [ ] **Step 5: Bump registration threshold `BASE+15` (148) → `BASE+23` (156); run it. PASS.**
 
 - [ ] **Step 6: Commit**
 ```powershell
@@ -862,11 +884,22 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ## Task 5: Module 3 — Connection type & approval administration (6 write + 3 read)
 
+> **API VERIFIED 2026-05-30 (reflection R26 + R27).** Real signatures (differ from the
+> draft below — use these):
+> - `StructuralConnectionType.Create(Document, StructuralConnectionApplyTo applyTo, String name, ElementId familySymbolId)` — needs `applyTo` + `name`, NOT `Create(doc, symId)`.
+> - `StructuralConnectionType.ValidFamilySymbolId(Document, StructuralConnectionApplyTo applyTo, ElementId)` — needs `applyTo`, NOT `(doc, symId)`.
+> - `StructuralConnectionType`: instance `GetFamilySymbolId()`, `SetFamilySymbolId(ElementId)`; prop `ApplyTo {get;}`; static `GetAllStructuralConnectionTypeIds(doc, out ICollection<ElementId>)`.
+> - `enum StructuralConnectionApplyTo`: `BeamsAndBraces`, `ColumnTop`, `ColumnBase`, `Connection`.
+> - `StructuralConnectionHandlerType.Create(doc, name, Guid, familyName[, categoryId][, IList<ConnectionInputPointInfo>])` (3 overloads); `CreateDefaultStructuralConnectionHandlerType(doc)`; `IsTypeNameValidForCustomConnection(doc, name)`; `UpdateCustomConnectionType(handler, addRefs, removeRefs)`.
+> - **R26→R27 gating CONFIRMED:** `AddElementsToCustomConnection` and `RemoveMainSubelementsFromCustomConnection` exist on R23-R26 but are **REMOVED in R27**. `UpdateCustomConnectionType` **survives in R27**. So `manage_custom_steel_connection_type` uses `#if !REVIT2027_OR_GREATER` for the add/remove-subelements actions and routes the generic add/remove-references action through `UpdateCustomConnectionType` on ALL versions (no total Fail on R27).
+> - `StructuralConnectionApprovalType`: only `Create(doc, name)`, `IsValidApprovalTypeName(doc, name)`, `GetAllStructuralConnectionApprovalTypes(doc, out ...)` — **NO rename, NO delete**. So `manage_steel_approval_type` supports `create` + `list`; `rename`/`delete` return a structured Fail.
+> - `ConnectionValidationInfo`: `GetWarning(int)`, `ManyWarnings()`, `IsValidWarningIndex(int)`. `ConnectionValidationWarning`: props `Reason` (`ConnectionWarning`), `Resolution` (`ConnectionResolution`), `GetParts()`. (Reflect how to OBTAIN a `ConnectionValidationInfo` from a handler — likely a validate method on the handler or StructuralConnectionTestUtil; if no public producer exists, `get_steel_connection_validation` returns a documented "not available via public API" Fail.)
+
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelConnectionTypeTools.cs`
-- Modify: `StructuralSteelTools.cs` (+9 wrappers), `ToolRegistrationTests.cs` (`BASE+24` → `BASE+33`)
+- Modify: `StructuralSteelTools.cs` (+9 wrappers), `ToolRegistrationTests.cs` (`BASE+23` (156) → `BASE+32` (165))
 
-`manage_custom_steel_connection_type` is **R27-gated** (`AddElementsToCustomConnection` absent in R27 per spec) and IntPtr-free (summary/documented-member ops only). **Reflect `StructuralConnectionHandlerType`/`StructuralConnectionType`/`StructuralConnectionApprovalType` first.**
+`manage_custom_steel_connection_type` is **R27-gated** (add/remove-subelements absent in R27) and IntPtr-free (documented-member ops only).
 
 - [ ] **Step 1: Create the file with `create_steel_structural_connection_type` (FULL — a clean typed create)**
 
@@ -947,7 +980,7 @@ public class CreateSteelStructuralConnectionTypeTool : ICortexTool
 Build R25 + R24 + R26 + **R27** (R27 exercises the `manage_custom_steel_connection_type` `#else`).
 
 - [ ] **Step 4: Add 9 Module-3 wrappers. Build server.**
-- [ ] **Step 5: Bump threshold `BASE+24` → `BASE+33`; run. PASS.**
+- [ ] **Step 5: Bump threshold 156 → 165 (BASE+32; Module 3 adds 9); run. PASS.**
 - [ ] **Step 6: Commit**
 ```powershell
 git add src/RevitCortex.Tools/StructuralSteel/StructuralSteelConnectionTypeTools.cs src/RevitCortex.Server/Tools/StructuralSteelTools.cs src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs
@@ -958,13 +991,35 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 6: Module 4 — Fabrication metadata, materials, warnings (9 write + 4 read)
+## Task 6: Module 4 — Fabrication metadata (5 tools — RE-SCOPED from 13)
+
+> **API VERIFIED 2026-05-30 (reflection R25).** `Autodesk.Revit.DB.Steel.SteelElementProperties`
+> (in RevitAPI.dll) exposes ONLY these public members:
+> - STATIC `IList<ElementId> AddFabricationInformationForRevitElements(Document, IList<ElementId>)`
+> - STATIC `Guid GetFabricationUniqueID(Document, Reference)`
+> - STATIC `Reference GetReference(Document, Guid)`
+> - STATIC `SteelElementProperties GetSteelElementProperties(Element)`
+> - INSTANCE prop `Guid UniqueID {get;set;}`, `bool IsValidObject {get;}`
+>
+> **The plan's other 8 assumed members DO NOT EXIST** and their tools are CUT:
+> `AddToElement`, `GetExternalId`, `GetRevitId`, `RegisterMaterial`, `RemoveLink`,
+> `ClearWarnings`, `CountOfAsyncWarnings`, `GetCurrWarnings`, `PostWarning`,
+> `RemoveWarning`, `FlushWarnings`, `SetChanged` — none are on `SteelElementProperties`
+> (nor is there any public steel warning-queue / external-material / fabrication-link API).
+> Module 4 is therefore **5 tools** built on the 6 real members, NOT 13.
+>
+> The 5 tools:
+> - **`add_steel_fabrication_info`** (write): `elementIds[]` → `AddFabricationInformationForRevitElements(doc, ids)`; returns the ids that received fabrication info (the method returns an `IList<ElementId>`). confirm/tx/rollback + dryRun.
+> - **`get_steel_element_fabrication_properties`** (read): `elementId` → `GetSteelElementProperties(elem)`; return `{ hasFabricationProperties (props!=null && IsValidObject), uniqueId (Guid string or null) }`.
+> - **`set_steel_fabrication_unique_id`** (write): `elementId`, `uniqueId` (Guid, ParseGuid) → `GetSteelElementProperties(elem).UniqueID = guid` in a tx. Fail if the element has no steel properties.
+> - **`get_steel_fabrication_unique_id`** (read): `elementId` → resolve props, return `UniqueID`. (Reference-based `GetFabricationUniqueID(doc, Reference)` is not exposed because we can't fabricate a Reference from JSON; use the element-props path.)
+> - **`get_steel_reference_by_fabrication_id`** (read): `fabricationGuid` (ParseGuid) → `GetReference(doc, guid)`; return the referenced element id (`reference.ElementId`) or a not-found note.
 
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelFabricationTools.cs`
-- Modify: `StructuralSteelTools.cs` (+13 wrappers), `ToolRegistrationTests.cs` (`BASE+33` → `BASE+46`)
+- Modify: `StructuralSteelTools.cs` (+5 wrappers), `ToolRegistrationTests.cs` (165 → 170)
 
-These wrap `SteelElementProperties`. **Reflect it first** — the spec lists `AddFabricationInformationForRevitElements`, `AddToElement`, `GetFabricationUniqueID`, `GetReference`, `GetExternalId`, `GetRevitId`, `RegisterMaterial`, `RemoveLink`, `ClearWarnings`, `CountOfAsyncWarnings`, `GetCurrWarnings`, `PostWarning`, `RemoveWarning`, `FlushWarnings`, `SetChanged` — confirm each.
+Wrap `SteelElementProperties` (verified members only — no warning/material/link/changed API exists).
 
 - [ ] **Step 1: Create the file with `add_steel_fabrication_info` (FULL)**
 
@@ -1049,8 +1104,8 @@ public class AddSteelFabricationInfoTool : ICortexTool
 
   Each warning write tool: note that warnings may be asynchronous — return queued vs current counts so the caller isn't misled. Build R25 + R24 + R26.
 
-- [ ] **Step 4: Add 13 wrappers. Build server.**
-- [ ] **Step 5: Bump threshold `BASE+33` → `BASE+46`; run. PASS.**
+- [ ] **Step 4: Add 5 wrappers. Build server.**
+- [ ] **Step 5: Bump threshold 165 → 170 (Module 4 adds 5); run. PASS.**
 - [ ] **Step 6: Commit**
 ```powershell
 git add src/RevitCortex.Tools/StructuralSteel/StructuralSteelFabricationTools.cs src/RevitCortex.Server/Tools/StructuralSteelTools.cs src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs
@@ -1063,11 +1118,28 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ## Task 7: Module 5 — Solid & instance-void cuts (5 write + 3 read)
 
+> **API VERIFIED 2026-05-30 (reflection R25). Both util classes are SOLID — all methods real.**
+> `Autodesk.Revit.DB.SolidSolidCutUtils` (STATIC):
+> - `void AddCutBetweenSolids(Document, Element solidToBeCut, Element cuttingSolid, bool splitFacesOfCuttingSolid)` and 3-arg `(Document, solidToBeCut, cuttingSolid)`. **ARG ORDER: (cuttee, cutter)** — the draft below passes them REVERSED. "cutElementId cuts targetElementId" ⇒ `AddCutBetweenSolids(doc, target, cutter, splitFaces)` (target = solidToBeCut, cutter = cuttingSolid).
+> - `bool CanElementCutElement(Element cuttingElement, Element cutElement, out CutFailureReason reason)` — (cutter, cuttee). So `CanElementCutElement(cutter, target, out reason)` is correct.
+> - `bool CutExistsBetweenElements(Element first, Element second, out bool firstCutsSecond)`
+> - `ICollection<ElementId> GetCuttingSolids(Element)`, `ICollection<ElementId> GetSolidsBeingCut(Element)`
+> - `bool IsAllowedForSolidCut(Element)`, `bool IsElementFromAppropriateContext(Element)`
+> - `void RemoveCutBetweenSolids(Document, Element first, Element second)`
+> - `void SplitFacesOfCuttingSolid(Element first, Element second, bool split)`
+> `Autodesk.Revit.DB.InstanceVoidCutUtils` (STATIC):
+> - `void AddInstanceVoidCut(Document, Element element, Element cuttingInstance)` — **(cuttee, voidInstance)**. So `AddInstanceVoidCut(doc, target, voidInstance)`.
+> - `bool CanBeCutWithVoid(Element)` — arg is the CUTTEE (the element to be cut).
+> - `ICollection<ElementId> GetCuttingVoidInstances(Element element)`, `ICollection<ElementId> GetElementsBeingCut(Element cuttingInstance)`
+> - `bool InstanceVoidCutExists(Element element, Element cuttingInstance)`, `bool IsVoidInstanceCuttingElement(Element)`
+> - `void RemoveInstanceVoidCut(Document, Element element, Element cuttingInstance)`
+> `CutFailureReason` is an enum (report `reason.ToString()` when a pair is ineligible).
+
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelCutTools.cs`
-- Modify: `StructuralSteelTools.cs` (+8 wrappers), `ToolRegistrationTests.cs` (`BASE+46` → `BASE+54`)
+- Modify: `StructuralSteelTools.cs` (+8 wrappers), `ToolRegistrationTests.cs` (170 → 178)
 
-These wrap `SolidSolidCutUtils` + `InstanceVoidCutUtils` (generic Revit APIs — results MUST state whether the op was steel-specific or generic geometry, per spec). **Reflect both util classes first.**
+These wrap `SolidSolidCutUtils` + `InstanceVoidCutUtils` (generic Revit APIs — results MUST state the cut is generic geometry, not steel-specific).
 
 - [ ] **Step 1: Create the file with `add_steel_solid_cut` (FULL) + `check_steel_cut_eligibility` (FULL read)**
 
@@ -1185,7 +1257,7 @@ public class CheckSteelCutEligibilityTool : ICortexTool
   Build R25 + R24 + R26.
 
 - [ ] **Step 4: Add 8 wrappers. Build server.**
-- [ ] **Step 5: Bump threshold `BASE+46` → `BASE+54`; run. PASS.**
+- [ ] **Step 5: Bump threshold 170 → 178 (Module 5 adds 8); run. PASS.**
 - [ ] **Step 6: Commit**
 ```powershell
 git add src/RevitCortex.Tools/StructuralSteel/StructuralSteelCutTools.cs src/RevitCortex.Server/Tools/StructuralSteelTools.cs src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs
@@ -1198,11 +1270,20 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ## Task 8: Module 6 — Provider & extension reporting (3 read tools)
 
+> **API VERIFIED 2026-05-30 (reflection R25). The provider infra is NOT publicly queryable** — these
+> tools are honest "not available via public API" reporters, exactly as the contracts already allow:
+> - `StructuralConnectionsProviderRegistry`: only `Dispose()` + `IsValidObject` — NO public query method, NO public ctor. Cannot enumerate providers.
+> - `StructuralConnectionsProviderData`: only `Dispose()` + `IsValidObject` — opaque, provider-filled via callback, not readable by us.
+> - `IStructuralConnectionsProvider`: provider-implemented interface (`GetAvailableConnectionTypes`, `GetTypeInfo`, ...), not a queryable list.
+> - `ConnectionValidationInfo`: has a public `.ctor()` + `GetWarning(int)`, `ManyWarnings()`, `IsValidWarningIndex(int)` — BUT no public method produces a populated instance from a placed handler (Revit fills it internally during provider validation). `ConnectionValidationWarning`: props `Reason` (`ConnectionWarning` enum: Unknown/Alignment/Size/Shape/Connectivity), `Resolution` (`ConnectionResolution` enum), `GetParts()`.
+>
+> So all 3 tools return `Ok` with `{ available:false, note:"..." }` (or, for validation, the handler's `CodeCheckingStatus` + the empty `ManyWarnings()` of a fresh info object) — never throw, never fabricate. This mirrors `StructuralSteelToolHelpers.AnyConnectionProviderInstalled()` which already returns false for the same reason.
+
 **Files:**
 - Create: `src/RevitCortex.Tools/StructuralSteel/StructuralSteelProviderTools.cs`
-- Modify: `StructuralSteelTools.cs` (+3 wrappers), `ToolRegistrationTests.cs` (`BASE+54` → `BASE+57`)
+- Modify: `StructuralSteelTools.cs` (+3 wrappers), `ToolRegistrationTests.cs` (178 → 181)
 
-All read-only. RevitCortex does NOT compile provider implementations from MCP input — these are discovery/reporting only. **Reflect `StructuralConnectionsProviderRegistry`/`IStructuralConnectionsProvider`/`ConnectionValidationInfo` first.**
+All read-only. RevitCortex does NOT compile provider implementations from MCP input — these are discovery/reporting only.
 
 - [ ] **Step 1: Create the file with all 3 tools.** Contracts:
   - **`get_structural_connection_provider_registry`** (read): enumerate registered providers via `StructuralConnectionsProviderRegistry` → ids/names/availability. If the registry can't be enumerated safely, return `{ count: 0, available: false, note: "..." }` (never throw).
@@ -1213,7 +1294,7 @@ All read-only. RevitCortex does NOT compile provider implementations from MCP in
 
 - [ ] **Step 2: Build R25 + R24 + R26.**
 - [ ] **Step 3: Add 3 wrappers. Build server.**
-- [ ] **Step 4: Bump threshold `BASE+54` → `BASE+57`; run. PASS.**
+- [ ] **Step 4: Bump threshold 178 → 181 (Module 6 adds 3); run. PASS.**
 - [ ] **Step 5: Commit**
 ```powershell
 git add src/RevitCortex.Tools/StructuralSteel/StructuralSteelProviderTools.cs src/RevitCortex.Server/Tools/StructuralSteelTools.cs src/RevitCortex.Tests/Tools/ToolRegistrationTests.cs

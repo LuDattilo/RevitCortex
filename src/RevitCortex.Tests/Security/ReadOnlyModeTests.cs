@@ -85,6 +85,12 @@ public class ReadOnlyModeTests
     [InlineData("create_rebar_from_shape", false)]
     [InlineData("set_rebar_layout", false)]
     [InlineData("remove_rebar_system", false)]
+    [InlineData("list_steel_connection_handlers", true)]
+    [InlineData("get_steel_element_properties", true)]
+    [InlineData("get_structural_steel_api_capabilities", true)]
+    [InlineData("create_generic_steel_connection", false)]
+    [InlineData("add_steel_solid_cut", false)]
+    [InlineData("delete_steel_connection", false)]
     public void IsReadOnlyTool_ClassifiesCorrectly(string toolName, bool expectedReadOnly)
     {
         Assert.Equal(expectedReadOnly, CortexRouter.IsReadOnlyTool(toolName));
