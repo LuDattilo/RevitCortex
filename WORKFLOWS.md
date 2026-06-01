@@ -763,3 +763,45 @@ ColorByCategory =
 **Porta:** Il listener si apre sulla porta `27016` (una sopra il TCP bridge su `27015`). Se due istanze Revit sono aperte, la seconda salta il listener silenziosamente.
 
 **Documentazione tecnica completa:** `docs/powerbi-live-phase2c-handoff.md` — architettura, threading model, sicurezza, cronologia commit, sintesi per post WIP.
+
+---
+
+## Acciaio Strutturale — Discovery + Connessioni + Tagli
+
+48 strumenti `StructuralSteel`. Coordinate in mm. **Sempre prima:** `get_structural_steel_api_capabilities`.
+
+**Setup / scoperta:**
+1. `get_structural_steel_api_capabilities()` → versione Revit, API custom-connection, presenza provider
+2. `list_steel_connection_handlers(maxResults=50)` → connessioni già presenti (id, tipo, n. elementi connessi)
+3. `list_steel_connection_types()` / `list_steel_approval_types()` → tipi disponibili nel modello
+
+**Creare una connessione generica** (funziona senza provider):
+1. `get_selected_elements()` o filtri per ottenere ≥2 elementi strutturali
+2. `create_generic_steel_connection(elementIds=[id1, id2], connectionName="...")` → `connectionId`
+3. `get_steel_connection_data(connectionId=...)` → verifica elementi connessi, origine
+4. `modify_steel_connection_inputs(connectionId=..., action="add_element_ids", elementIds=[id3])` per aggiungere/togliere elementi
+
+**Fabbricazione (metadati):**
+1. `add_steel_fabrication_info(elementIds=[...], dryRun=true)` → anteprima; poi `dryRun=false`
+2. `get_steel_element_fabrication_properties(elementId=...)` → `hasFabricationProperties`, `uniqueId`
+3. `set_steel_fabrication_unique_id(elementId=..., uniqueId="<GUID>")` se serve fissare l'id
+4. `get_steel_reference_by_fabrication_id(fabricationGuid="<GUID>")` → risale all'elemento
+
+**Tagli (geometria Revit generica, non specifici acciaio):**
+1. `check_steel_cut_eligibility(cutElementId=..., targetElementId=...)` → `solidCutEligible`, `instanceVoidCutEligible`
+2. `add_steel_solid_cut(cutElementId=..., targetElementId=..., dryRun=true)` → anteprima; poi `dryRun=false`
+3. `get_solid_cut_relationships(elementId=...)` → cosa taglia / cosa è tagliato
+4. `remove_steel_solid_cut(...)` per annullare; analoghi `*_instance_void_cut` per i tagli con istanze void
+
+**Avvertenze operative:**
+- Le connessioni **tipizzate** (`create_steel_connection`) e le approvazioni dipendono da un **provider installato** + famiglie compatibili → senza provider restituiscono un errore "provider non disponibile". Quando il provider è incerto, usa `create_generic_steel_connection`.
+- `set_steel_connection_type` **ricrea** la connessione (l'API non ha un setter di tipo): preserva gli elementi connessi ma cambia il `connectionId`.
+- I tool di taglio sono geometria Revit generica (SolidSolidCutUtils / InstanceVoidCutUtils): la risposta lo segnala. Verifica sempre l'idoneità prima con `check_steel_cut_eligibility`.
+- `get_structural_connection_provider_registry/_data` e `get_structural_connection_validation_info` riportano `available:false` con nota: l'infrastruttura provider non è interrogabile via API pubblica.
+
+**NON fare:**
+- Non assumere che esista un'API di code-warning / link-materiali / "external id" sugli elementi steel: `SteelElementProperties` espone solo `UniqueID` + l'associazione di fabbricazione.
+- Non usare `manage_custom_steel_connection_type` aspettandoti mutazioni da JSON: richiede Reference/Subelement selezionati interattivamente; in Revit 2027 le API legacy add/remove sono rimosse.
+- Non considerare un taglio o una connessione una verifica strutturale: è detailing modellato, da validare con calcolo/progetto.
+
+**Fonte:** implementazione API Acciaio Strutturale (6 moduli, 48 tool), branch `feat/structural-steel`, 2026-06; ogni tool verificato contro l'API Revit reale (reflection R23→R27) prima dell'implementazione.
