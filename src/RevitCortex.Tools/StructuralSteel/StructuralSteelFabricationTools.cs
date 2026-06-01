@@ -193,7 +193,9 @@ public class SetSteelFabricationUniqueIdTool : ICortexTool
             {
                 message = $"Set steel fabrication unique id on element {elementId}",
                 elementId,
-                uniqueId = guid.ToString()
+                uniqueId = guid.ToString(),
+                experimental = true,
+                note = "Relies on a non-public SteelElementProperties.UniqueID setter invoked via reflection; may fail on future Revit versions."
             });
         }
         catch (Exception ex)
