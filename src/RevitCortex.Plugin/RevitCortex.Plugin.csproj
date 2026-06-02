@@ -8,9 +8,9 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>RevitCortex.Plugin</RootNamespace>
     <AssemblyName>RevitCortex.Plugin</AssemblyName>
-    <Version>1.0.29</Version>
-    <AssemblyVersion>1.0.29.0</AssemblyVersion>
-    <FileVersion>1.0.29.0</FileVersion>
+    <Version>1.0.30</Version>
+    <AssemblyVersion>1.0.30.0</AssemblyVersion>
+    <FileVersion>1.0.30.0</FileVersion>
   </PropertyGroup>
 
   <!-- Revit 2023 -->
