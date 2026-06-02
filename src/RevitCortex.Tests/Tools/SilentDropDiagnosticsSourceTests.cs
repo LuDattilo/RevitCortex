@@ -42,6 +42,20 @@ public class SilentDropDiagnosticsSourceTests
     }
 
     [Fact]
+    public void ExportToExcel_GatesAutoFitAndSurfacesTruncation()
+    {
+        var src = ReadTool("Elements", "ExportToExcelTool.cs");
+        // AdjustToContents must be gated behind a row-count threshold, not unconditional:
+        // the AdjustToContents call must be guarded by the autoFit flag.
+        Assert.Contains("AutoFitRowThreshold", src);
+        Assert.Contains("if (autoFit)", src);
+        Assert.Contains("AdjustToContents(1, 50)", src);
+        // Truncation must be surfaced, not silent.
+        Assert.Contains("truncated", src);
+        Assert.Contains("Take(maxElements + 1)", src);
+    }
+
+    [Fact]
     public void BulkModify_DoesNotMarkUnassignableValuesAsModified_AndSurfacesFailures()
     {
         var src = ReadTool("Parameters", "BulkModifyParameterValuesTool.cs");

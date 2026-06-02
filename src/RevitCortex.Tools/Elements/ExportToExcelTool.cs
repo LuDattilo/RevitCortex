@@ -63,7 +63,10 @@ public class ExportToExcelTool : ICortexTool
                     .Where(e => e.Category != null);
             }
 
-            var elemList = elements.Take(maxElements).ToList();
+            // Take one extra to detect truncation without materializing the whole set.
+            var probed = elements.Take(maxElements + 1).ToList();
+            var truncated = probed.Count > maxElements;
+            var elemList = truncated ? probed.Take(maxElements).ToList() : probed;
             if (elemList.Count == 0)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No elements found");
 
@@ -166,7 +169,14 @@ public class ExportToExcelTool : ICortexTool
                 row++;
             }
 
-            ws.Columns().AdjustToContents(1, 50);
+            // AdjustToContents measures every cell across all rows — in ClosedXML this is the
+            // dominant cost and scales O(rows × cols) (≈10 s on a 10k-row export). Only auto-fit
+            // when the row count is modest; above the threshold leave default column widths
+            // (the user can auto-fit in Excel). Caller may force with autoFitColumns.
+            const int AutoFitRowThreshold = 2000;
+            var autoFit = input["autoFitColumns"]?.Value<bool?>() ?? (elemList.Count <= AutoFitRowThreshold);
+            if (autoFit)
+                ws.Columns().AdjustToContents(1, 50);
             workbook.SaveAs(filePath);
 
             return CortexResult<object>.Ok(new
@@ -174,7 +184,12 @@ public class ExportToExcelTool : ICortexTool
                 filePath,
                 elementCount = elemList.Count,
                 instanceParameterCount = instanceParamNames.Count,
-                typeParameterCount = typeParamNames.Count
+                typeParameterCount = typeParamNames.Count,
+                columnsAutoFitted = autoFit,
+                truncated,
+                truncationNote = truncated
+                    ? $"Output capped at maxElements={maxElements}; more elements matched. Narrow with 'categories' or raise 'maxElements'."
+                    : null
             });
         }
         catch (Exception ex)
