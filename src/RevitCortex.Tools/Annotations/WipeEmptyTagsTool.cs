@@ -127,16 +127,31 @@ public class WipeEmptyTagsTool : ICortexTool
                 using var tx = new Transaction(doc, "RevitCortex: Wipe Empty Tags");
                 tx.Start();
                 int deleted = 0;
+                // Surface per-tag delete failures (e.g. a tag pinned or in a locked workset)
+                // instead of swallowing them: deletedCount alone hides partial failure.
+                var failures = new List<object>();
                 foreach (dynamic t in emptyTags)
                 {
+                    try
+                    {
 #if REVIT2024_OR_GREATER
-                    try { doc.Delete(new ElementId((long)t.id)); deleted++; } catch { }
+                        doc.Delete(new ElementId((long)t.id));
 #else
-                    try { doc.Delete(new ElementId((int)t.id)); deleted++; } catch { }
+                        doc.Delete(new ElementId((int)t.id));
 #endif
+                        deleted++;
+                    }
+                    catch (Exception ex) { failures.Add(new { id = t.id, reason = ex.Message }); }
                 }
                 tx.Commit();
-                return CortexResult<object>.Ok(new { dryRun = false, deletedCount = deleted, emptyTagCount = emptyTags.Count });
+                return CortexResult<object>.Ok(new
+                {
+                    dryRun = false,
+                    deletedCount = deleted,
+                    emptyTagCount = emptyTags.Count,
+                    failedCount = failures.Count,
+                    failures = failures.Take(50).ToList()
+                });
             }
 
             return CortexResult<object>.Ok(new

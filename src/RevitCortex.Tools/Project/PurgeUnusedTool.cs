@@ -115,22 +115,24 @@ public class PurgeUnusedTool : ICortexTool
                 tx.Start();
                 int deletedTypes = 0, deletedMaterials = 0, deletedTemplates = 0, deletedFilters = 0;
 
+                // Accumulate per-item delete failures instead of swallowing them silently:
+                // an element may be in use/locked/pinned and refuse deletion. Surfacing this
+                // lets the caller distinguish "deleted N, 0 failed" from "deleted N, M failed".
+                var failures = new List<object>();
+                void TryDelete(long id, string kind, Action onSuccess)
+                {
+                    try { doc.Delete(ToolHelpers.ToElementId(id)); onSuccess(); }
+                    catch (Exception ex) { failures.Add(new { id, kind, reason = ex.Message }); }
+                }
+
                 foreach (var ut in unusedTypes)
-                {
-                    try { doc.Delete(ToolHelpers.ToElementId(ut.id)); deletedTypes++; } catch { }
-                }
+                    TryDelete(ut.id, "type", () => deletedTypes++);
                 foreach (var um in unusedMaterials)
-                {
-                    try { doc.Delete(ToolHelpers.ToElementId(um.id)); deletedMaterials++; } catch { }
-                }
+                    TryDelete(um.id, "material", () => deletedMaterials++);
                 foreach (var vt in unusedViewTemplates)
-                {
-                    try { doc.Delete(ToolHelpers.ToElementId((long)vt.id)); deletedTemplates++; } catch { }
-                }
+                    TryDelete((long)vt.id, "viewTemplate", () => deletedTemplates++);
                 foreach (var f in unusedFilters)
-                {
-                    try { doc.Delete(ToolHelpers.ToElementId((long)f.id)); deletedFilters++; } catch { }
-                }
+                    TryDelete((long)f.id, "filter", () => deletedFilters++);
 
                 tx.Commit();
                 return CortexResult<object>.Ok(new
@@ -140,7 +142,9 @@ public class PurgeUnusedTool : ICortexTool
                     deletedMaterials,
                     deletedViewTemplates = deletedTemplates,
                     deletedFilters,
-                    totalDeleted = deletedTypes + deletedMaterials + deletedTemplates + deletedFilters
+                    totalDeleted = deletedTypes + deletedMaterials + deletedTemplates + deletedFilters,
+                    failedCount = failures.Count,
+                    failures = failures.Take(50).ToList()
                 });
             }
 

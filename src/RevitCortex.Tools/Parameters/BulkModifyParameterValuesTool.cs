@@ -75,6 +75,7 @@ public class BulkModifyParameterValuesTool : ICortexTool
 
             var elementList = elements.ToList();
             var modified = new List<object>();
+            var failures = new List<object>();
             var skipped = 0;
 
             if (!dryRun)
@@ -84,12 +85,12 @@ public class BulkModifyParameterValuesTool : ICortexTool
 
                 using var tx = new Transaction(doc, "RevitCortex: Bulk Modify Parameters");
                 tx.Start();
-                ProcessElements(elementList, parameterName!, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped);
+                ProcessElements(elementList, parameterName!, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped, failures);
                 tx.Commit();
             }
             else
             {
-                ProcessElements(elementList, parameterName!, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped, true);
+                ProcessElements(elementList, parameterName!, operation, value, findText, replaceText, onlyEmpty, modified, ref skipped, failures, true);
             }
 
             // Only emit the sample when the caller asks for it. Counts always go out.
@@ -102,6 +103,8 @@ public class BulkModifyParameterValuesTool : ICortexTool
                 dryRun,
                 modifiedCount = modified.Count,
                 skippedCount = skipped,
+                failedCount = failures.Count,
+                failures = failures.Take(50).ToList(),
                 sampleIncluded = includeSample,
                 sampleLimit = includeSample ? (int?)sampleLimit : null,
                 modified = sample
@@ -115,7 +118,7 @@ public class BulkModifyParameterValuesTool : ICortexTool
 
     private static void ProcessElements(IEnumerable<Element> elements, string parameterName, string operation,
         string value, string findText, string replaceText, bool onlyEmpty,
-        List<object> modified, ref int skipped, bool dryRun = false)
+        List<object> modified, ref int skipped, List<object> failures, bool dryRun = false)
     {
         foreach (var elem in elements)
         {
@@ -136,14 +139,41 @@ public class BulkModifyParameterValuesTool : ICortexTool
                 default: skipped++; continue;
             }
 
+            // Determine whether newValue is assignable to this parameter's storage type.
+            // A numeric parameter with an unparsable value must NOT be reported as modified
+            // (the previous code added it to `modified` even though Set() never ran). This
+            // check also makes dryRun honest: it now predicts the same skips as the real run.
+            bool assignable =
+                param.StorageType == StorageType.String ||
+                (param.StorageType == StorageType.Double && double.TryParse(newValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _)) ||
+                (param.StorageType == StorageType.Integer && int.TryParse(newValue, out _)) ||
+                param.StorageType == StorageType.ElementId;
+
+            if (!assignable)
+            {
+                skipped++;
+                failures.Add(new { id = ToolHelpers.GetElementIdValue(elem.Id), reason = $"value '{newValue}' is not assignable to a {param.StorageType} parameter" });
+                continue;
+            }
+
             if (!dryRun)
             {
-                if (param.StorageType == StorageType.String)
-                    param.Set(newValue);
-                else if (param.StorageType == StorageType.Double && double.TryParse(newValue, out var d))
-                    param.Set(d);
-                else if (param.StorageType == StorageType.Integer && int.TryParse(newValue, out var i))
-                    param.Set(i);
+                try
+                {
+                    if (param.StorageType == StorageType.String)
+                        param.Set(newValue);
+                    else if (param.StorageType == StorageType.Double && double.TryParse(newValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
+                        param.Set(d);
+                    else if (param.StorageType == StorageType.Integer && int.TryParse(newValue, out var i))
+                        param.Set(i);
+                    else { skipped++; continue; }  // ElementId or unhandled: not written
+                }
+                catch (Exception ex)
+                {
+                    // Per-element Set failure must not abort the whole batch.
+                    failures.Add(new { id = ToolHelpers.GetElementIdValue(elem.Id), reason = ex.Message });
+                    continue;
+                }
             }
 
             modified.Add(new { id = ToolHelpers.GetElementIdValue(elem.Id), oldValue, newValue });
