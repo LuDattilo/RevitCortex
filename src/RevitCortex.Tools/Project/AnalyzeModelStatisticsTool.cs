@@ -45,16 +45,25 @@ public class AnalyzeModelStatisticsTool : ICortexTool
                 .OrderByDescending(x => x.count)
                 .ToList();
 
-            // Level distribution
+            // Level distribution. Count per level in a SINGLE pass over the already-collected
+            // allElements (grouped by LevelId), instead of re-running a full-document collector
+            // for every level — the previous approach was O(levels × elements). Output is identical:
+            // each level's count is still the number of non-type elements whose LevelId == level.Id;
+            // elements with no level (InvalidElementId) are excluded, exactly as before.
             var levels = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
                 .OrderBy(l => l.Elevation).ToList();
-            var byLevel = levels.Select(level =>
+            var countByLevelId = new Dictionary<ElementId, int>();
+            foreach (var e in allElements)
             {
-                var count = new FilteredElementCollector(doc)
-                    .WhereElementIsNotElementType()
-                    .Where(e => e.LevelId == level.Id)
-                    .Count();
-                return new { level = level.Name, elevation = level.Elevation * 304.8, count };
+                var lid = e.LevelId;
+                if (lid == null || lid == ElementId.InvalidElementId) continue;
+                countByLevelId[lid] = countByLevelId.TryGetValue(lid, out var c) ? c + 1 : 1;
+            }
+            var byLevel = levels.Select(level => new
+            {
+                level = level.Name,
+                elevation = level.Elevation * 304.8,
+                count = countByLevelId.TryGetValue(level.Id, out var c) ? c : 0
             }).ToList();
 
             var result = new

@@ -279,6 +279,29 @@ public static class RebarTools
         return (await revit.ExecuteAsync("split_rebar", p, ct)).ToString();
     }
 
+    [McpServerTool(Name = "set_rebar_varying"), Description("Enable/disable a varying-length rebar set (the 'Varying Rebar Set' command, Revit 2025+). Provide rebarId and enabled (bool): when true the set's constraints drive per-bar lengths. The set must be shape-driven and eligible (CanHaveVaryingLengthBars). Returns a version error on older targets.")]
+    public static async Task<string> SetRebarVarying(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("true = varying-length bars on; false = uniform")] bool enabled,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId, ["enabled"] = enabled };
+        return (await revit.ExecuteAsync("set_rebar_varying", p, ct)).ToString();
+    }
+
+    [McpServerTool(Name = "get_rebar_varying_data"), Description("Read varying-length rebar state (Revit 2025+, read-only): canHaveVaryingLengthBars, varyingEnabled, and per-position centerline length (mm). Provide rebarId, optional includeBarLengths (default true). Returns a version error on older targets.")]
+    public static async Task<string> GetRebarVaryingData(
+        RevitConnectionManager revit,
+        [Description("Rebar element id")] long rebarId,
+        [Description("Include per-position centerline lengths (default true)")] bool? includeBarLengths = null,
+        CancellationToken ct = default)
+    {
+        var p = new JObject { ["rebarId"] = rebarId };
+        if (includeBarLengths != null) p["includeBarLengths"] = includeBarLengths;
+        return (await revit.ExecuteAsync("get_rebar_varying_data", p, ct)).ToString();
+    }
+
     // ── Module 3: area / path reinforcement ──────────────────────────────────
     [McpServerTool(Name = "create_area_reinforcement"), Description("Create an area reinforcement system on a host (wall/floor/foundation). majorDirection is JSON {x,y,z}; optional curves is a JSON array of {type:line|arc, start{x,y,z}, end{x,y,z}, mid?{x,y,z}} in mm for an explicit boundary. memberCount/memberIds reflect the bars after regeneration; if memberCountNote is present the count was still 0 — re-read with get_area_reinforcement_data.")]
     public static async Task<string> CreateAreaReinforcement(

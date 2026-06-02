@@ -334,6 +334,8 @@ Categoria **`Rebar`** — 62 strumenti per l'armatura strutturale (barre, sistem
 | `move_rebar_in_set` | Trasla una singola barra all'interno del set |
 | `include_exclude_rebar_bars` | Includi/escludi singole barre del set in una vista |
 | `split_rebar` | Divide un set a una posizione |
+| `set_rebar_varying` | Attiva/disattiva un set a lunghezza variabile (*Varying Rebar Set*) *(Revit 2025+)* |
+| `get_rebar_varying_data` | Stato lunghezza variabile + lunghezza per posizione (lettura) *(Revit 2025+)* |
 
 ### Sistemi Area / Percorso (scrittura + lettura)
 

@@ -231,28 +231,41 @@ public class CortexRouter
     /// </summary>
     internal static string HashParams(JObject input)
     {
-        var canonical = Canonicalize(input);
-        var json = canonical.ToString(Formatting.None);
-        return ComputeSha256(json);
+        // Emit the canonical JSON directly (object keys sorted recursively, no whitespace)
+        // instead of building a parallel sorted JToken tree and deep-cloning every leaf.
+        // The byte output is identical to the previous Canonicalize(...).ToString(Formatting.None),
+        // so cache keys are unchanged (locked by CortexRouterHashStabilityTests).
+        var sw = new System.IO.StringWriter(new StringBuilder(256),
+            System.Globalization.CultureInfo.InvariantCulture);
+        using (var writer = new JsonTextWriter(sw) { Formatting = Formatting.None })
+        {
+            WriteCanonical(writer, input);
+        }
+        return ComputeSha256(sw.ToString());
     }
 
-    private static JToken Canonicalize(JToken token)
+    private static void WriteCanonical(JsonTextWriter writer, JToken token)
     {
         switch (token.Type)
         {
             case JTokenType.Object:
-                var src = (JObject)token;
-                var sorted = new JObject();
-                foreach (var prop in src.Properties().OrderBy(p => p.Name, StringComparer.Ordinal))
-                    sorted.Add(prop.Name, Canonicalize(prop.Value));
-                return sorted;
+                writer.WriteStartObject();
+                foreach (var prop in ((JObject)token).Properties().OrderBy(p => p.Name, StringComparer.Ordinal))
+                {
+                    writer.WritePropertyName(prop.Name);
+                    WriteCanonical(writer, prop.Value);
+                }
+                writer.WriteEndObject();
+                break;
             case JTokenType.Array:
-                var arr = new JArray();
+                writer.WriteStartArray();
                 foreach (var item in (JArray)token)
-                    arr.Add(Canonicalize(item));
-                return arr;
+                    WriteCanonical(writer, item);
+                writer.WriteEndArray();
+                break;
             default:
-                return token.DeepClone();
+                token.WriteTo(writer);
+                break;
         }
     }
 

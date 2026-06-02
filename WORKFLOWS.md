@@ -870,3 +870,16 @@ ColorByCategory =
 **Nota (memberCount):** `create_area_reinforcement` / `create_path_reinforcement` rigenerano il documento prima di leggere le barre del sistema, quindi `memberCount`/`memberIds` nella risposta di creazione sono veritieri. Se compare `memberCountNote` (conteggio ancora 0 dopo la rigenerazione), le barre si materializzano solo dopo il commit: rileggere con `get_area_reinforcement_data` / `get_path_reinforcement_data` per il conteggio definitivo.
 
 **Fonte:** API Revit Structure — AreaReinforcement / PathReinforcement / FabricArea + limitazione propagate documentata in implementazione
+
+---
+
+### Rebar: Set a lunghezza variabile (Varying Rebar Set) — Revit 2025+
+
+**Sequenza:** `get_rebar_api_capabilities` (verificare `supportsVaryingLengthBars: true`, cioè Revit 2025+) -> `get_rebar_varying_data` (leggere `canHaveVaryingLengthBars`) -> `set_rebar_varying(rebarId, enabled: true)` -> `get_rebar_varying_data` (verifica: `varyingEnabled: true` + `barLengths[]` con lunghezze diverse per posizione)
+**Parametri chiave:**
+- `set_rebar_varying`: `rebarId!`, `enabled!` (bool). Il set deve essere **shape-driven** ed **eleggibile** (`canHaveVaryingLengthBars: true`). Operazione con conferma -> `Cancelled` se annullato.
+- `get_rebar_varying_data`: `rebarId!`, opzionale `includeBarLengths` (default `true`). Restituisce `canHaveVaryingLengthBars`, `varyingEnabled`, `numberOfBarPositions` e la lunghezza centerline (mm) per posizione.
+**Regola operativa:** l'eleggibilità (`canHaveVaryingLengthBars`) è una condizione **più stretta** di "shape-driven": il set deve essere guidato dai vincoli (constraint-driven) con handle vincolati a facce host non parallele, così che le barre assumano lunghezze diverse. Se `canHaveVaryingLengthBars: false`, vincolare prima il set (vedi `manage_rebar_constraints`) -- `set_rebar_varying(enabled: true)` restituisce altrimenti `InvalidInput`. Disabilitare (`enabled: false`) è sempre valido.
+**NON fare:** Non chiamare su Revit < 2025 (gated -> errore con versione minima). Non assumere che ogni set shape-driven sia eleggibile: leggere prima `canHaveVaryingLengthBars`. Non confondere con `set_rebar_layout` (che cambia la distribuzione, non la lunghezza variabile delle singole barre).
+
+**Fonte:** API Revit Structure — `Rebar.CanHaveVaryingLengthBars` + `RebarShapeDrivenAccessor.UseRebarConstraintsToProduceVaryingBars` (verificate per reflection su ref assemblies R23-R27, presenti solo R25+)

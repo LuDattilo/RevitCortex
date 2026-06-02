@@ -49,4 +49,26 @@ public class RebarServerContractTests
             n => Assert.Equal("revit", n),
             n => Assert.Equal("ct", n));
     }
+
+    [Fact]
+    public void SetRebarVarying_ExposesRebarIdAndEnabled()
+    {
+        var m = GetMethod(nameof(RebarTools.SetRebarVarying));
+        var ps = m.GetParameters();
+        Assert.Equal(typeof(RevitConnectionManager), ps[0].ParameterType);
+        Assert.Contains("rebarId", ps.Select(p => p.Name));
+        Assert.Equal(typeof(long), Assert.Single(ps, p => p.Name == "rebarId").ParameterType);
+        // 'enabled' is the varying toggle and must be required (non-nullable bool).
+        var enabled = Assert.Single(ps, p => p.Name == "enabled");
+        Assert.Equal(typeof(bool), enabled.ParameterType);
+        Assert.NotNull(m.GetCustomAttribute<DescriptionAttribute>());
+    }
+
+    [Fact]
+    public void GetRebarVaryingData_ExposesRebarId()
+    {
+        var m = GetMethod(nameof(RebarTools.GetRebarVaryingData));
+        Assert.Contains("rebarId", m.GetParameters().Select(p => p.Name));
+        Assert.Equal(typeof(long), Assert.Single(m.GetParameters(), p => p.Name == "rebarId").ParameterType);
+    }
 }

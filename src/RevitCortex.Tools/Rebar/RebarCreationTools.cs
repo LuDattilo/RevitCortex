@@ -730,3 +730,161 @@ public class SplitRebarTool : ICortexTool
         }
     }
 }
+
+// =====================================================================================================
+// "Varying Rebar Set" (ribbon Set Type panel) — Revit 2025+ only.
+//
+// API verification (reflected from Nice3point ref assemblies before writing):
+//   * Rebar.CanHaveVaryingLengthBars (read-only bool)                              : R25/R26 only (absent R23/R24).
+//   * RebarShapeDrivenAccessor.UseRebarConstraintsToProduceVaryingBars (get/set)   : R25/R26 only (absent R23/R24).
+// There is NO separate VaryingLength* type; toggling the accessor flag turns a constraint-driven
+// shape-driven set into a varying-length set. Per-bar lengths are then read via GetCenterlineCurves(...,
+// barPositionIndex). Gate matches get_rebar_api_capabilities.supportsVaryingLengthBars = year >= 2025.
+// =====================================================================================================
+
+/// <summary>
+/// Toggles whether a shape-driven rebar set produces varying-length bars from its constraints
+/// (the "Varying Rebar Set" command). Revit 2025+ only; returns a version error on older targets.
+/// </summary>
+public class SetRebarVaryingTool : ICortexTool
+{
+    public string Name => "set_rebar_varying";
+    public string Category => "Rebar";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+    public string Description => "Enable/disable a varying-length rebar set (the 'Varying Rebar Set' command, Revit 2025+). Provide rebarId and enabled (bool): when true the set's constraints drive per-bar lengths. The set must be shape-driven and eligible (CanHaveVaryingLengthBars). Returns a version error on older targets.";
+
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+#if REVIT2025_OR_GREATER
+        var (doc, error) = ToolHelpers.RequireDocument(session);
+        if (error != null) return error;
+        var (rebar, rerr) = RebarToolHelpers.RequireRebar(doc!, input["rebarId"]?.Value<long?>());
+        if (rerr != null) return rerr;
+        if (!rebar!.IsRebarShapeDriven())
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "Varying-length bars can only be set on a shape-driven rebar set.",
+                suggestion: "Free-form rebar does not support varying-length sets.");
+        if (input["enabled"] == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "enabled (bool) is required");
+        var enabled = input["enabled"]!.Value<bool>();
+
+        // Only ENABLING requires eligibility; disabling a set is always valid.
+        if (enabled && !rebar.CanHaveVaryingLengthBars)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "This rebar set cannot have varying-length bars (CanHaveVaryingLengthBars is false).",
+                suggestion: "Varying bars require a constraint-driven shape-driven set whose handles are constrained to non-parallel host faces; constrain the set first.");
+
+        if (!session.RequestConfirmation(enabled ? "enable varying rebar set" : "disable varying rebar set", 1))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        using var tx = new Transaction(doc!, "RevitCortex: Set Varying Rebar Set");
+        tx.Start();
+        try
+        {
+            var acc = rebar.GetShapeDrivenAccessor();
+            acc.UseRebarConstraintsToProduceVaryingBars = enabled;
+            // Regenerate so NumberOfBarPositions / per-bar geometry reflect the toggle before we read back.
+            doc!.Regenerate();
+            var resulting = acc.UseRebarConstraintsToProduceVaryingBars;
+            tx.Commit();
+            return CortexResult<object>.Ok(new
+            {
+                message = $"Varying-length bars {(resulting ? "enabled" : "disabled")} for rebar {ToolHelpers.GetElementIdValue(rebar)}",
+                rebarId = ToolHelpers.GetElementIdValue(rebar),
+                varyingEnabled = resulting,
+                numberOfBarPositions = rebar.NumberOfBarPositions
+            });
+        }
+        catch (Exception ex)
+        {
+            if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack();
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed, $"Failed to set varying rebar set: {ex.Message}");
+        }
+#else
+        return RebarToolHelpers.MinVersionError("Varying-length rebar sets", 2025);
+#endif
+    }
+}
+
+/// <summary>
+/// Reads varying-length state of a rebar set: eligibility, the current toggle, and the centerline
+/// length (mm) of each bar position so a varying set's per-bar differences are visible. Revit 2025+,
+/// read-only; returns a version error on older targets.
+/// </summary>
+public class GetRebarVaryingDataTool : ICortexTool
+{
+    public string Name => "get_rebar_varying_data";
+    public string Category => "Rebar";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+    public string Description => "Read varying-length rebar state (Revit 2025+, read-only): canHaveVaryingLengthBars, varyingEnabled, and per-position centerline length (mm). Provide rebarId, optional includeBarLengths (default true). Returns a version error on older targets.";
+
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+#if REVIT2025_OR_GREATER
+        var (doc, error) = ToolHelpers.RequireDocument(session);
+        if (error != null) return error;
+        var (rebar, rerr) = RebarToolHelpers.RequireRebar(doc!, input["rebarId"]?.Value<long?>());
+        if (rerr != null) return rerr;
+
+        var includeBarLengths = input["includeBarLengths"]?.Value<bool?>() ?? true;
+        try
+        {
+            var shapeDriven = rebar!.IsRebarShapeDriven();
+            bool varyingEnabled = false;
+            if (shapeDriven)
+            {
+                try { varyingEnabled = rebar.GetShapeDrivenAccessor().UseRebarConstraintsToProduceVaryingBars; } catch { }
+            }
+
+            var result = new JObject
+            {
+                ["rebarId"] = ToolHelpers.GetElementIdValue(rebar),
+                ["isRebarShapeDriven"] = shapeDriven,
+                ["canHaveVaryingLengthBars"] = rebar.CanHaveVaryingLengthBars,
+                ["varyingEnabled"] = varyingEnabled,
+                ["numberOfBarPositions"] = rebar.NumberOfBarPositions
+            };
+
+            if (includeBarLengths)
+            {
+                var lengths = new JArray();
+                for (int i = 0; i < rebar.NumberOfBarPositions; i++)
+                {
+                    var dto = new JObject { ["barPositionIndex"] = i };
+                    try
+                    {
+                        // Positional args (the 2nd was renamed suppressHooks->suppressHooksAndCranks in R2026);
+                        // position/types are identical across targets. Suppress hooks+bend so the reported length
+                        // is the bar's centerline run, comparable position-to-position.
+                        var curves = rebar.GetCenterlineCurves(
+                            true,                                       // adjustForSelfIntersection
+                            true,                                       // suppressHooks / suppressHooksAndCranks
+                            false,                                      // suppressBendRadius
+                            MultiplanarOption.IncludeOnlyPlanarCurves,  // multiplanarOption
+                            i);                                         // barPositionIndex
+                        double totalFt = 0;
+                        foreach (var c in curves) totalFt += c.Length;
+                        dto["centerlineLengthMm"] = RebarToolHelpers.ToMm(totalFt);
+                    }
+                    catch (Exception exBar)
+                    {
+                        dto["error"] = exBar.Message;
+                    }
+                    lengths.Add(dto);
+                }
+                result["barLengths"] = lengths;
+            }
+
+            return CortexResult<object>.Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed to read varying rebar data: {ex.Message}");
+        }
+#else
+        return RebarToolHelpers.MinVersionError("Varying-length rebar sets", 2025);
+#endif
+    }
+}

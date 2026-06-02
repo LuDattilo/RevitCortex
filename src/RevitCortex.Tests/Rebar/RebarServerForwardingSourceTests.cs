@@ -72,6 +72,22 @@ public class RebarServerForwardingSourceTests
         Assert.Contains("[\"summaryOnly\"] = summaryOnly", src);
     }
 
+    [Fact]
+    public void SetRebarVarying_ForwardsRebarIdAndEnabled()
+    {
+        var src = ReadRebarTools();
+        Assert.Contains("set_rebar_varying", src);
+        Assert.Contains("[\"rebarId\"] = rebarId", src);
+        Assert.Contains("[\"enabled\"] = enabled", src);
+    }
+
+    [Fact]
+    public void GetRebarVaryingData_ForwardsRebarId()
+    {
+        var src = ReadRebarTools();
+        Assert.Contains("get_rebar_varying_data", src);
+    }
+
     // ── Reflection: every wrapper forwards via the SAME name it declares ──────────
     // This is fully deterministic (it never touches the plugin/Tools assembly).
 
