@@ -78,10 +78,9 @@ public class CortexSession
     /// <summary>
     /// When true, all subsequent confirmations are auto-approved. Set by "Auto"
     /// in the confirmation dialog. Cleared by the user (Stop Auto / closing the
-    /// Auto mode window), on document close (Reinitialize), or by an inactivity
-    /// timeout owned by the UI layer. Unlike ApproveAll (a fixed 120 s wall-clock
-    /// window), AutoMode has no built-in timeout — the UI decides when a burst of
-    /// operations has ended, driven by <see cref="AutoModeActivity"/>.
+    /// Auto mode window), or on document close (Reinitialize). Unlike ApproveAll
+    /// (a fixed 120 s wall-clock window), AutoMode has no timeout and continues
+    /// until an explicit stop path.
     /// </summary>
     public bool AutoMode
     {
@@ -92,9 +91,8 @@ public class CortexSession
 
     /// <summary>
     /// Raised every time a destructive operation is auto-approved because
-    /// AutoMode is on. The Plugin subscribes to reset its inactivity timer so the
-    /// Auto mode window stays open during a burst and closes shortly after the
-    /// last operation. Core stays Revit-agnostic — it only signals activity.
+    /// AutoMode is on. Core stays Revit-agnostic: UI layers can use this for
+    /// status updates without changing the lifetime of Auto mode.
     /// </summary>
     public event Action? AutoModeActivity;
 
@@ -164,8 +162,9 @@ public class CortexSession
     }
 
     /// <summary>
-    /// Resets both ApproveAll and AutoMode. Called when the user stops Auto mode
-    /// (Stop Auto button / closing the Auto mode window) or when a batch completes.
+    /// Resets both transient confirmation modes. Use this only for explicit stop
+    /// or session-boundary paths; the router clears ApproveAll directly after
+    /// each tool so AutoMode can remain active.
     /// </summary>
     public void ResetApproveAll()
     {

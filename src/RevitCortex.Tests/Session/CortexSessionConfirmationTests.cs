@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using RevitCortex.Core.Discovery;
 using RevitCortex.Core.Session;
 using Xunit;
@@ -14,6 +15,13 @@ namespace RevitCortex.Tests.Session;
 public class CortexSessionConfirmationTests
 {
     private static CortexSession NewSession() => new CortexSession(new SessionStore());
+
+    private static string ReadAutoModeWindowSource()
+    {
+        var path = Path.GetFullPath(Path.Combine("..", "..", "..", "..",
+            "RevitCortex.Plugin", "UI", "AutoModeWindow.xaml.cs"));
+        return File.ReadAllText(path);
+    }
 
     // ── AutoMode auto-approval ───────────────────────────────────────────────
 
@@ -51,13 +59,12 @@ public class CortexSessionConfirmationTests
         var session = NewSession();
         session.AutoMode = true;
 
-        // ApproveAll expires after 120 s by wall clock; AutoMode must not at the
-        // session level — the inactivity timeout lives in the UI layer, driven by
-        // the AutoModeActivity signal (see RequestConfirmation_*Activity tests).
+        // ApproveAll expires after 120 s by wall clock; AutoMode must not.
+        // It stays active until Stop Auto/window close or a document boundary.
         Assert.True(session.AutoMode);
     }
 
-    // ── Activity signal (drives the UI inactivity timer) ─────────────────────
+    // ── Activity signal (optional UI status hook) ────────────────────────────
 
     [Fact]
     public void RequestConfirmation_WhenAutoModeOn_FiresAutoModeActivity()
@@ -84,6 +91,16 @@ public class CortexSessionConfirmationTests
         session.RequestConfirmation("delete", 5);
 
         Assert.False(activityFired);
+    }
+
+    [Fact]
+    public void AutoModeWindow_HasNoInactivityTimer()
+    {
+        var source = ReadAutoModeWindowSource();
+
+        Assert.DoesNotContain("DispatcherTimer", source);
+        Assert.DoesNotContain("InactivitySeconds", source);
+        Assert.DoesNotContain("OnInactivityElapsed", source);
     }
 
     // ── Reset on document boundary ───────────────────────────────────────────

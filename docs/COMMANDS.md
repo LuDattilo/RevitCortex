@@ -4,7 +4,7 @@
 >
 > Non devi conoscere i nomi tecnici dei comandi: scrivi la richiesta in italiano naturale e l'assistente sceglie lo strumento giusto. Gli esempi qui sotto servono a darti un'idea di *cosa* puoi chiedere.
 
-**Versione:** 1.0.28 · **Aggiornato:** 2026-05-29
+**Versione:** 1.0.28 · **Aggiornato:** 2026-06-02
 
 ## Come si usa
 
@@ -14,7 +14,7 @@ Apri Claude Code (o Codex) sul progetto, assicurati che RevitCortex sia avviato 
 - *"Crea una pianta del piano terra in scala 1:100 e mettila su una tavola A-101"*
 - *"Controlla le interferenze tra strutture e impianti"*
 
-Per le operazioni che modificano il modello (creazione, modifica, eliminazione) RevitCortex mostra una **conferma nativa in Revit** prima di agire. In modalità *Auto* (pulsante sul ribbon) le conferme vengono approvate automaticamente per operazioni in serie.
+Per le operazioni che modificano il modello (creazione, modifica, eliminazione) RevitCortex mostra una **conferma nativa in Revit** prima di agire. In modalità *Auto* le conferme vengono approvate automaticamente e continuano finché l'utente non preme **Stop Auto**, chiude la finestra Auto o cambia/chiude documento.
 
 ## Indice
 

@@ -313,9 +313,8 @@ public class RevitCortexApp : IExternalApplication
     }
 
     /// <summary>
-    /// Forwards an Auto-mode auto-approval to the floating window so it can reset
-    /// its inactivity timer. Marshals to the UI thread (the signal originates on
-    /// the tool-execution thread).
+    /// Forwards an Auto-mode auto-approval to the floating window. Marshals to
+    /// the UI thread because the signal originates on the tool-execution thread.
     /// </summary>
     private void OnAutoModeActivity()
     {
