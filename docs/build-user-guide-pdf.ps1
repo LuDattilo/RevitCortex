@@ -32,7 +32,10 @@ strong { color: #0b1f33; }
 '@ | Set-Content -Path $css -Encoding UTF8
 
 Write-Host "pandoc: md -> HTML..."
-pandoc $md -f gfm -t html5 -s --embed-resources --css $css --metadata title="RevitCortex - Guida Utente" -o $html
+# NB: niente --metadata title: il markdown ha gia' il proprio '# RevitCortex - Guida Utente'
+# come primo h1; passarlo come metadata genererebbe un h1.title duplicato in prima pagina.
+# --metadata title vuoto sopprime l'avviso pandoc sul titolo mancante.
+pandoc $md -f gfm -t html5 -s --embed-resources --css $css --metadata title="" -o $html
 if ($LASTEXITCODE -ne 0) { throw "pandoc fallito" }
 
 $chrome = @(
