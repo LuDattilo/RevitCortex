@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
@@ -56,30 +57,28 @@ public class SetElementParametersTool : ICortexTool
                     continue;
                 }
 
-                // Try instance parameter first, then fall back to type parameter
-                var param = element.LookupParameter(req.ParameterName);
-                if (param == null)
-                {
-                    var typeId = element.GetTypeId();
-                    if (typeId != ElementId.InvalidElementId)
-                    {
-                        var typeElem = doc.GetElement(typeId);
-                        param = typeElem?.LookupParameter(req.ParameterName);
-                    }
-                }
+                var param = ParameterLookup.FindParameter(
+                    element,
+                    req.ParameterName,
+                    req.BuiltInParameter,
+                    out var requestedParameter,
+                    out var matchedBuiltInParameter);
 
                 if (param == null)
                 {
-                    results.Add(new { elementId = req.ElementId, parameterName = req.ParameterName,
-                        success = false, message = $"Parameter '{req.ParameterName}' not found" });
+                    results.Add(new { elementId = req.ElementId, parameterName = requestedParameter,
+                        builtInParameter = matchedBuiltInParameter,
+                        success = false, message = $"Parameter '{requestedParameter}' not found" });
                     failCount++;
                     continue;
                 }
 
                 if (param.IsReadOnly)
                 {
-                    results.Add(new { elementId = req.ElementId, parameterName = req.ParameterName,
-                        success = false, message = $"Parameter '{req.ParameterName}' is read-only" });
+                    results.Add(new { elementId = req.ElementId, parameterName = requestedParameter,
+                        resolvedParameterName = param.Definition?.Name,
+                        builtInParameter = matchedBuiltInParameter,
+                        success = false, message = $"Parameter '{requestedParameter}' is read-only" });
                     failCount++;
                     continue;
                 }
@@ -90,20 +89,26 @@ public class SetElementParametersTool : ICortexTool
                     bool set = isClear ? ClearParameterValue(param) : SetParameterValue(param, req.Value);
                     if (set)
                     {
-                        results.Add(new { elementId = req.ElementId, parameterName = req.ParameterName,
+                        results.Add(new { elementId = req.ElementId, parameterName = requestedParameter,
+                            resolvedParameterName = param.Definition?.Name,
+                            builtInParameter = matchedBuiltInParameter,
                             success = true, message = isClear ? "Parameter cleared" : "Parameter set successfully" });
                         successCount++;
                     }
                     else
                     {
-                        results.Add(new { elementId = req.ElementId, parameterName = req.ParameterName,
+                        results.Add(new { elementId = req.ElementId, parameterName = requestedParameter,
+                            resolvedParameterName = param.Definition?.Name,
+                            builtInParameter = matchedBuiltInParameter,
                             success = false, message = isClear ? "Failed to clear parameter value" : "Failed to set parameter value" });
                         failCount++;
                     }
                 }
                 catch (Exception ex)
                 {
-                    results.Add(new { elementId = req.ElementId, parameterName = req.ParameterName,
+                    results.Add(new { elementId = req.ElementId, parameterName = requestedParameter,
+                        resolvedParameterName = param.Definition?.Name,
+                        builtInParameter = matchedBuiltInParameter,
                         success = false, message = ex.Message });
                     failCount++;
                 }
@@ -134,6 +139,9 @@ public class SetElementParametersTool : ICortexTool
         // Values from JSON deserialization arrive as JToken — handle explicitly
         if (value is JToken jToken)
         {
+            if (jToken.Type == JTokenType.Null || jToken.Type == JTokenType.Undefined)
+                return false;
+
             switch (param.StorageType)
             {
                 case StorageType.String:
@@ -222,6 +230,7 @@ public class SetElementParametersTool : ICortexTool
     {
         public long ElementId { get; set; }
         public string ParameterName { get; set; } = "";
+        public string BuiltInParameter { get; set; } = "";
         public object? Value { get; set; }
     }
 }

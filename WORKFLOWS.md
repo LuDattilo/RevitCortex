@@ -57,6 +57,19 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 ---
 
+## Aggiornamento Parametri Built-In
+
+**Sequenza:** `get_element_parameters` su elemento campione -> leggere `builtInParameter` nella riga del parametro -> `set_element_parameters` con `builtInParameter` invece di affidarsi al nome display
+**Parametri chiave:**
+- `set_element_parameters`: ogni request puo usare `builtInParameter` (es. `REBAR_SYSTEM_SPACING_TOP_DIR_1`) al posto di `parameterName`
+- Per lunghezze/interassi, passare valori con unita display come stringa, es. `"200 mm"`, quando non si vuole usare l'unita interna Revit
+- Utile per parametri localizzati, duplicati o non risolti bene da `LookupParameter`, come gli interassi di `AreaReinforcementType`
+**NON fare:** Non dichiarare che il parametro non e esposto via API solo perche `LookupParameter(nome)` non lo trova. Verificare prima se esiste un `BuiltInParameter`.
+
+**Fonte:** sessione 2026-06-03 (fix builtInParameter in set/get element parameters)
+
+---
+
 ## Aggiornamento Parametri Diversi per Elemento
 
 **Sequenza:** preparare CSV con colonne ElementId + parametri -> `sync_csv_parameters`

@@ -122,6 +122,7 @@ public class GetElementParametersTool : ICortexTool
         return new
         {
             name = prefix + (param.Definition?.Name ?? "Unknown"),
+            builtInParameter = ParameterLookup.GetBuiltInParameterName(param),
             value,
             hasValue = param.HasValue,
             isReadOnly = param.IsReadOnly,
