@@ -12,7 +12,7 @@
 ;   Output: installer\Output\RevitCortex-Setup.exe
 
 #define MyAppName "RevitCortex"
-#define MyAppVersion "1.0.32"
+#define MyAppVersion "1.0.33"
 #define MyAppPublisher "Luigi Dattilo"
 #define MyAppURL "https://github.com/LuDattilo/RevitCortex"
 
