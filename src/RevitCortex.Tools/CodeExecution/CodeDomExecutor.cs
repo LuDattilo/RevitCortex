@@ -40,13 +40,19 @@ public static class CodeDomExecutor
                 IncludeDebugInformation = false,
             };
 
-            // Add references from loaded assemblies
+            // Add references from loaded assemblies, deduplicated by simple
+            // assembly name to avoid conflicts from other Revit add-ins.
+            var seenReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
                 try
                 {
                     if (!asm.IsDynamic && !string.IsNullOrEmpty(asm.Location))
-                        parameters.ReferencedAssemblies.Add(asm.Location);
+                    {
+                        var name = asm.GetName().Name ?? string.Empty;
+                        if (seenReferences.Add(name))
+                            parameters.ReferencedAssemblies.Add(asm.Location);
+                    }
                 }
                 catch { }
             }

@@ -32,23 +32,7 @@ public static class RoslynExecutor
         {
             var wrappedCode = WrapCode(code);
 
-            // Collect file-based references — deduplicate by simple name to avoid
-            // "assembly already imported" errors when multiple plugins load the same DLL
-            var refs = new List<MetadataReference>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                try
-                {
-                    if (!asm.IsDynamic && !string.IsNullOrEmpty(asm.Location))
-                    {
-                        var name = asm.GetName().Name ?? string.Empty;
-                        if (seen.Add(name))
-                            refs.Add(MetadataReference.CreateFromFile(asm.Location));
-                    }
-                }
-                catch { }
-            }
+            var refs = BuildReferences();
 
             var parseOptions = CSharpParseOptions.Default
                 .WithLanguageVersion(LanguageVersion.Latest);
@@ -166,6 +150,109 @@ public static class RoslynExecutor
         sb.AppendLine("  }");
         sb.AppendLine("}");
         return sb.ToString();
+    }
+
+    private static List<MetadataReference> BuildReferences()
+    {
+        var refs = new List<MetadataReference>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Revit hosts many add-ins in one process. Some ship private copies of
+        // framework assemblies, so loaded-assembly enumeration can leak duplicate
+        // identities into Roslyn before user code is compiled.
+        AddTrustedPlatformAssemblies(refs, seen);
+
+        AddAssembly(refs, seen, typeof(object).Assembly);
+        AddAssembly(refs, seen, typeof(Enumerable).Assembly);
+        AddAssembly(refs, seen, typeof(List<>).Assembly);
+        AddAssembly(refs, seen, typeof(Document).Assembly);
+        AddAssembly(refs, seen, typeof(Autodesk.Revit.UI.UIDocument).Assembly);
+        AddAssembly(refs, seen, typeof(JObject).Assembly);
+
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (ShouldReferenceLoadedAssembly(asm))
+                AddAssembly(refs, seen, asm);
+        }
+
+        return refs;
+    }
+
+    private static void AddTrustedPlatformAssemblies(List<MetadataReference> refs, HashSet<string> seen)
+    {
+        var tpa = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+        if (string.IsNullOrEmpty(tpa))
+            return;
+
+        foreach (var path in tpa.Split(Path.PathSeparator))
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                continue;
+
+            var name = Path.GetFileNameWithoutExtension(path);
+            if (!IsFrameworkReference(name))
+                continue;
+
+            AddReferencePath(refs, seen, path);
+        }
+    }
+
+    private static bool IsFrameworkReference(string name)
+    {
+        return name == "netstandard"
+            || name == "Microsoft.CSharp"
+            || name == "WindowsBase"
+            || name == "PresentationCore"
+            || name == "PresentationFramework"
+            || name.StartsWith("System.", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldReferenceLoadedAssembly(Assembly asm)
+    {
+        try
+        {
+            if (asm.IsDynamic || string.IsNullOrEmpty(asm.Location))
+                return false;
+
+            var name = asm.GetName().Name ?? string.Empty;
+            return name == "RevitAPI"
+                || name == "RevitAPIUI"
+                || name == "Newtonsoft.Json"
+                || name.StartsWith("Autodesk.Revit.", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("RevitCortex.", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void AddAssembly(List<MetadataReference> refs, HashSet<string> seen, Assembly asm)
+    {
+        try
+        {
+            if (asm.IsDynamic || string.IsNullOrEmpty(asm.Location))
+                return;
+
+            AddReferencePath(refs, seen, asm.Location);
+        }
+        catch { }
+    }
+
+    private static void AddReferencePath(List<MetadataReference> refs, HashSet<string> seen, string path)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return;
+
+            var name = Path.GetFileNameWithoutExtension(path);
+            if (string.IsNullOrEmpty(name) || !seen.Add(name))
+                return;
+
+            refs.Add(MetadataReference.CreateFromFile(path));
+        }
+        catch { }
     }
 
     private static object SerializeResult(object? result)
