@@ -66,7 +66,15 @@ public class IfcReloadLinkTool : ICortexTool
             {
                 var revitFilePath = newIfcFilePath + ".RVT";
                 var options = new RevitLinkOptions(false);
-                RevitLinkType.CreateFromIFC(doc!, newIfcFilePath, revitFilePath, recreateLink, options);
+                // CreateFromIFC modifies the document and must run inside a transaction
+                // (mirrors IfcLinkTool). Without it Revit throws "Cannot modify the document
+                // outside of a transaction" (ultrareview C6).
+                using (var tx = new Transaction(doc!, "RevitCortex: Reload IFC Link"))
+                {
+                    tx.Start();
+                    RevitLinkType.CreateFromIFC(doc!, newIfcFilePath, revitFilePath, recreateLink, options);
+                    tx.Commit();
+                }
             }
             else
             {

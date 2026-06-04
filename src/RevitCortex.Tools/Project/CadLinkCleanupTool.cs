@@ -66,11 +66,8 @@ public class CadLinkCleanupTool : ICortexTool
                 });
             }
 
-            // Delete action
-            using var tx = new Transaction(doc, "RevitCortex: CAD Link Cleanup");
-            tx.Start();
-            int deleted = 0;
-
+            // Delete action — resolve the target set BEFORE opening the transaction so the
+            // confirmation dialog reports an accurate count (ultrareview C7).
             var toDelete = imports.AsEnumerable();
             if (elementIds.Count > 0)
             {
@@ -83,7 +80,15 @@ public class CadLinkCleanupTool : ICortexTool
                 if (!deleteLinks) toDelete = toDelete.Where(i => !i.IsLinked);
             }
 
-            foreach (var item in toDelete.ToList())
+            var targets = toDelete.ToList();
+
+            if (!session.RequestConfirmation("delete CAD imports/links", targets.Count))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+            using var tx = new Transaction(doc, "RevitCortex: CAD Link Cleanup");
+            tx.Start();
+            int deleted = 0;
+            foreach (var item in targets)
             {
                 try { doc.Delete(item.Id); deleted++; } catch { }
             }

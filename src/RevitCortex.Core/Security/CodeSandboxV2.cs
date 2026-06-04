@@ -19,7 +19,7 @@ public static class CodeSandboxV2
         "System.Net",
         "System.Diagnostics.Process",
         "Microsoft.Win32",
-        "System.Reflection.Emit",
+        "System.Reflection",   // covers .Emit too; blocks reflection-based sandbox escapes
         "System.Runtime.InteropServices",
     };
 
@@ -33,7 +33,7 @@ public static class CodeSandboxV2
         new Regex(@"\b(File|Directory|Path)\s*\.\s*(Read|Write|Delete|Move|Copy|Create|Exists|Open|Append|GetFiles|GetDirectories)\w*", RegexOptions.Compiled),
         new Regex(@"\b(WebClient|HttpClient|WebRequest|HttpWebRequest|TcpClient|Socket)\b", RegexOptions.Compiled),
         new Regex(@"\bRegistry(Key)?\s*\.\s*(Open|Get|Set|Create|Delete)\b", RegexOptions.Compiled),
-        new Regex(@"\bEnvironment\s*\.\s*(Exit|SetEnvironmentVariable)\b", RegexOptions.Compiled),
+        new Regex(@"\bEnvironment\s*\.\s*(Exit|SetEnvironmentVariable|GetEnvironmentVariable|GetEnvironmentVariables|GetFolderPath|GetCommandLineArgs|ExpandEnvironmentVariables|MachineName|UserName|UserDomainName|CurrentDirectory|SystemDirectory|ProcessPath|StackTrace)\b", RegexOptions.Compiled),
         new Regex(@"\bAssembly\s*\.\s*(Load|LoadFrom|LoadFile)\b", RegexOptions.Compiled),
         // Reflection bypasses (no-arg / fixed-form)
         new Regex(@"\bType\s*\.\s*GetType\b", RegexOptions.Compiled),
@@ -43,6 +43,15 @@ public static class CodeSandboxV2
         new Regex(@"\btypeof\s*\([^)]+\)\s*\.\s*(GetMethod|GetField|GetProperty|GetMember|GetConstructor|InvokeMember)\b", RegexOptions.Compiled),
         // dynamic keyword opens late-bound dispatch — bypasses static pattern matching entirely
         new Regex(@"\bdynamic\b", RegexOptions.Compiled),
+        // Reflection enumerators (zero-arg, plural) — the entry point for "enumerate members then
+        // Invoke one" escapes. Distinct from the deliberately-allowed singular obj.GetType() and
+        // type.GetMethod("name") (the latter is caught by ReflectionWithArgumentPatterns when abused).
+        new Regex(@"\.\s*(GetTypes|GetMethods|GetConstructors|GetMembers|GetFields|GetProperties|GetInterfaces|GetNestedTypes|GetRuntimeMethods|GetRuntimeFields|GetRuntimeProperties)\s*\(", RegexOptions.Compiled),
+        // Any reflective invoke on a value (m.Invoke(...), ctor.Invoke(...), del.DynamicInvoke(...)).
+        // The earlier \bMethodInfo\.Invoke\b literal only caught the class-name form, not a variable.
+        new Regex(@"\.\s*(Invoke|DynamicInvoke)\s*\(", RegexOptions.Compiled),
+        // Assembly acquisition — the root of a reflection walk over loaded types.
+        new Regex(@"\b(GetExecutingAssembly|GetCallingAssembly|GetEntryAssembly)\b", RegexOptions.Compiled),
     };
 
     // Patterns checked against the ORIGINAL code (string literals NOT stripped). We need this
@@ -63,11 +72,14 @@ public static class CodeSandboxV2
         if (string.IsNullOrWhiteSpace(code)) return null;
 
         var cleaned = StripCommentsAndStrings(code);
+        // Collapse whitespace around member-access dots so a prohibited namespace cannot be
+        // smuggled past the substring check as "System . IO" or "System.\n  IO" (C2 hardening).
+        var normalized = Regex.Replace(cleaned, @"\s*\.\s*", ".");
         var violations = new List<string>();
 
         foreach (var ns in ProhibitedNamespaces)
         {
-            if (cleaned.Contains(ns))
+            if (normalized.Contains(ns))
                 violations.Add(ns);
         }
 

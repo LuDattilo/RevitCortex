@@ -101,6 +101,7 @@ public static class UpdateChecker
         var versionStr = (string?)obj["version"];
         var downloadUrl = (string?)obj["downloadUrl"];
         var changelog = (string?)obj["changelog"];
+        var sha256 = (string?)obj["sha256"];
 
         if (string.IsNullOrWhiteSpace(versionStr) ||
             string.IsNullOrWhiteSpace(downloadUrl))
@@ -110,11 +111,22 @@ public static class UpdateChecker
 
         if (!Version.TryParse(versionStr, out var remoteVer)) return;
 
+        // Security (C5): refuse to advertise an update whose download URL is not on a
+        // trusted host. A poisoned manifest could otherwise aim the elevated installer
+        // at an attacker-controlled server.
+        if (!IsTrustedDownloadUrl(downloadUrl))
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[RevitCortex] Update manifest rejected: untrusted downloadUrl '{downloadUrl}'.");
+            return;
+        }
+
         Latest = new UpdateInfo(
             remoteVer,
             downloadUrl!,
             changelog ?? string.Empty,
-            remoteVer > CurrentVersion);
+            remoteVer > CurrentVersion,
+            string.IsNullOrWhiteSpace(sha256) ? null : sha256!.Trim());
 
         if (Latest.HasUpdate)
             UpdateAvailable?.Invoke();
@@ -137,6 +149,14 @@ public static class UpdateChecker
         lock (_progressLock) { _downloadProgress = (0, 0); }
 
         var url = Latest.DownloadUrl;
+        // Defense in depth (C5): Latest is only set after IsTrustedDownloadUrl in CheckAsync,
+        // but re-validate before pulling bytes that will be run elevated.
+        if (!IsTrustedDownloadUrl(url))
+        {
+            _state = DownloadState.Error;
+            _downloadError = "Refusing to download update from an untrusted URL.";
+            return;
+        }
         var ct = _cts.Token;
 
         Task.Run(async () =>
@@ -150,6 +170,17 @@ public static class UpdateChecker
                 {
                     _state = DownloadState.Error;
                     _downloadError = result.ErrorMessage;
+                    return;
+                }
+
+                // Security (C4): if the trusted manifest published a SHA-256, the downloaded
+                // artifact must match it before we extract and run the elevated installer.
+                var expectedHash = Latest?.Sha256;
+                if (!string.IsNullOrWhiteSpace(expectedHash) && !Sha256Matches(TempZipPath, expectedHash))
+                {
+                    _state = DownloadState.Error;
+                    _downloadError = "Update aborted: downloaded file failed its SHA-256 integrity check.";
+                    try { File.Delete(TempZipPath); } catch { /* best effort cleanup */ }
                     return;
                 }
 
@@ -225,6 +256,62 @@ public static class UpdateChecker
         lock (_progressLock) { _downloadProgress = (0, 0); }
         _extractedPath = null;
     }
+
+    // --- Security helpers (ultrareview 2026-06-04, criticals C4/C5) ---
+
+    // Release artifacts are hosted on GitHub (releases repo) or OneDrive/SharePoint
+    // (the manifest historically used 1drv.ms). Extend this list if the host changes.
+    private static readonly string[] AllowedDownloadHostSuffixes =
+    {
+        "githubusercontent.com",
+        "github.com",
+        "1drv.ms",
+        "onedrive.live.com",
+        "sharepoint.com",
+    };
+
+    /// <summary>
+    /// True only for an HTTPS URL whose host is a known release-hosting domain.
+    /// Fails closed: an unrecognized host is rejected so a poisoned manifest cannot
+    /// point the elevated installer at an attacker-controlled server (C5).
+    /// </summary>
+    public static bool IsTrustedDownloadUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri is null) return false;
+        if (!string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase)) return false;
+
+        var host = uri.Host;
+        foreach (var suffix in AllowedDownloadHostSuffixes)
+        {
+            if (host.Equals(suffix, StringComparison.OrdinalIgnoreCase) ||
+                host.EndsWith("." + suffix, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// True if the file at <paramref name="filePath"/> matches the given SHA-256 hex
+    /// digest (case-insensitive). Used to verify download integrity against the hash
+    /// published in the trusted manifest before the elevated installer runs (C4).
+    /// </summary>
+    public static bool Sha256Matches(string filePath, string? expectedHex)
+    {
+        if (string.IsNullOrWhiteSpace(expectedHex)) return false;
+        if (!File.Exists(filePath)) return false;
+
+        string actual;
+        using (var sha = System.Security.Cryptography.SHA256.Create())
+        using (var stream = File.OpenRead(filePath))
+        {
+            var hash = sha.ComputeHash(stream);
+            actual = BitConverter.ToString(hash).Replace("-", string.Empty);
+        }
+
+        var expected = expectedHex!.Trim().Replace(" ", string.Empty);
+        return string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 public class UpdateInfo
@@ -233,12 +320,14 @@ public class UpdateInfo
     public string DownloadUrl { get; }
     public string Changelog { get; }
     public bool HasUpdate { get; }
+    public string? Sha256 { get; }
 
-    public UpdateInfo(Version remoteVersion, string downloadUrl, string changelog, bool hasUpdate)
+    public UpdateInfo(Version remoteVersion, string downloadUrl, string changelog, bool hasUpdate, string? sha256 = null)
     {
         RemoteVersion = remoteVersion;
         DownloadUrl = downloadUrl;
         Changelog = changelog;
         HasUpdate = hasUpdate;
+        Sha256 = sha256;
     }
 }
