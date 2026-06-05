@@ -36,6 +36,11 @@ public class BatchModifyViewRangeTool : ICortexTool
         if (viewIds.Count == 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "viewIds array is required");
 
+        // H9: confirm before modifying view ranges across a set of views.
+        if (!session.RequestConfirmation("modify view range for", viewIds.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled,
+                "Operation cancelled by user");
+
         try
         {
             var results = new List<object>();

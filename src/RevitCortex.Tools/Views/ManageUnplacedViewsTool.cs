@@ -64,6 +64,11 @@ public class ManageUnplacedViewsTool : ICortexTool
 
             if (action == "delete" && !dryRun)
             {
+                // H4: confirm before permanently deleting views.
+                if (!session.RequestConfirmation("delete unplaced views", views.Count))
+                    return CortexResult<object>.Fail(CortexErrorCode.Cancelled,
+                        "Operation cancelled by user");
+
                 using var tx = new Transaction(doc, "RevitCortex: Delete Unplaced Views");
                 tx.Start();
                 int deleted = 0;
