@@ -19,6 +19,14 @@ export class RevitClient {
       const timeout = setTimeout(() => reject(new Error("Connection timed out")), 5000);
       this.socket.on("connect", () => {
         clearTimeout(timeout);
+        // H12: once connected, the connect-phase error listener becomes a no-op (its
+        // Promise is settled). Install persistent error/close handlers so a mid-command
+        // socket failure (Revit crash, TCP reset) rejects the pending sendCommand
+        // immediately instead of leaving it hung for the full 5-minute timeout — which
+        // also holds the connection mutex and freezes every other tool call.
+        this.socket.on("error", (err) => this.failAllPending(err));
+        this.socket.on("close", () =>
+          this.failAllPending(new Error("Connection to Revit closed unexpectedly")));
         resolve();
       });
       this.socket.on("error", (err) => {
@@ -28,6 +36,23 @@ export class RevitClient {
       this.socket.on("data", (data) => this.onData(data));
       this.socket.connect(this.port, this.host);
     });
+  }
+
+  /** Reject every in-flight command and clear its timeout (H12). */
+  private failAllPending(err: Error): void {
+    for (const timeout of this.timeouts.values()) clearTimeout(timeout);
+    this.timeouts.clear();
+    const callbacks = Array.from(this.responseCallbacks.values());
+    this.responseCallbacks.clear();
+    for (const cb of callbacks) {
+      // Each callback parses the line and resolves/rejects its Promise; feed it a
+      // JSON-RPC error envelope so it rejects rather than hangs.
+      try {
+        cb(JSON.stringify({ jsonrpc: "2.0", error: { message: err.message } }));
+      } catch {
+        // ignore — the Promise is being torn down anyway
+      }
+    }
   }
 
   disconnect(): void {

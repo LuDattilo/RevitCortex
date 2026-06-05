@@ -2,7 +2,7 @@ import initSqlJs, { Database as SqlJsDatabase } from "sql.js";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { homedir } from "os";
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync, renameSync } from "fs";
 
 const __bundledir = dirname(fileURLToPath(import.meta.url));
 
@@ -13,18 +13,27 @@ const DB_PATH = join(DB_DIR, "usage-mcp.db");
 let db: SqlJsDatabase | null = null;
 let savePending = false;
 
+// H37: atomic temp-file + rename so a crash mid-write can't truncate the DB and
+// trigger getUsageDatabase()'s catch{} into silently recreating an empty database.
+function atomicWriteDb() {
+  if (!db) return;
+  const tmp = DB_PATH + ".tmp";
+  writeFileSync(tmp, Buffer.from(db.export()));
+  renameSync(tmp, DB_PATH);
+}
+
 function scheduleSave() {
   if (savePending) return;
   savePending = true;
   setImmediate(() => {
     savePending = false;
-    if (db) writeFileSync(DB_PATH, Buffer.from(db.export()));
+    atomicWriteDb();
   });
 }
 
 function flushDatabase() {
   savePending = false;
-  if (db) writeFileSync(DB_PATH, Buffer.from(db.export()));
+  atomicWriteDb();
 }
 
 export async function getUsageDatabase(): Promise<SqlJsDatabase> {

@@ -2,7 +2,7 @@ import initSqlJs, { Database as SqlJsDatabase } from "sql.js";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { homedir } from "os";
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync, renameSync } from "fs";
 
 const __bundledir = dirname(fileURLToPath(import.meta.url));
 
@@ -13,18 +13,29 @@ const DB_PATH = join(DB_DIR, "revitcortex-data.db");
 let db: SqlJsDatabase | null = null;
 let savePending = false;
 
+// H37: write to a temp file then atomically rename over the target. A SIGKILL or
+// power loss mid-write would otherwise leave a truncated DB file, and getDatabase()'s
+// catch{} silently replaces it with an empty database — destroying all stored data.
+// renameSync on the same filesystem is atomic on both POSIX and Windows (NTFS).
+function atomicWriteDb() {
+  if (!db) return;
+  const tmp = DB_PATH + ".tmp";
+  writeFileSync(tmp, Buffer.from(db.export()));
+  renameSync(tmp, DB_PATH);
+}
+
 function scheduleSave() {
   if (savePending) return;
   savePending = true;
   setImmediate(() => {
     savePending = false;
-    if (db) writeFileSync(DB_PATH, Buffer.from(db.export()));
+    atomicWriteDb();
   });
 }
 
 function flushDatabase() {
   savePending = false;
-  if (db) writeFileSync(DB_PATH, Buffer.from(db.export()));
+  atomicWriteDb();
 }
 
 export async function getDatabase(): Promise<SqlJsDatabase> {
