@@ -76,8 +76,17 @@ public class CadLinkCleanupTool : ICortexTool
             }
             else
             {
-                if (!deleteImports) toDelete = toDelete.Where(i => i.IsLinked);
-                if (!deleteLinks) toDelete = toDelete.Where(i => !i.IsLinked);
+                // H32: the old two-WHERE chain contradicted itself when both flags were
+                // false (keep-links AND keep-imports → empty set, silent zero-delete).
+                // Build an inclusive predicate instead: keep an item only if its kind was
+                // explicitly requested for deletion.
+                if (!deleteImports && !deleteLinks)
+                    return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                        "Nothing selected to delete: set deleteImports and/or deleteLinks to true, or pass explicit elementIds.",
+                        suggestion: "deleteImports=true removes CAD imports; deleteLinks=true removes CAD links.");
+
+                toDelete = toDelete.Where(i =>
+                    (deleteLinks && i.IsLinked) || (deleteImports && !i.IsLinked));
             }
 
             var targets = toDelete.ToList();

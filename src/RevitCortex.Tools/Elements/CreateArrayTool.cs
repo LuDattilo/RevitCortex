@@ -115,9 +115,21 @@ public class CreateArrayTool : ICortexTool
                 var center = new XYZ(centerX / MmPerFoot, centerY / MmPerFoot, 0);
                 var axis = Line.CreateBound(center, center + XYZ.BasisZ * 10);
 
-                for (int i = 1; i <= count; i++)
+                // H13: match the associative RadialArray semantics — `count` is the TOTAL
+                // number of members (the un-copied source is member 1). The old divisor
+                // (count+1) under-filled every partial sweep. Step depends on whether the
+                // sweep is a closed full circle:
+                //   - closed (~360°): members evenly spaced by totalAngle/count, so the
+                //     count-th position would coincide with the source at 0° — skip it.
+                //   - open (e.g. 90°): the last copy must land exactly at totalAngle, so
+                //     step by totalAngle/(count-1).
+                bool closedLoop = Math.Abs((totalAngle % 360.0 + 360.0) % 360.0) < 1e-6;
+                double stepDeg = count > 1
+                    ? (closedLoop ? totalAngle / count : totalAngle / (count - 1))
+                    : totalAngle;
+                for (int i = 1; i <= count - 1; i++)
                 {
-                    var angle = (totalAngle / (count + 1)) * i * Math.PI / 180.0;
+                    var angle = stepDeg * i * Math.PI / 180.0;
                     var copied = ElementTransformUtils.CopyElements(doc, sourceIds, XYZ.Zero);
                     foreach (var copiedId in copied)
                     {

@@ -696,10 +696,17 @@ public class AIElementFilterTool : ICortexTool
         foreach (Parameter p in elem.Parameters)
         {
             if (p.StorageType != StorageType.Double || !p.HasValue) continue;
+            // H30: a flat *MmPerFoot multiplier is only correct for LENGTH parameters.
+            // Area params are stored in ft^2 (×304.8^2) and volume in ft^3 (×304.8^3),
+            // so the old `valueMm` was 304x too small for area and ~92903x for volume.
+            // AsValueString() applies the parameter's own unit/format, which is correct
+            // for every dimension type; we also expose the raw internal value (feet-based)
+            // for callers that want to convert themselves.
             list.Add(new
             {
                 name  = p.Definition?.Name ?? "Unknown",
-                valueMm = p.AsDouble() * MmPerFoot,
+                value = p.AsValueString(),
+                valueInternal = p.AsDouble(),
                 isReadOnly = p.IsReadOnly
             });
         }

@@ -64,19 +64,35 @@ public class AlignLinkToHostTool : ICortexTool
 
             if (alignMode.Equals("shared", StringComparison.OrdinalIgnoreCase))
             {
-                // Move to shared coordinates: use project location survey point offset
-                var hostLocation = doc.ActiveProjectLocation;
-                var hostPosition = hostLocation.GetProjectPosition(XYZ.Zero);
+                // H42: shared-coordinate alignment means the link's shared origin must sit on
+                // top of the host's shared origin. The old code moved the link to the host's
+                // survey-point offset expressed in internal feet, which is not a shared
+                // alignment at all. The correct delta is computed from BOTH models' project
+                // positions (survey-point displacements), which requires the link document.
+                var linkDoc = linkInstance.GetLinkDocument();
+                if (linkDoc == null)
+                {
+                    if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack();
+                    return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                        "Shared-coordinate alignment requires the linked model to be loaded.",
+                        suggestion: "Reload the link, or use alignMode='origin' to reset to the internal origin.");
+                }
 
-                // The shared coordinate offset from internal origin
-                var sharedOffset = new XYZ(
-                    hostPosition.EastWest,
-                    hostPosition.NorthSouth,
-                    hostPosition.Elevation);
+                // Host and link shared-coordinate displacement of their respective internal
+                // origins (the survey point offset of each model, in internal feet).
+                var hostPos = doc.ActiveProjectLocation.GetProjectPosition(XYZ.Zero);
+                var linkPos = linkDoc.ActiveProjectLocation.GetProjectPosition(XYZ.Zero);
 
-                // Move from current position to the shared coordinate origin
-                var delta = sharedOffset - currentTransform.Origin;
-                ElementTransformUtils.MoveElement(doc, linkInstance.Id, delta);
+                var hostShared = new XYZ(hostPos.EastWest, hostPos.NorthSouth, hostPos.Elevation);
+                var linkShared = new XYZ(linkPos.EastWest, linkPos.NorthSouth, linkPos.Elevation);
+
+                // To make the link's shared origin coincide with the host's, the link
+                // instance must be offset by the difference of the two survey displacements,
+                // on top of clearing its current placement.
+                var sharedDelta = hostShared - linkShared;
+                var delta = sharedDelta - currentTransform.Origin;
+                if (delta.GetLength() > 0.001)
+                    ElementTransformUtils.MoveElement(doc, linkInstance.Id, delta);
             }
             else
             {
