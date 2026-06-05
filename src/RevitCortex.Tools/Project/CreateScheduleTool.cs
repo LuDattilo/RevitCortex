@@ -43,11 +43,23 @@ public class CreateScheduleTool : ICortexTool
                 if (resolvedId != null) catId = resolvedId;
             }
 
+            // H33: material takeoff and key schedules require a valid category. Validate up
+            // front so we return a clear InvalidInput instead of a raw Revit exception from
+            // CreateMaterialTakeoff/CreateKeySchedule(InvalidElementId).
+            var normalizedType = scheduleType.ToLowerInvariant().Replace(" ", "").Replace("_", "");
+            if ((normalizedType == "materialtakeoff" || normalizedType == "keyschedule")
+                && catId == ElementId.InvalidElementId)
+            {
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"categoryName is required and must resolve to a valid category for scheduleType '{scheduleType}'.",
+                    suggestion: "Pass a valid categoryName (e.g. OST_Walls) or a localized category display name.");
+            }
+
             using var tx = new Transaction(doc, "RevitCortex: Create Schedule");
             tx.Start();
 
             ViewSchedule schedule;
-            switch (scheduleType.ToLowerInvariant().Replace(" ", "").Replace("_", ""))
+            switch (normalizedType)
             {
                 case "materialtakeoff":
                     schedule = ViewSchedule.CreateMaterialTakeoff(doc, catId);

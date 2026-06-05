@@ -43,17 +43,25 @@ public class AddSharedParameterTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "categories array is required (at least one category)");
 
+        var app = doc.Application;
+        // H8: if we have to point Revit at a temp shared-parameter file, remember the
+        // user's original filename and restore it afterwards. Without this, every later
+        // OpenSharedParameterFile() in the session would return our temp file, silently
+        // breaking all shared-parameter workflows.
+        var originalSharedParamFile = app.SharedParametersFilename;
+        bool overrodeSharedParamFile = false;
         try
         {
-            var app = doc.Application;
             var sharedParamFile = app.OpenSharedParameterFile();
             if (sharedParamFile == null)
             {
-                // Create a temp shared parameter file if none loaded
-                var tempPath = Path.Combine(Path.GetTempPath(), "RevitCortex_SharedParams.txt");
-                if (!File.Exists(tempPath))
-                    File.WriteAllText(tempPath, "");
+                // Create a unique temp shared parameter file if none loaded (unique name
+                // avoids concurrent-session collisions on a static path).
+                var tempPath = Path.Combine(Path.GetTempPath(),
+                    $"RevitCortex_SharedParams_{Guid.NewGuid():N}.txt");
+                File.WriteAllText(tempPath, "");
                 app.SharedParametersFilename = tempPath;
+                overrodeSharedParamFile = true;
                 sharedParamFile = app.OpenSharedParameterFile();
                 if (sharedParamFile == null)
                     return CortexResult<object>.Fail(CortexErrorCode.Unknown,
@@ -150,6 +158,14 @@ public class AddSharedParameterTool : ICortexTool
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
                 $"Failed to add shared parameter: {ex.Message}");
+        }
+        finally
+        {
+            // H8: restore the user's original shared-parameter file if we overrode it.
+            if (overrodeSharedParamFile)
+            {
+                try { app.SharedParametersFilename = originalSharedParamFile; } catch { }
+            }
         }
     }
 

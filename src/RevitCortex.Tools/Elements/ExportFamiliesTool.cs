@@ -46,7 +46,9 @@ public class ExportFamiliesTool : ICortexTool
             {
                 var catIds = categories
                     .Select(c => Utilities.CategoryResolver.ResolveToId(doc, c))
-                    .Where(id => id != ElementId.InvalidElementId)
+                    // C7: ResolveToId returns null for unrecognized names; guard before the
+                    // InvalidElementId comparison (on net48 ElementId is a reference type).
+                    .Where(id => id != null && id != ElementId.InvalidElementId)
                     .ToHashSet();
                 families = families.Where(f => f.FamilyCategory != null && catIds.Contains(f.FamilyCategory.Id));
             }
@@ -63,24 +65,32 @@ public class ExportFamiliesTool : ICortexTool
                         continue;
                     }
 
-                    var dir = outputDirectory;
-                    if (groupByCategory && family.FamilyCategory != null)
+                    // H18: ensure the opened family document is always closed, even when
+                    // SaveAs throws (permissions, disk full, invalid path) — otherwise it
+                    // leaks open in Revit and locks the file for the rest of the session.
+                    try
                     {
-                        dir = Path.Combine(outputDirectory, family.FamilyCategory.Name);
-                        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                    }
+                        var dir = outputDirectory;
+                        if (groupByCategory && family.FamilyCategory != null)
+                        {
+                            dir = Path.Combine(outputDirectory, family.FamilyCategory.Name);
+                            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                        }
 
-                    var filePath = Path.Combine(dir, $"{family.Name}.rfa");
-                    if (File.Exists(filePath) && !overwrite)
+                        var filePath = Path.Combine(dir, $"{family.Name}.rfa");
+                        if (File.Exists(filePath) && !overwrite)
+                        {
+                            results.Add(new { name = family.Name, success = false, reason = "File exists (set overwrite: true)" });
+                            continue;
+                        }
+
+                        famDoc.SaveAs(filePath, new SaveAsOptions { OverwriteExistingFile = true });
+                        results.Add(new { name = family.Name, path = filePath, success = true });
+                    }
+                    finally
                     {
-                        results.Add(new { name = family.Name, success = false, reason = "File exists (set overwrite: true)" });
-                        famDoc.Close(false);
-                        continue;
+                        try { famDoc.Close(false); } catch { }
                     }
-
-                    famDoc.SaveAs(filePath, new SaveAsOptions { OverwriteExistingFile = true });
-                    famDoc.Close(false);
-                    results.Add(new { name = family.Name, path = filePath, success = true });
                 }
                 catch (Exception ex)
                 {

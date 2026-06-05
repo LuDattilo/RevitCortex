@@ -30,7 +30,12 @@ public class CreateFabricAreaTool : ICortexTool
         var (host, herr) = RebarToolHelpers.RequireHost(doc!, input["hostId"]?.Value<long?>());
         if (herr != null) return herr;
         if (input["majorDirection"] == null) return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "majorDirection{x,y,z} is required");
-        var major = RebarToolHelpers.ParseXyzMm(input["majorDirection"]!).Normalize();
+        // H35: a zero vector would make XYZ.Normalize() throw and escape Execute().
+        var majorRaw = RebarToolHelpers.ParseXyzMm(input["majorDirection"]!);
+        if (majorRaw.IsZeroLength())
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "majorDirection must be a non-zero vector");
+        var major = majorRaw.Normalize();
 
         var sheetType = doc!.GetElement(ToolHelpers.ToElementId(input["fabricSheetTypeId"]?.Value<long?>() ?? -1)) as FabricSheetType;
         if (sheetType == null)

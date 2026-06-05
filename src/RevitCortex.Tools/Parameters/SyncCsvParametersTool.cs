@@ -63,12 +63,24 @@ public class SyncCsvParametersTool : ICortexTool
                     }
 
                     int setCount = 0;
+                    var failedParams = new List<object>();
                     foreach (var prop in parameters.Properties())
                     {
                         var param = elem.LookupParameter(prop.Name);
-                        if (param == null || param.IsReadOnly) continue;
+                        if (param == null)
+                        {
+                            failedParams.Add(new { param = prop.Name, reason = "Parameter not found on element" });
+                            continue;
+                        }
+                        if (param.IsReadOnly)
+                        {
+                            failedParams.Add(new { param = prop.Name, reason = "Parameter is read-only" });
+                            continue;
+                        }
 
                         var val = prop.Value.ToString();
+                        // H43: do not swallow Set() failures silently — record them so the
+                        // per-element result reflects real success/failure.
                         try
                         {
                             switch (param.StorageType)
@@ -85,12 +97,24 @@ public class SyncCsvParametersTool : ICortexTool
                                     param.Set(i);
                                     setCount++;
                                     break;
+                                default:
+                                    failedParams.Add(new { param = prop.Name, reason = $"Value '{val}' not valid for storage type {param.StorageType}" });
+                                    break;
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            failedParams.Add(new { param = prop.Name, reason = ex.Message });
+                        }
                     }
 
-                    results.Add(new { elementId, success = true, parametersSet = setCount });
+                    results.Add(new
+                    {
+                        elementId,
+                        success = failedParams.Count == 0,
+                        parametersSet = setCount,
+                        failedParameters = failedParams
+                    });
                 }
 
                 tx.Commit();
