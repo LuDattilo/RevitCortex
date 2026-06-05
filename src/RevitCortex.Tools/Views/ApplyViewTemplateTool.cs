@@ -33,8 +33,8 @@ public class ApplyViewTemplateTool : ICortexTool
             return action.ToLowerInvariant() switch
             {
                 "list" => ListTemplates(doc),
-                "apply" => ApplyTemplate(doc, input),
-                "remove" => RemoveTemplate(doc, input),
+                "apply" => ApplyTemplate(doc, input, session),
+                "remove" => RemoveTemplate(doc, input, session),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}", suggestion: "Use: list, apply, remove")
             };
@@ -56,7 +56,7 @@ public class ApplyViewTemplateTool : ICortexTool
         return CortexResult<object>.Ok(new { templateCount = templates.Count, templates });
     }
 
-    private static CortexResult<object> ApplyTemplate(Document doc, JObject input)
+    private static CortexResult<object> ApplyTemplate(Document doc, JObject input, CortexSession session)
     {
         var viewIds = input["viewIds"]?.ToObject<List<long>>() ?? new List<long>();
         var templateId = input["templateId"]?.Value<long>() ?? 0;
@@ -80,6 +80,10 @@ public class ApplyViewTemplateTool : ICortexTool
         if (template == null)
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "View template not found");
 
+        // H14: confirm before changing view templates across a set of views.
+        if (!session.RequestConfirmation("apply view template to", viewIds.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
         using var tx = new Transaction(doc, "RevitCortex: Apply View Template");
         tx.Start();
         int applied = 0;
@@ -96,9 +100,14 @@ public class ApplyViewTemplateTool : ICortexTool
         return CortexResult<object>.Ok(new { appliedCount = applied, templateName = template.Name });
     }
 
-    private static CortexResult<object> RemoveTemplate(Document doc, JObject input)
+    private static CortexResult<object> RemoveTemplate(Document doc, JObject input, CortexSession session)
     {
         var viewIds = input["viewIds"]?.ToObject<List<long>>() ?? new List<long>();
+
+        // H14: confirm before clearing view templates across a set of views.
+        if (!session.RequestConfirmation("remove view template from", viewIds.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
         using var tx = new Transaction(doc, "RevitCortex: Remove View Template");
         tx.Start();
         int removed = 0;

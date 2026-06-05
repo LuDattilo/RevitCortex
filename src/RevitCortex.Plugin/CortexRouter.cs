@@ -36,7 +36,12 @@ public class CortexRouter
     // the UI thread is idle, and a UI-thread caller blocked in
     // WaitForCompletion holds it busy until timeout.
     private int _uiThreadId;
-    private readonly HashSet<string> _disabledTools = new();
+    // H27: read on socket worker threads (Route) and written from the WPF UI thread
+    // (SetDisabledTools). A mutated HashSet races (Clear/Add visible mid-read). System
+    // .Collections.Immutable is unavailable on net48 (R23/R24) without an extra NuGet, so
+    // we use copy-on-write: writers build a brand-new HashSet and swap the volatile
+    // reference atomically; readers only ever see a fully-built, never-mutated instance.
+    private volatile HashSet<string> _disabledTools = new();
     private bool _readOnlyMode;
 
     /// <summary>
@@ -372,9 +377,9 @@ public class CortexRouter
 
     public void SetDisabledTools(IEnumerable<string> toolNames)
     {
-        _disabledTools.Clear();
-        foreach (var name in toolNames)
-            _disabledTools.Add(name);
+        // H27: build a new set, then swap the reference atomically — readers never observe
+        // a Clear/Add window.
+        _disabledTools = new HashSet<string>(toolNames);
     }
 
     public IReadOnlyCollection<string> DisabledTools => _disabledTools;

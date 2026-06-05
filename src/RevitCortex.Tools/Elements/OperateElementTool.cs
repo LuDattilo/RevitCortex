@@ -72,6 +72,21 @@ public class OperateElementTool : ICortexTool
         ICollection<ElementId> elementIds = rawIds.Select(id => new ElementId((int)id)).ToList();
 #endif
 
+        // H31: 'delete' is destructive — validate IDs and confirm before dispatching.
+        if (string.Equals(action, "delete", StringComparison.OrdinalIgnoreCase))
+        {
+            // Drop IDs that no longer resolve to an element, so doc.Delete never
+            // throws on a stale/invalid ID and the caller sees an accurate count.
+            elementIds = elementIds.Where(id => doc.GetElement(id) != null).ToList();
+            if (elementIds.Count == 0)
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                    "None of the supplied elementIds exist in the active document");
+
+            if (!session.RequestConfirmation("delete", elementIds.Count))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled,
+                    "Operation cancelled by user");
+        }
+
         // UIDocument for UI operations
         var uiDoc = new UIDocument(doc);
 

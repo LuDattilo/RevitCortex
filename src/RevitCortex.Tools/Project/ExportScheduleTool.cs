@@ -51,18 +51,22 @@ public class ExportScheduleTool : ICortexTool
 
             var rows = new List<List<string>>();
 
-            // Headers
-            if (includeHeaders && sectionData.NumberOfRows > 0)
+            // H3: column headings live in the Header section, not Body row 0. The old
+            // code read Body row 0 as the header AND skipped it from the data loop, so
+            // every export with includeHeaders=true had wrong column names and lost its
+            // first data record. Read the (last) Header row for titles and keep ALL Body
+            // rows as data.
+            if (includeHeaders && headerData.NumberOfRows > 0)
             {
                 var headerRow = new List<string>();
-                for (int col = 0; col < sectionData.NumberOfColumns; col++)
-                    headerRow.Add(schedule.GetCellText(SectionType.Body, 0, col));
+                int headerRowIndex = headerData.NumberOfRows - 1; // bottom-most header row holds the field titles
+                for (int col = 0; col < headerData.NumberOfColumns; col++)
+                    headerRow.Add(schedule.GetCellText(SectionType.Header, headerRowIndex, col));
                 rows.Add(headerRow);
             }
 
-            // Data rows
-            int startRow = includeHeaders ? 1 : 0;
-            for (int row = startRow; row < sectionData.NumberOfRows; row++)
+            // Data rows — Body row 0 is real data and must not be skipped.
+            for (int row = 0; row < sectionData.NumberOfRows; row++)
             {
                 var dataRow = new List<string>();
                 for (int col = 0; col < sectionData.NumberOfColumns; col++)

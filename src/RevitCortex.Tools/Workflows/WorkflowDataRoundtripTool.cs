@@ -36,8 +36,20 @@ public class WorkflowDataRoundtripTool : ICortexTool
         var filePath = input["filePath"]?.Value<string>();
 
         if (string.IsNullOrEmpty(filePath))
+        {
             filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
                 $"RevitRoundtrip_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+        }
+        else
+        {
+            // H36: a caller-supplied path must stay under a user-owned directory;
+            // workbook.SaveAs would otherwise write anywhere the Revit process can reach.
+            if (!PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+                return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
+                    pathError,
+                    suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+            filePath = safePath;
+        }
 
         try
         {
@@ -47,8 +59,14 @@ public class WorkflowDataRoundtripTool : ICortexTool
             {
                 var catIds = categories
                     .Select(c => Utilities.CategoryResolver.ResolveToId(doc, c))
-                    .Where(id => id != ElementId.InvalidElementId)
+                    // H24: ResolveToId returns null for unknown names; without the null
+                    // guard a null ElementId reaches OfCategoryId(null) and throws.
+                    .Where(id => id != null && id != ElementId.InvalidElementId)
                     .ToList();
+                if (catIds.Count == 0)
+                    return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                        "None of the supplied categories could be resolved.",
+                        suggestion: "Use OST_* codes or valid localized category names.");
                 elements = catIds.SelectMany(catId =>
                     new FilteredElementCollector(doc).OfCategoryId(catId).WhereElementIsNotElementType());
             }

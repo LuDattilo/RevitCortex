@@ -34,8 +34,8 @@ public class CreatePlaceholderSheetsTool : ICortexTool
             {
                 "create" => CreatePlaceholders(doc, input),
                 "list" => ListPlaceholders(doc),
-                "convert" => ConvertPlaceholders(doc, input),
-                "delete" => DeletePlaceholders(doc, input),
+                "convert" => ConvertPlaceholders(doc, input, session),
+                "delete" => DeletePlaceholders(doc, input, session),
                 _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Unknown action: {action}", suggestion: "Use: create, list, convert, delete")
             };
@@ -84,13 +84,17 @@ public class CreatePlaceholderSheetsTool : ICortexTool
         return CortexResult<object>.Ok(new { placeholderCount = sheets.Count, sheets });
     }
 
-    private static CortexResult<object> ConvertPlaceholders(Document doc, JObject input)
+    private static CortexResult<object> ConvertPlaceholders(Document doc, JObject input, CortexSession session)
     {
         var sheetIds = input["sheetIds"]?.ToObject<List<long>>() ?? new List<long>();
         var titleBlockId = input["titleBlockId"]?.Value<long>() ?? 0;
 
         if (sheetIds.Count == 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "sheetIds required for convert");
+
+        // H23: converting deletes the placeholder sheet and recreates a real one — confirm first.
+        if (!session.RequestConfirmation("convert (delete + recreate) placeholder sheets", sheetIds.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         // Resolve title block
         ElementId tbId;
@@ -152,11 +156,15 @@ public class CreatePlaceholderSheetsTool : ICortexTool
         return CortexResult<object>.Ok(new { convertedCount = results.Count(r => ((dynamic)r).success), sheets = results });
     }
 
-    private static CortexResult<object> DeletePlaceholders(Document doc, JObject input)
+    private static CortexResult<object> DeletePlaceholders(Document doc, JObject input, CortexSession session)
     {
         var sheetIds = input["sheetIds"]?.ToObject<List<long>>() ?? new List<long>();
         if (sheetIds.Count == 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "sheetIds required for delete");
+
+        // H23: confirm before permanently deleting sheets.
+        if (!session.RequestConfirmation("delete placeholder sheets", sheetIds.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Delete Placeholder Sheets");
         tx.Start();

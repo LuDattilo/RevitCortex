@@ -1781,7 +1781,16 @@ public partial class PowerBiExportWindow : Window
 #endif
     }
 
-    private void SetStatus(string text) => StatusText.Text = text;
+    // H15: SetStatus can be called after an await whose continuation ran on a thread-pool
+    // thread (e.g. HttpClient calls in FirePbiRefreshAsync use ConfigureAwait(false)).
+    // Writing StatusText.Text off the UI thread throws; marshal back via the Dispatcher.
+    private void SetStatus(string text)
+    {
+        if (Dispatcher.CheckAccess())
+            StatusText.Text = text;
+        else
+            Dispatcher.Invoke(() => StatusText.Text = text);
+    }
 
     // ───────────────────────── View-model rows ─────────────────────────
 

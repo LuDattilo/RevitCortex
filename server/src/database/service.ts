@@ -1,5 +1,18 @@
 import { dbRun, dbGet, dbAll, dbLastInsertRowid } from "./db.js";
 
+/**
+ * Parse a stored metadata JSON string without throwing (H11). A single corrupted
+ * row must not abort a whole .map() and discard every other (valid) row.
+ */
+function safeParseJson(raw: unknown): unknown {
+  if (raw == null || raw === "") return null;
+  try {
+    return JSON.parse(raw as string);
+  } catch {
+    return null;
+  }
+}
+
 interface ProjectData {
   project_name: string;
   project_path?: string;
@@ -111,7 +124,7 @@ export function getAllProjects() {
     FROM projects ORDER BY last_updated DESC
   `).map((p: any) => ({
     ...p,
-    metadata: p.metadata ? JSON.parse(p.metadata) : null,
+    metadata: safeParseJson(p.metadata),
     timestamp: new Date(p.timestamp).toISOString(),
     last_updated: new Date(p.last_updated).toISOString(),
   }));
@@ -124,7 +137,7 @@ export function getProjectById(projectId: number) {
     FROM projects WHERE id = ?
   `, [projectId]) as any;
   if (!p) return null;
-  return { ...p, metadata: p.metadata ? JSON.parse(p.metadata) : null,
+  return { ...p, metadata: safeParseJson(p.metadata),
     timestamp: new Date(p.timestamp).toISOString(), last_updated: new Date(p.last_updated).toISOString() };
 }
 
@@ -135,7 +148,7 @@ export function getProjectByName(projectName: string) {
     FROM projects WHERE project_name = ?
   `, [projectName]) as any;
   if (!p) return null;
-  return { ...p, metadata: p.metadata ? JSON.parse(p.metadata) : null,
+  return { ...p, metadata: safeParseJson(p.metadata),
     timestamp: new Date(p.timestamp).toISOString(), last_updated: new Date(p.last_updated).toISOString() };
 }
 
@@ -145,7 +158,7 @@ export function getRoomsByProjectId(projectId: number) {
       level, area, perimeter, occupancy, comments, timestamp, metadata
     FROM rooms WHERE project_id = ? ORDER BY room_number
   `, [projectId]).map((r: any) => ({
-    ...r, metadata: r.metadata ? JSON.parse(r.metadata) : null,
+    ...r, metadata: safeParseJson(r.metadata),
     timestamp: new Date(r.timestamp).toISOString(),
   }));
 }
@@ -158,7 +171,7 @@ export function getAllRoomsWithProject() {
     FROM rooms r JOIN projects p ON r.project_id = p.id
     ORDER BY p.project_name, r.room_number
   `).map((r: any) => ({
-    ...r, metadata: r.metadata ? JSON.parse(r.metadata) : null,
+    ...r, metadata: safeParseJson(r.metadata),
     timestamp: new Date(r.timestamp).toISOString(),
   }));
 }

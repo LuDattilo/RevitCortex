@@ -96,10 +96,45 @@ public static class UpdateDownloader
         if (Directory.Exists(destDir)) Directory.Delete(destDir, true);
         Directory.CreateDirectory(destDir);
 
-        // Run synchronous extraction on thread pool to avoid blocking UI thread
-        await Task.Run(() => ZipFile.ExtractToDirectory(zipPath, destDir), ct);
+        // Run synchronous extraction on thread pool to avoid blocking UI thread.
+        // Extract entry-by-entry with a zip-slip guard: ZipFile.ExtractToDirectory on
+        // net48 does NOT validate that entries stay inside destDir, so a crafted entry
+        // name like "..\..\evil.ps1" could escape the target folder.
+        await Task.Run(() => ExtractWithSlipGuard(zipPath, destDir), ct);
 
         return destDir;
+    }
+
+    private static void ExtractWithSlipGuard(string zipPath, string destDir)
+    {
+        // Canonical destination root, with a trailing separator so the prefix check
+        // cannot be satisfied by a sibling folder whose name shares a prefix.
+        string destRoot = Path.GetFullPath(destDir);
+        if (!destRoot.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
+            destRoot += Path.DirectorySeparatorChar;
+
+        using var zip = ZipFile.OpenRead(zipPath);
+        foreach (var entry in zip.Entries)
+        {
+            string targetPath = Path.GetFullPath(Path.Combine(destRoot, entry.FullName));
+
+            if (!targetPath.StartsWith(destRoot, StringComparison.Ordinal))
+                throw new InvalidDataException(
+                    $"Zip entry '{entry.FullName}' would extract outside the target directory (zip-slip).");
+
+            // Directory entry (trailing slash, no file name): just ensure it exists.
+            if (string.IsNullOrEmpty(entry.Name))
+            {
+                Directory.CreateDirectory(targetPath);
+                continue;
+            }
+
+            string? entryDir = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrEmpty(entryDir))
+                Directory.CreateDirectory(entryDir);
+
+            entry.ExtractToFile(targetPath, overwrite: true);
+        }
     }
 
     private static UpdateDownloadResult Fail(string msg) => new(false, msg, null);

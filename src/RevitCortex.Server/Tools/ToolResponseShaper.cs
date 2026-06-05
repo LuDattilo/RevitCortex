@@ -140,7 +140,14 @@ public static class ToolResponseShaper
             };
         }
 
-        var fieldNames = payload["fields"]!
+        // H29: honor the "never throw on malformed payload" invariant — if the plugin
+        // returned no 'fields' key (error response, empty category, zero schedulable
+        // fields), return the payload unchanged instead of dereferencing null.
+        var fieldsToken = payload["fields"];
+        if (fieldsToken is null)
+            return payload;
+
+        var fieldNames = fieldsToken
             .Children<JObject>()
             .Select(field => field["name"])
             .Where(name => name is not null)

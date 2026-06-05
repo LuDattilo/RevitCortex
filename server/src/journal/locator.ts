@@ -1,5 +1,5 @@
 import { readdirSync, statSync } from "fs";
-import { join } from "path";
+import { join, resolve, sep } from "path";
 import { homedir } from "os";
 
 /**
@@ -45,4 +45,27 @@ function getJournalDirectory(revitVersion: string): string {
     `Autodesk Revit ${revitVersion}`,
     "Journals"
   );
+}
+
+/**
+ * Validate a caller-supplied journal_path (H25). The path must resolve inside the
+ * Revit Journals directory for the given version — otherwise an MCP caller could
+ * read any file on disk (e.g. credentials, SSH keys) via readFileSync.
+ * Returns the canonical absolute path, or throws on a path-traversal attempt.
+ */
+export function resolveJournalPathSafe(
+  journalPath: string,
+  revitVersion: string
+): string {
+  const journalDir = resolve(getJournalDirectory(revitVersion));
+  const root = journalDir.endsWith(sep) ? journalDir : journalDir + sep;
+  const full = resolve(journalPath);
+
+  if (full !== journalDir && !full.startsWith(root)) {
+    throw new Error(
+      `journal_path must be inside the Revit ${revitVersion} Journals directory ` +
+      `(${journalDir}). Refusing to read '${journalPath}'.`
+    );
+  }
+  return full;
 }

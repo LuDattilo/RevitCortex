@@ -84,6 +84,17 @@ public class ModifyScheduleTool : ICortexTool
                 _ => new object()
             };
 
+            // H19: the sub-methods signal validation failures by returning an anonymous
+            // object with an `error` property. Returning that inside CortexResult.Ok hid
+            // the failure from callers (Ok envelope with a buried error). Detect it, roll
+            // back, and surface a real Fail instead.
+            var errorProp = result.GetType().GetProperty("error");
+            if (errorProp?.GetValue(result) is string errMsg && !string.IsNullOrEmpty(errMsg))
+            {
+                if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack();
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, errMsg);
+            }
+
             tx.Commit();
             return CortexResult<object>.Ok(result);
         }

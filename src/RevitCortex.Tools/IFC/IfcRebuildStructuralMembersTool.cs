@@ -97,7 +97,18 @@ public class IfcRebuildStructuralMembersTool : ICortexTool
                 }
 
                 var level = IfcGeometryHelper.FindNearestLevel(doc!, profile.BaseElevation);
-                if (level == null) { skipped++; continue; }
+                if (level == null)
+                {
+                    // H20: record the skip so the result count matches the candidate count.
+                    skipped++;
+                    results.Add(new
+                    {
+                        sourceElementId = ToolHelpers.GetElementIdValue(ds.Id),
+                        name = ds.Name, type = "column",
+                        status = "skipped", reason = "No level found near the base elevation",
+                    });
+                    continue;
+                }
 
                 if (dryRun)
                 {
@@ -175,7 +186,18 @@ public class IfcRebuildStructuralMembersTool : ICortexTool
                 }
 
                 var level = IfcGeometryHelper.FindNearestLevel(doc!, profile.Elevation);
-                if (level == null) { skipped++; continue; }
+                if (level == null)
+                {
+                    // H20: record the skip so the result count matches the candidate count.
+                    skipped++;
+                    results.Add(new
+                    {
+                        sourceElementId = ToolHelpers.GetElementIdValue(ds.Id),
+                        name = ds.Name, type = "beam",
+                        status = "skipped", reason = "No level found near the elevation",
+                    });
+                    continue;
+                }
 
                 if (dryRun)
                 {

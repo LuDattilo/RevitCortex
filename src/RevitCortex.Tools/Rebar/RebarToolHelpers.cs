@@ -187,8 +187,9 @@ public static class RebarToolHelpers
         var all = new FilteredElementCollector(doc).OfClass(typeof(RebarBarType)).Cast<RebarBarType>().ToList();
         if (!string.IsNullOrWhiteSpace(typeName))
         {
-            var byName = all.FirstOrDefault(t => t.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase));
-            if (byName != null) return byName;
+            // H7: a specified-but-unresolved name must return null (→ caller emits a clear
+            // "not found"), NOT silently fall back to the first bar type in the document.
+            return all.FirstOrDefault(t => t.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase));
         }
         return all.FirstOrDefault();
     }
@@ -257,8 +258,8 @@ public static class RebarToolHelpers
             .ToList();
         if (!string.IsNullOrWhiteSpace(typeName))
         {
-            var byName = all.FirstOrDefault(t => t.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase));
-            if (byName != null) return byName;
+            // H7: specified-but-unresolved name → null, not a silent first-coupler fallback.
+            return all.FirstOrDefault(t => t.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase));
         }
         return all.FirstOrDefault();
     }

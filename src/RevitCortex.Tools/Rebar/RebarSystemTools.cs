@@ -33,7 +33,14 @@ public class CreateAreaReinforcementTool : ICortexTool
         if (barType == null) return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No rebar bar type resolved",
             suggestion: "Use list_rebar_bar_types to find a barTypeId");
         if (input["majorDirection"] == null) return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "majorDirection{x,y,z} is required");
-        var major = RebarToolHelpers.ParseXyzMm(input["majorDirection"]!).Normalize();
+        // H35: guard against a zero vector — XYZ.Normalize() throws on it, and that
+        // exception would otherwise escape Execute() uncaught (the try/catch only wraps
+        // the transaction further down).
+        var majorRaw = RebarToolHelpers.ParseXyzMm(input["majorDirection"]!);
+        if (majorRaw.IsZeroLength())
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                "majorDirection must be a non-zero vector");
+        var major = majorRaw.Normalize();
 
         // Host validation: area reinforcement only supports walls, floors, and foundations
         var hostCat = host!.Category?.Id;

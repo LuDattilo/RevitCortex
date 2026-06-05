@@ -74,7 +74,20 @@ public class IfcRebuildFamilyInstancesTool : ICortexTool
         foreach (var ds in candidates)
         {
             var bb = ds.get_BoundingBox(null);
-            if (bb == null) { skipped++; continue; }
+            if (bb == null)
+            {
+                // H20: record the skip so result count matches candidate count.
+                skipped++;
+                results.Add(new
+                {
+                    sourceElementId = ToolHelpers.GetElementIdValue(ds.Id),
+                    name = ds.Name,
+                    category = ds.Category?.Name ?? "Unknown",
+                    status = "skipped",
+                    reason = "No bounding box (cannot determine placement)",
+                });
+                continue;
+            }
 
             var catName = ds.Category?.Name ?? "Unknown";
             var isDoor = catName.ToLowerInvariant().Contains("door") || catName.ToLowerInvariant().Contains("port");
@@ -110,7 +123,20 @@ public class IfcRebuildFamilyInstancesTool : ICortexTool
                 bb.Min.Z);
 
             var level = IfcGeometryHelper.FindNearestLevel(doc!, bb.Min.Z);
-            if (level == null) { skipped++; continue; }
+            if (level == null)
+            {
+                // H20: record the skip so result count matches candidate count.
+                skipped++;
+                results.Add(new
+                {
+                    sourceElementId = ToolHelpers.GetElementIdValue(ds.Id),
+                    name = ds.Name,
+                    category = catName,
+                    status = "skipped",
+                    reason = "No level found near the element elevation",
+                });
+                continue;
+            }
 
             // Find host wall (for doors/windows)
             Wall? hostWall = (isDoor || isWindow) ? FindNearestWall(walls, center) : null;

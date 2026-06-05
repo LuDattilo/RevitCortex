@@ -215,33 +215,46 @@ public static class UpdateChecker
     /// Launches install.ps1 from ExtractedPath with RunAs (UAC prompt).
     /// State transitions: Ready → Installing.
     /// </summary>
-    public static void LaunchInstaller()
+    /// <returns>
+    /// true if the installer process was actually started (caller may then close Revit);
+    /// false if it could not launch (UAC denied, missing script, wrong state) — callers
+    /// MUST NOT shut Revit down on false (H1).
+    /// </returns>
+    public static bool LaunchInstaller()
     {
-        if (_state != DownloadState.Ready || string.IsNullOrEmpty(_extractedPath)) return;
+        if (_state != DownloadState.Ready || string.IsNullOrEmpty(_extractedPath)) return false;
 
         var script = Path.Combine(_extractedPath, "install.ps1");
         if (!File.Exists(script))
         {
             _state = DownloadState.Error;
             _downloadError = $"install.ps1 not found in {_extractedPath}";
-            return;
+            return false;
         }
 
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "powershell.exe",
                 Arguments = $"-ExecutionPolicy Bypass -File \"{script}\"",
                 Verb = "runas",
                 UseShellExecute = true,
             });
+            if (proc == null)
+            {
+                _downloadError = "Installer process could not be started.";
+                return false;
+            }
             _state = DownloadState.Installing;
+            return true;
         }
         catch (Exception ex)
         {
             // UAC denied or process launch failed — stay in Ready so user can retry
+            _downloadError = $"Installer launch failed: {ex.Message}";
             System.Diagnostics.Trace.WriteLine($"[RevitCortex] LaunchInstaller failed: {ex.Message}");
+            return false;
         }
     }
 
