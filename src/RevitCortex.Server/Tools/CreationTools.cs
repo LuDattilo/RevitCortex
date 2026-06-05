@@ -65,7 +65,7 @@ public static class CreationTools
     [McpServerTool(Name = "change_element_type"), Description("Change the type of one or more elements to a target type specified by ID or name.")]
     public static async Task<string> ChangeElementType(
         RevitConnectionManager revit,
-        [Description("Element IDs to change")] int[] elementIds,
+        [Description("Element IDs to change")] long[] elementIds,
         [Description("Target type element ID")] long? targetTypeId = null,
         [Description("Target type name")] string? targetTypeName = null,
         CancellationToken ct = default)

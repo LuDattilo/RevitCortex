@@ -170,7 +170,9 @@ public static class CodeDomExecutor
             return new { result };
 
         if (result is Element elem)
-            return new { elementId = elem.Id.IntegerValue, name = elem.Name, category = elem.Category?.Name };
+            // H10: elem.Id.IntegerValue truncates 64-bit IDs on R2024 (net48). Use the
+            // version-guarded helper (Value on R2024+, IntegerValue cast on R2023).
+            return new { elementId = Utilities.ToolHelpers.GetElementIdValue(elem.Id), name = elem.Name, category = elem.Category?.Name };
 
         try
         {

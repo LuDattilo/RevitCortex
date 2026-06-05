@@ -22,6 +22,11 @@ public class RevitThreadDispatcher
     public CortexResult<object> Execute(ICortexTool tool, JObject input, CortexSession session,
         int timeoutMs = 120000)
     {
+        // H5: only the prepare + Raise pair must be atomic against other requests; the
+        // shared ToolExecutionHandler already rejects a concurrent request via
+        // TryPrepareExecution. Holding _lock across WaitForCompletion (up to 120s) would
+        // serialize *every* tool call behind a single slow/hung operation, so the wait is
+        // done OUTSIDE the lock.
         lock (_lock)
         {
             if (!_handler.TryPrepareExecution(tool, input, session))
@@ -39,16 +44,20 @@ public class RevitThreadDispatcher
                     $"Revit rejected the event request: {raiseResult}",
                     suggestion: "Revit may be busy with another operation. Try again.");
             }
-
-            if (!_handler.WaitForCompletion(timeoutMs))
-            {
-                return CortexResult<object>.Fail(CortexErrorCode.Timeout,
-                    $"Tool '{tool.Name}' timed out after {timeoutMs}ms",
-                    suggestion: "The operation took too long. Try with fewer elements.");
-            }
-
-            return _handler.Result ?? CortexResult<object>.Fail(
-                CortexErrorCode.Unknown, "No result from tool execution");
         }
+
+        if (!_handler.WaitForCompletion(timeoutMs))
+        {
+            // H5: clear the prepared/pending state on timeout, otherwise _hasPendingOrRunning
+            // stays true and the very next request is refused until Revit eventually fires
+            // the deferred event.
+            _handler.ClearPreparedExecution();
+            return CortexResult<object>.Fail(CortexErrorCode.Timeout,
+                $"Tool '{tool.Name}' timed out after {timeoutMs}ms",
+                suggestion: "The operation took too long. Try with fewer elements.");
+        }
+
+        return _handler.Result ?? CortexResult<object>.Fail(
+            CortexErrorCode.Unknown, "No result from tool execution");
     }
 }

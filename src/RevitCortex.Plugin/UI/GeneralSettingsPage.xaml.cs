@@ -201,7 +201,12 @@ public partial class GeneralSettingsPage : Page
                 break;
 
             case UpdateChecker.DownloadState.Ready:
-                UpdateChecker.LaunchInstaller();
+                // H1: do not close Revit unless the installer actually started.
+                if (!UpdateChecker.LaunchInstaller())
+                {
+                    RefreshUpdateBanner();
+                    break;
+                }
                 RefreshUpdateBanner();
                 // Close Revit after a short delay so the installer process has
                 // time to start and enter its Assert-RevitClosed loop before

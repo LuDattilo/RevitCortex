@@ -254,7 +254,7 @@ public static class ProjectTools
     [McpServerTool(Name = "delete_element"), Description("Delete elements from the Revit project.")]
     public static async Task<string> DeleteElement(
         RevitConnectionManager revit,
-        [Description("Array of element IDs to delete")] int[] elementIds,
+        [Description("Array of element IDs to delete")] long[] elementIds,
         [Description("Preview changes without applying")] bool dryRun = true,
         CancellationToken ct = default)
     {
@@ -290,7 +290,7 @@ public static class ProjectTools
     [McpServerTool(Name = "batch_rename"), Description("Batch rename elements or system types in the Revit project. Supports both loadable-family elements and system types (wall/floor/ceiling/roof types).")]
     public static async Task<string> BatchRename(
         RevitConnectionManager revit,
-        [Description("Array of element IDs to rename. Use this when you already have specific IDs.")] int[]? elementIds = null,
+        [Description("Array of element IDs to rename. Use this when you already have specific IDs.")] long[]? elementIds = null,
         [Description("Target category to rename. Valid values: views | sheets | levels | grids | rooms | walltypes | floortypes | ceilingtypes | rooftypes. Use 'floortypes' to rename system floor types.")] string? targetCategory = null,
         [Description("Text to find")] string? findText = null,
         [Description("Replacement text")] string? replaceText = null,

@@ -100,15 +100,16 @@ try {
     # Format: action?param1=value1&param2=value2
     $action, $query = $stripped -split '\?', 2
 
+    # H6: decode with [uri]::UnescapeDataString (built into .NET, always loaded) instead
+    # of [System.Web.HttpUtility]::UrlDecode, which previously failed because System.Web
+    # was loaded via Add-Type only AFTER this loop ran.
     $params = @{}
     if ($query) {
         foreach ($pair in ($query -split '&')) {
             $k, $v = $pair -split '=', 2
-            if ($k) { $params[$k] = [System.Web.HttpUtility]::UrlDecode($v) }
+            if ($k) { $params[$k] = [uri]::UnescapeDataString($v) }
         }
     }
-
-    Add-Type -AssemblyName System.Web | Out-Null
 
     $methodMap = @{
         'select' = 'select_from_powerbi'

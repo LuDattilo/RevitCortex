@@ -158,7 +158,14 @@ public partial class UpdateNotificationWindow : Window
 
             case NotifState.ConfirmInstall:
                 StopPolling();
-                UpdateChecker.LaunchInstaller();
+                // H1: only schedule Revit shutdown if the installer actually launched.
+                // On UAC denial / launch failure, stay put so the user keeps their work.
+                if (!UpdateChecker.LaunchInstaller())
+                {
+                    _state = NotifState.Idle;
+                    Refresh();
+                    break;
+                }
                 _state = NotifState.Installing;
                 Refresh();
                 // Give the installer a moment to launch, then close Revit.
