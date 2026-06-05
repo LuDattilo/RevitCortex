@@ -232,6 +232,17 @@ public partial class GeneralSettingsPage : Page
     {
         var info = UpdateChecker.Latest;
         if (info == null || string.IsNullOrWhiteSpace(info.DownloadUrl)) return;
+
+        // H38: never shell-execute an unvalidated URL. UseShellExecute dispatches by
+        // scheme, so a non-https FileName (file://, ms-msdt:, UNC path) that slipped
+        // through would run as the user. Gate on the same HTTPS + host allowlist used
+        // for the elevated installer path.
+        if (!UpdateChecker.IsTrustedDownloadUrl(info.DownloadUrl))
+        {
+            TaskDialog.Show(Localization.T("support.title"),
+                Localization.T("update.open_browser_failed", info.DownloadUrl));
+            return;
+        }
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo

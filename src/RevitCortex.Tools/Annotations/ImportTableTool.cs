@@ -31,7 +31,13 @@ public class ImportTableTool : ICortexTool
                 "No active document in session");
 
         var filePath = input["filePath"]?.Value<string>();
-        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        // H28: restrict reads to user-owned directories; reject traversal/UNC/system paths.
+        if (!PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+        filePath = safePath;
+        if (!File.Exists(filePath))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"File not found: {filePath}",
                 suggestion: "Provide a valid absolute path to a CSV or TSV file");

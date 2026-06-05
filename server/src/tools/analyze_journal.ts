@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AnalyzeJournalInput } from "../schemas/journal.js";
-import { findJournalFiles } from "../journal/locator.js";
+import { findJournalFiles, resolveJournalPathSafe } from "../journal/locator.js";
 import { parseJournal } from "../journal/parser.js";
 import { runAnalysis } from "../journal/analyzers.js";
 import { toolResponse, toolError } from "../logging/compactTool.js";
@@ -13,10 +13,12 @@ export function registerAnalyzeJournalTool(server: McpServer): void {
     async (args) => {
       const start = Date.now();
       try {
-        // Locate journal files
+        // Locate journal files. A caller-supplied journal_path is validated to stay
+        // inside the Revit Journals directory (H25) before any readFileSync.
+        const revitVersion = args.revit_version ?? "2025";
         const paths = args.journal_path
-          ? [args.journal_path]
-          : findJournalFiles(args.revit_version ?? "2025", args.last_n_sessions ?? 1);
+          ? [resolveJournalPathSafe(args.journal_path, revitVersion)]
+          : findJournalFiles(revitVersion, args.last_n_sessions ?? 1);
 
         const analysisType = args.analysis_type;
 

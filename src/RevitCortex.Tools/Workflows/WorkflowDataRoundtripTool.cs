@@ -36,8 +36,20 @@ public class WorkflowDataRoundtripTool : ICortexTool
         var filePath = input["filePath"]?.Value<string>();
 
         if (string.IsNullOrEmpty(filePath))
+        {
             filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
                 $"RevitRoundtrip_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+        }
+        else
+        {
+            // H36: a caller-supplied path must stay under a user-owned directory;
+            // workbook.SaveAs would otherwise write anywhere the Revit process can reach.
+            if (!PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+                return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
+                    pathError,
+                    suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+            filePath = safePath;
+        }
 
         try
         {
