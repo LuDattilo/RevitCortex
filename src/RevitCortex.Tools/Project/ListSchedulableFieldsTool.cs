@@ -28,7 +28,13 @@ public class ListSchedulableFieldsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "No active document in session");
 
-        var categoryName = input["categoryName"]?.Value<string>() ?? "OST_Rooms";
+        // Accept both "categoryName" (wrapper-native) and "category" (the convention used by
+        // create_schedule, get_compound_structure, export_to_excel, etc.). Without this alias a
+        // caller passing "category" silently fell through to the OST_Rooms default and got a
+        // Room-oriented field list for whatever category they actually asked about.
+        var categoryName = input["categoryName"]?.Value<string>()
+            ?? input["category"]?.Value<string>()
+            ?? "OST_Rooms";
         var scheduleType = input["scheduleType"]?.Value<string>() ?? "regular";
 
         var resolved = CategoryResolver.Resolve(categoryName);

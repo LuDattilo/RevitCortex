@@ -56,6 +56,25 @@ public class SilentDropDiagnosticsSourceTests
     }
 
     [Fact]
+    public void ListSchedulableFields_AcceptsCategoryAlias_NotJustCategoryName()
+    {
+        // Repro 2026-06-05: a smoke test passed `category: OST_StructuralColumns` (the convention
+        // used by create_schedule/get_compound_structure/export_to_excel), but the tool read only
+        // `categoryName`, so the missing key silently fell through to the OST_Rooms default and the
+        // response reported category=OST_Rooms with Room-oriented fields. The tool must accept both
+        // input keys, mirroring CreateScheduleTool's blessed alias pattern.
+        var src = ReadTool("Project", "ListSchedulableFieldsTool.cs");
+        Assert.Contains("input[\"categoryName\"]?.Value<string>()", src);
+        Assert.Contains("input[\"category\"]?.Value<string>()", src);
+        // The categoryName resolution must reference both keys before the OST_Rooms fallback.
+        var categoryNameIdx = src.IndexOf("input[\"categoryName\"]?.Value<string>()", System.StringComparison.Ordinal);
+        var categoryIdx = src.IndexOf("input[\"category\"]?.Value<string>()", System.StringComparison.Ordinal);
+        var fallbackIdx = src.IndexOf("\"OST_Rooms\"", System.StringComparison.Ordinal);
+        Assert.True(categoryNameIdx < categoryIdx && categoryIdx < fallbackIdx,
+            "category alias must be checked after categoryName and before the OST_Rooms default");
+    }
+
+    [Fact]
     public void BulkModify_DoesNotMarkUnassignableValuesAsModified_AndSurfacesFailures()
     {
         var src = ReadTool("Parameters", "BulkModifyParameterValuesTool.cs");
