@@ -12,11 +12,14 @@ using RevitCortex.Core.Tools;
 namespace RevitCortex.Tools.Elements;
 
 /// <summary>
-/// Round-trip companion of <see cref="PushToPowerBiTool"/>. Reads a CSV that
-/// was previously exported (or a hand-edited copy of one) and writes the
-/// values back to Revit element parameters. Identification key is the
-/// ElementId column. Read-only and computed columns are silently skipped
-/// (they're filtered upfront so the user is never blocked by a single bad cell).
+/// Round-trip companion of <see cref="PushToPowerBiTool"/> (','-delimited CSV)
+/// and <see cref="ExportElementsDataTool"/> (';'-delimited CSV). Reads a CSV
+/// that was previously exported (or a hand-edited copy of one) and writes the
+/// values back to Revit element parameters. The field separator is sniffed
+/// from the header line (override with the 'delimiter' input). Identification
+/// key is the ElementId column. Read-only and computed columns are silently
+/// skipped (they're filtered upfront so the user is never blocked by a single
+/// bad cell).
 ///
 /// Schedule mode is NOT supported — schedule CSVs use display strings, not
 /// raw parameter values, and writing them back would require unit re-parsing
@@ -47,12 +50,27 @@ public class ImportFromPowerBiTool : ICortexTool
         // Optional: only update these columns (alias headers as in the CSV).
         var columnFilter = input["columns"]?.ToObject<List<string>>();
 
+        // Optional explicit field separator; default is sniffed from the header
+        // line (push_to_powerbi emits ',', export_elements_data emits ';').
+        var delimiterRaw = input["delimiter"]?.Value<string>();
+        char? delimiter = null;
+        if (!string.IsNullOrEmpty(delimiterRaw))
+        {
+            if (delimiterRaw is ";" or ",")
+                delimiter = delimiterRaw[0];
+            else
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"Unsupported delimiter '{delimiterRaw}'. Use \";\" or \",\".",
+                    suggestion: "Omit the delimiter to auto-detect it from the CSV header line.");
+        }
+
         // Parse CSV
         List<string> headers;
         List<string[]> rows;
+        char effectiveDelimiter;
         try
         {
-            (headers, rows) = ReadCsv(filePath);
+            (headers, rows, effectiveDelimiter) = ReadCsv(filePath, delimiter);
         }
         catch (Exception ex)
         {
@@ -192,6 +210,7 @@ public class ImportFromPowerBiTool : ICortexTool
         {
             file = filePath,
             dryRun,
+            delimiter = effectiveDelimiter.ToString(),
             rows = affectedRows,
             writableColumns = writable.Count,
             updatedCount = updated,
@@ -258,73 +277,14 @@ public class ImportFromPowerBiTool : ICortexTool
     }
 
     /// <summary>
-    /// Minimal RFC 4180 CSV reader: handles quoted fields, doubled quotes,
-    /// embedded newlines and commas. Returns headers + rows (each as a
-    /// fixed-length string array — short rows are padded).
+    /// Reads the CSV and parses it via <see cref="CsvParsing"/>. The field
+    /// separator is sniffed from the header line unless explicitly provided.
     /// </summary>
-    private static (List<string> headers, List<string[]> rows) ReadCsv(string path)
+    private static (List<string> headers, List<string[]> rows, char delimiter) ReadCsv(string path, char? delimiter)
     {
         var content = File.ReadAllText(path, Encoding.UTF8);
-        var fields = new List<List<string>>();
-        var current = new List<string>();
-        var sb = new StringBuilder();
-        bool inQuotes = false;
-        for (int i = 0; i < content.Length; i++)
-        {
-            char c = content[i];
-            if (inQuotes)
-            {
-                if (c == '"')
-                {
-                    if (i + 1 < content.Length && content[i + 1] == '"')
-                    {
-                        sb.Append('"');
-                        i++;
-                    }
-                    else inQuotes = false;
-                }
-                else sb.Append(c);
-            }
-            else
-            {
-                if (c == '"') inQuotes = true;
-                else if (c == ',')
-                {
-                    current.Add(sb.ToString());
-                    sb.Clear();
-                }
-                else if (c == '\r')
-                {
-                    // ignore — handled by the LF that should follow
-                }
-                else if (c == '\n')
-                {
-                    current.Add(sb.ToString());
-                    sb.Clear();
-                    fields.Add(current);
-                    current = new List<string>();
-                }
-                else sb.Append(c);
-            }
-        }
-        if (sb.Length > 0 || current.Count > 0)
-        {
-            current.Add(sb.ToString());
-            fields.Add(current);
-        }
-
-        if (fields.Count == 0) return (new(), new());
-        var headers = fields[0];
-        var rowsOut = new List<string[]>();
-        int width = headers.Count;
-        for (int r = 1; r < fields.Count; r++)
-        {
-            var row = fields[r];
-            if (row.Count == 0 || (row.Count == 1 && string.IsNullOrEmpty(row[0]))) continue;
-            // Pad short rows to the header width
-            while (row.Count < width) row.Add("");
-            rowsOut.Add(row.ToArray());
-        }
-        return (headers, rowsOut.ToArray().ToList());
+        char sep = delimiter ?? CsvParsing.SniffDelimiter(content);
+        var (headers, rows) = CsvParsing.Parse(content, sep);
+        return (headers, rows, sep);
     }
 }

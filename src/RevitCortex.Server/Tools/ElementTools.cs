@@ -641,13 +641,14 @@ public static class ElementTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "import_from_powerbi"), Description("Reads a previously-exported (or hand-edited) Power BI CSV and writes parameter values back to Revit elements. Identifies elements via the ElementId column. Built-in fields and read-only parameters are skipped. Defaults to dryRun=true so callers can preview first.")]
+    [McpServerTool(Name = "import_from_powerbi"), Description("Reads a previously-exported (or hand-edited) Power BI CSV and writes parameter values back to Revit elements. Accepts both ','-delimited (push_to_powerbi) and ';'-delimited (export_elements_data) CSVs — the separator is auto-detected from the header line. Identifies elements via the ElementId column. Built-in fields and read-only parameters are skipped. Defaults to dryRun=true so callers can preview first.")]
     public static async Task<string> ImportFromPowerBi(
         RevitConnectionManager revit,
-        [Description("Path to the CSV file (typically the one written by push_to_powerbi).")] string filePath,
+        [Description("Path to the CSV file (typically the one written by push_to_powerbi or export_elements_data).")] string filePath,
         [Description("Preview mode: report what would change without committing. Default: true.")] bool dryRun = true,
         [Description("Name of the column holding the Revit ElementId. Default: 'ElementId'.")] string idColumn = "ElementId",
         [Description("Optional whitelist of column headers to write (others ignored).")] string[]? columns = null,
+        [Description("Field separator: ';' or ','. Default: auto-detected from the CSV header line.")] string? delimiter = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -657,6 +658,7 @@ public static class ElementTools
             ["idColumn"] = idColumn,
         };
         if (columns != null) p["columns"] = new JArray(columns);
+        if (delimiter != null) p["delimiter"] = delimiter;
         var result = await revit.ExecuteAsync("import_from_powerbi", p, ct);
         return result.ToString();
     }

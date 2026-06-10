@@ -275,7 +275,7 @@ Questa sezione raccoglie i comandi per leggere, cercare, creare e modificare gli
 | `export_families` | Esporta le famiglie del progetto in una cartella, opzionalmente per categoria. | "Esporta tutte le famiglie di porte in questa cartella" |
 | `push_to_powerbi` | Pubblica elementi/parametri verso Power BI con scope configurabile. | "Pubblica tutti i muri su Power BI con i parametri scelti" |
 | `push_table_to_powerbi` | Pubblica una tabella personalizzata (intestazioni + righe) verso Power BI. | "Manda questa tabella di quantità a Power BI" |
-| `import_from_powerbi` | Importa dati da Power BI e li applica agli elementi tramite colonna ID (anteprima con dryRun). | "Importa da Power BI e aggiorna gli elementi via ElementId, in anteprima" |
+| `import_from_powerbi` | Importa dati da un CSV (Power BI o export_elements_data) e li applica agli elementi tramite colonna ID (anteprima con dryRun). Il separatore `,`/`;` è rilevato automaticamente dall'intestazione. | "Importa da Power BI e aggiorna gli elementi via ElementId, in anteprima" |
 | `select_from_powerbi` | Seleziona/evidenzia in Revit gli elementi indicati da Power BI tramite i loro ID. | "Seleziona in Revit gli elementi che ho filtrato in Power BI" |
 
 #### Avanzato
