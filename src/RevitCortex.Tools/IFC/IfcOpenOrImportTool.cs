@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.IFC;
 
@@ -27,6 +28,14 @@ public class IfcOpenOrImportTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "filePath is required",
                 suggestion: "Provide the full path to the IFC file");
+
+        // H25-wave: restrict reads to user-owned directories; reject traversal/UNC/system paths.
+        // To link an IFC that lives on a network share, use ifc_link instead.
+        if (!PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+        filePath = safePath;
 
         if (!File.Exists(filePath))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,

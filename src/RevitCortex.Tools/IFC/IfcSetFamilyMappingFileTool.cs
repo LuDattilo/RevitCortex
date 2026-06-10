@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.IFC;
 
@@ -36,6 +37,14 @@ public class IfcSetFamilyMappingFileTool : ICortexTool
                 message = "Family mapping file cleared from session",
             });
         }
+
+        // H25-wave: the stored path is later read by the IFC export tools; restrict it
+        // to user-owned directories like every other caller-supplied file path.
+        if (!PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+        filePath = safePath;
 
         if (!File.Exists(filePath))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,

@@ -36,6 +36,14 @@ public class AddLinkedFileTool : ICortexTool
         if (string.IsNullOrWhiteSpace(filePath))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "filePath is required");
 
+        // H25-wave: gate caller paths; UNC allowed because linking models from network
+        // shares is a standard BIM workflow and the confirmation dialog shows the path.
+        if (!PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError, allowUnc: true))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, temp, or a network share");
+        filePath = safePath;
+
         if (!session.RequestConfirmation("add linked file", 1, $"Link file: {filePath}"))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 

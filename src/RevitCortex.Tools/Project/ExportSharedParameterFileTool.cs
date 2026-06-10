@@ -28,6 +28,17 @@ public class ExportSharedParameterFileTool : ICortexTool
 
         var filePath = input["filePath"]?.Value<string>();
 
+        // H25-wave: File.Copy below overwrites the destination — restrict it to
+        // user-owned directories; reject traversal/UNC/system paths.
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            if (!Utilities.PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    pathError,
+                    suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+            filePath = safePath;
+        }
+
         try
         {
             var app = doc.Application;

@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.LinkedFiles;
 
@@ -32,6 +33,14 @@ public class ReloadLinkedFileFromTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "linkTypeId is required");
         if (string.IsNullOrWhiteSpace(newPath))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "newPath is required");
+
+        // H25-wave: gate caller paths; UNC allowed because linking models from network
+        // shares is a standard BIM workflow and the confirmation dialog shows the path.
+        if (!PathSafety.TryResolveSafe(newPath, out var safePath, out var pathError, allowUnc: true))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, temp, or a network share");
+        newPath = safePath;
 
         try
         {

@@ -127,6 +127,28 @@ Il listener Phase 2C è classificato come **rischio basso**: operazioni non dist
 
 ---
 
+## Validazione percorsi file — PathSafety (2026-06-10)
+
+I tool che accettano percorsi file dal chiamante (MCP) passano attraverso `PathSafety.TryResolveSafe` (`RevitCortex.Tools/Utilities/PathSafety.cs`): il percorso viene canonicalizzato (`Path.GetFullPath`, che collassa `..`) e accettato solo se ricade sotto directory di proprietà dell'utente — Documents, Desktop, Downloads, profilo utente, temp. Percorsi di sistema (`C:\Windows`, `C:\ProgramData`, ...) e traversal vengono rifiutati con `InvalidInput` strutturato.
+
+### Tool coperti
+
+**Policy stretta (solo directory utente, niente UNC):** `import_table`, `workflow_data_roundtrip`, `ifc_validate_request`, `ifc_export_basic`, `ifc_export_with_configuration`, `ifc_set_family_mapping_file`, `ifc_open_or_import`, `export_to_excel`, `export_families`, `import_from_excel`, `batch_export`, `export_shared_parameter_file`.
+
+**Policy link (UNC ammesso, `allowUnc: true`):** `ifc_link`, `ifc_reload_link`, `add_linked_file`, `reload_linked_file_from`.
+
+### Trade-off UNC sui tool di link
+
+Collegare modelli da share di rete (`\\server\share\...`) è un workflow BIM standard (modelli centrali, coordinamento multidisciplinare): bloccare gli UNC su questi quattro tool li renderebbe inutilizzabili in studio. Il rischio residuo è contenuto perché:
+
+1. ogni tool di link è già gated da `RequestConfirmation()` — il dialogo nativo Revit mostra il percorso all'utente prima di procedere;
+2. i percorsi locali restano comunque vincolati alle directory utente anche con `allowUnc: true`;
+3. l'operazione di scrittura derivata (la cache `.ifc.RVT` creata da `CreateFromIFC`) finisce accanto al file IFC validato, e l'eventuale sovrascrittura della cache è dichiarata nel dialogo di conferma.
+
+I tool di export e import dati restano invece su policy stretta: scrivere o leggere file arbitrari su share di rete non è necessario per quei workflow e amplierebbe la superficie di esfiltrazione/sovrascrittura.
+
+---
+
 ## Livello di rischio
 
 | Area | Livello rischio | Stato |
@@ -140,3 +162,4 @@ Il listener Phase 2C è classificato come **rischio basso**: operazioni non dist
 | PBI listener localhost (Phase 2C) | Basso | Loopback + operazioni non distruttive + auto-stop |
 | PBI REST API in uscita (Pipeline B + Opzione C) | Basso | HTTPS, stesso tenant M365, dati non escono dall'org |
 | Token MSAL cache locale | Basso | DPAPI cifra per utente Windows corrente |
+| Percorsi file arbitrari dai tool | Basso | PathSafety su tutti i tool con path caller-supplied; UNC solo sui tool di link con conferma utente |

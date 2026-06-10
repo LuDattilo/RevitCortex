@@ -49,9 +49,21 @@ public class IfcReloadLinkTool : ICortexTool
         var newIfcFilePath = input["newIfcFilePath"]?.Value<string>();
         var recreateLink = input["recreateLink"]?.Value<bool>() ?? true;
 
-        if (!string.IsNullOrWhiteSpace(newIfcFilePath) && !File.Exists(newIfcFilePath))
-            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                $"New IFC file not found: {newIfcFilePath}");
+        if (!string.IsNullOrWhiteSpace(newIfcFilePath))
+        {
+            // H25-wave: gate caller paths; UNC allowed because linking from network shares
+            // is a standard BIM workflow and the confirmation dialog shows the path.
+            // The derived .RVT cache is written next to this path, so it is covered too.
+            if (!PathSafety.TryResolveSafe(newIfcFilePath, out var safeIfcPath, out var pathError, allowUnc: true))
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    pathError,
+                    suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, temp, or a network share");
+            newIfcFilePath = safeIfcPath;
+
+            if (!File.Exists(newIfcFilePath))
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"New IFC file not found: {newIfcFilePath}");
+        }
 
         var description = string.IsNullOrWhiteSpace(newIfcFilePath)
             ? $"Reload IFC link '{linkType.Name}'"

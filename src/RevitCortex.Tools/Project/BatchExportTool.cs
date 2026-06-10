@@ -40,6 +40,14 @@ public class BatchExportTool : ICortexTool
             outputDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "RevitExport");
         }
 
+        // H25-wave: this tool creates directories and writes export files — restrict the
+        // target to user-owned directories; reject traversal/UNC/system paths.
+        if (!Utilities.PathSafety.TryResolveSafe(outputDir, out var safeOutputDir, out var pathError))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+        outputDir = safeOutputDir;
+
         if (!Directory.Exists(outputDir))
             Directory.CreateDirectory(outputDir);
 

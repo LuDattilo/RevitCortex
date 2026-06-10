@@ -44,6 +44,13 @@ public class ExportToExcelTool : ICortexTool
             filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
                 $"RevitExport_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
 
+        // H25-wave: restrict writes to user-owned directories; reject traversal/UNC/system paths.
+        if (!PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+        filePath = safePath;
+
         try
         {
             // Collect elements

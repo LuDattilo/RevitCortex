@@ -32,7 +32,17 @@ public class ImportFromExcelTool : ICortexTool
         var sheetName = input["sheetName"]?.Value<string>();
         var dryRun = input["dryRun"]?.Value<bool>() ?? true;
 
-        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        if (string.IsNullOrEmpty(filePath))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "filePath is required and must exist");
+
+        // H25-wave: restrict reads to user-owned directories; reject traversal/UNC/system paths.
+        if (!Utilities.PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+        filePath = safePath;
+
+        if (!File.Exists(filePath))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "filePath is required and must exist");
 
         try

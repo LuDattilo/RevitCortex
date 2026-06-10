@@ -32,17 +32,39 @@ public class IfcLinkTool : ICortexTool
                 "ifcFilePath is required",
                 suggestion: "Provide the full path to the IFC file to link");
 
+        // H25-wave: gate caller paths; UNC allowed because linking from network shares
+        // is a standard BIM workflow and the confirmation dialog shows the path.
+        if (!PathSafety.TryResolveSafe(ifcFilePath, out var safeIfcPath, out var pathError, allowUnc: true))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, temp, or a network share");
+        ifcFilePath = safeIfcPath;
+
         if (!File.Exists(ifcFilePath))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"IFC file not found: {ifcFilePath}");
 
         var revitFilePath = input["revitFilePath"]?.Value<string>();
         if (string.IsNullOrWhiteSpace(revitFilePath))
+        {
             revitFilePath = ifcFilePath + ".RVT";
+        }
+        else
+        {
+            // CreateFromIFC overwrites this file — never let it point at an unvetted location.
+            if (!PathSafety.TryResolveSafe(revitFilePath, out var safeRvtPath, out var rvtPathError, allowUnc: true))
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    rvtPathError,
+                    suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, temp, or a network share");
+            revitFilePath = safeRvtPath;
+        }
 
         var recreateLink = input["recreateLink"]?.Value<bool>() ?? true;
 
-        if (!session.RequestConfirmation("link IFC file", 1, $"Link: {Path.GetFileName(ifcFilePath)}"))
+        var confirmDetail = File.Exists(revitFilePath)
+            ? $"Link: {Path.GetFileName(ifcFilePath)} (overwrites cache {Path.GetFileName(revitFilePath)})"
+            : $"Link: {Path.GetFileName(ifcFilePath)}";
+        if (!session.RequestConfirmation("link IFC file", 1, confirmDetail))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         try

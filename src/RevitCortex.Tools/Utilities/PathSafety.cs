@@ -66,7 +66,11 @@ public static class PathSafety
     /// <param name="userPath">The raw caller-supplied path.</param>
     /// <param name="resolvedPath">The canonical absolute path, when valid.</param>
     /// <param name="error">A human-readable reason when invalid.</param>
-    public static bool TryResolveSafe(string? userPath, out string resolvedPath, out string error)
+    /// <param name="allowUnc">Accept UNC/network paths (\\host\share). Reserved for link
+    /// tools, where loading models from network shares is a standard BIM workflow and
+    /// every call is already gated by a user confirmation dialog showing the path.
+    /// Local paths stay restricted to the allowed user directories regardless.</param>
+    public static bool TryResolveSafe(string? userPath, out string resolvedPath, out string error, bool allowUnc = false)
     {
         resolvedPath = string.Empty;
         error = string.Empty;
@@ -89,10 +93,16 @@ public static class PathSafety
             return false;
         }
 
-        // Reject UNC / network shares outright (\\host\share or //host/share).
+        // UNC / network shares (\\host\share or //host/share): rejected by default;
+        // link tools opt in because shares can never live under the user-profile roots.
         if (full.StartsWith(@"\\", StringComparison.Ordinal) ||
             full.StartsWith("//", StringComparison.Ordinal))
         {
+            if (allowUnc)
+            {
+                resolvedPath = full;
+                return true;
+            }
             error = "Network/UNC paths are not allowed.";
             return false;
         }

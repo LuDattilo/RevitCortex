@@ -34,6 +34,14 @@ public class ExportFamiliesTool : ICortexTool
         if (string.IsNullOrEmpty(outputDirectory))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "outputDirectory is required");
 
+        // H25-wave: this tool creates directories and writes .rfa files — restrict the
+        // target to user-owned directories; reject traversal/UNC/system paths.
+        if (!Utilities.PathSafety.TryResolveSafe(outputDirectory, out var safeOutputDirectory, out var pathError))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+        outputDirectory = safeOutputDirectory;
+
         try
         {
             if (!Directory.Exists(outputDirectory))

@@ -32,6 +32,13 @@ public class IfcExportBasicTool : ICortexTool, ICommandTimeoutTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "outputDirectory is required");
 
+        // H25-wave: restrict writes to user-owned directories; reject traversal/UNC/system paths.
+        if (!PathSafety.TryResolveSafe(outputDirectory, out var safeOutputDirectory, out var pathError))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+        outputDirectory = safeOutputDirectory;
+
         if (!Directory.Exists(outputDirectory))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Output directory does not exist: {outputDirectory}",
