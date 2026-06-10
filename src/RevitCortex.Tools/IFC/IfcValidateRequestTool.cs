@@ -27,6 +27,14 @@ public class IfcValidateRequestTool : ICortexTool
                 "filePath is required",
                 suggestion: "Provide the full path to an IFC file");
 
+        // The header sniff below returns raw file lines to the caller — restrict
+        // reads to user-owned directories like the other file-reading tools.
+        if (!Utilities.PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                pathError,
+                suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+        filePath = safePath;
+
         if (!File.Exists(filePath))
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"File not found: {filePath}",

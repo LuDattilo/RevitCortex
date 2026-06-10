@@ -66,6 +66,9 @@ public class RenumberElementsTool : ICortexTool
             var renumberResults = new List<object>();
             int currentNumber = startNumber;
 
+            if (!dryRun && !session.RequestConfirmation("renumber", elements.Count))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
             Transaction? tx = dryRun ? null : new Transaction(doc, "RevitCortex: Renumber Elements");
             try
             {

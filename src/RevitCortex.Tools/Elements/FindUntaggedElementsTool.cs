@@ -41,6 +41,10 @@ public class FindUntaggedElementsTool : ICortexTool
 
         // ── Parse inputs ───────────────────────────────────────────────────
         var categoriesToken = input["categories"] as JArray;
+        // Singular "category" alias: the server wrapper exposed it long before the
+        // plural form, and direct-bridge callers still use it.
+        if (categoriesToken == null && input["category"]?.Type == JTokenType.String)
+            categoriesToken = new JArray(input["category"]!.ToString());
         var viewIdToken = input["viewId"]?.Value<long?>();
         var limit = input["limit"]?.Value<int>() ?? 500;
 
@@ -75,12 +79,14 @@ public class FindUntaggedElementsTool : ICortexTool
                 foreach (var catToken in categoriesToken)
                 {
                     var catStr = catToken.ToString();
-                    if (Enum.TryParse(catStr, out BuiltInCategory bic))
-                        builtInCategories.Add(bic);
+                    var bic = Utilities.CategoryResolver.Resolve(catStr);
+                    if (bic != null)
+                        builtInCategories.Add(bic.Value);
                 }
                 if (builtInCategories.Count == 0)
                     return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                        "None of the provided categories could be parsed as valid BuiltInCategory OST_* codes");
+                        "None of the provided categories could be resolved",
+                        suggestion: "Use OST_* codes like OST_Walls, or English friendly names like Walls, Doors");
             }
             else
             {

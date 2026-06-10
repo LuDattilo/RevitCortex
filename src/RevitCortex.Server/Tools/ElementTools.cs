@@ -152,7 +152,8 @@ public static class ElementTools
         CancellationToken ct = default)
     {
         var p = new JObject();
-        if (category != null) p["category"] = category;
+        // Plugin reads "categories" as an array; keep "category" too for direct-bridge compat.
+        if (category != null) { p["categories"] = new JArray(category); p["category"] = category; }
         if (viewId != null) p["viewId"] = viewId;
         var result = await revit.ExecuteAsync("find_undimensioned_elements", p, ct);
         return result.ToString();
@@ -166,7 +167,8 @@ public static class ElementTools
         CancellationToken ct = default)
     {
         var p = new JObject();
-        if (category != null) p["category"] = category;
+        // Plugin reads "categories" as an array; keep "category" too for direct-bridge compat.
+        if (category != null) { p["categories"] = new JArray(category); p["category"] = category; }
         if (viewId != null) p["viewId"] = viewId;
         var result = await revit.ExecuteAsync("find_untagged_elements", p, ct);
         return result.ToString();
@@ -287,10 +289,10 @@ public static class ElementTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "set_element_workset"), Description("Move elements to a different workset. Pass a JSON array of requests: [{elementId, worksetId|worksetName}].")]
+    [McpServerTool(Name = "set_element_workset"), Description("Move elements to a different workset. Pass a JSON array of requests: [{elementId, worksetName}]. Worksets are resolved by name only.")]
     public static async Task<string> SetElementWorkset(
         RevitConnectionManager revit,
-        [Description("JSON array of requests: [{elementId, worksetId?, worksetName?}]")] string requests,
+        [Description("JSON array of requests: [{elementId, worksetName}]")] string requests,
         CancellationToken ct = default)
     {
         var p = new JObject { ["requests"] = JArray.Parse(requests) };

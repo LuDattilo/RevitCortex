@@ -95,22 +95,26 @@ public static class ParameterTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "add_prefix_suffix"), Description("Add a prefix and/or suffix to parameter values across the model or a selection.")]
+    [McpServerTool(Name = "add_prefix_suffix"), Description("Add a prefix and/or suffix to parameter values across the model or a selection. Runs as a dry-run preview by default; set dryRun=false to apply the changes.")]
     public static async Task<string> AddPrefixSuffix(
         RevitConnectionManager revit,
         [Description("Parameter name to modify")] string parameterName,
         [Description("Prefix to prepend")] string? prefix = null,
         [Description("Suffix to append")] string? suffix = null,
         [Description("Scope: whole_model or selection. Default: whole_model")] string? scope = "whole_model",
+        [Description("JSON array of category names to filter, e.g. [\"OST_Doors\"]")] string? categories = null,
+        [Description("Preview only when true (default). Set false to actually write the values.")] bool dryRun = true,
         CancellationToken ct = default)
     {
         var p = new JObject
         {
             ["parameterName"] = parameterName,
+            ["dryRun"] = dryRun,
         };
         if (prefix != null) p["prefix"] = prefix;
         if (suffix != null) p["suffix"] = suffix;
         if (scope != null) p["scope"] = scope;
+        if (categories != null) p["categories"] = JArray.Parse(categories);
         var result = await revit.ExecuteAsync("add_prefix_suffix", p, ct);
         return result.ToString();
     }

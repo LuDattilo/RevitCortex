@@ -228,7 +228,7 @@ RevitCortex defaults are calibrated for completeness, not efficiency. Override t
 
 **get_linked_elements**: Specify `categories` and `maxElements` to limit response. The `parameterNames` parameter is **additive**: without it the tool returns only `elementId`, `category`, `name` -- not all parameters. Add `parameterNames` only when specific linked element data is needed.
 
-**lines_per_view_count**: Always use `threshold >= 20` on models with >100 views. The tool has an automatic cap at 300 views.
+**lines_per_view_count**: Single document-wide pass — safe on any model size. Detail lines are reported per view; model lines (no owner view) as one project-wide count. Use `threshold` only to shrink the response.
 
 **get_current_view_elements**: Prefer `modelCategoryList` / `annotationCategoryList`. Use legacy `categoryFilter` only for backward compatibility.
 
@@ -324,7 +324,7 @@ Use a dedicated session per distinct BIM task. Do not mix QA tasks with authorin
 | `create_dimensions` | Z must exactly match the level elevation | Use elevation from `get_project_info` levels |
 | `set_element_phase` | Available only on models with phases (`doc.Phases > 0`) | Check `phases` in `get_project_info`, NOT `isWorkshared` -- phases are independent of worksharing |
 | `create_grid` | Label ignored if already exists in model | Use non-conflicting labels; the tool adds a warning in the response |
-| `lines_per_view_count` | Heavy on models with many views | Always use `threshold >= 20`; tool has automatic 300-view cap |
+| `lines_per_view_count` | Model lines are not view-specific | Reported once at project level (`modelLinesInProject`), not per view; per-view counts cover detail lines only |
 
 ### Token Estimates by Task Type
 

@@ -32,7 +32,6 @@ public class LinesPerViewCountTool : ICortexTool
         var includeDetailLines = input["includeDetailLines"]?.Value<bool>() ?? true;
         var includeModelLines  = input["includeModelLines"]?.Value<bool>() ?? true;
         var limit              = input["limit"]?.Value<int>() ?? 200;
-        var maxViews           = input["maxViews"]?.Value<int>() ?? 100;
         var timeBudgetMs       = input["timeBudgetMs"]?.Value<int>() ?? 15000;
 
         try
@@ -44,37 +43,42 @@ public class LinesPerViewCountTool : ICortexTool
                 .Where(v => !v.IsTemplate && v.CanBePrinted)
                 .ToList();
 
-            // Safety cap: prevent timeout on very large models. Keep the hard
-            // ceiling at 300 for compatibility, but default to a smaller scan
-            // because per-view Revit collectors can be expensive on sheet-heavy
-            // models.
-            const int hardMaxViewScan = 300;
-            if (maxViews <= 0) maxViews = 100;
-            maxViews = Math.Min(maxViews, hardMaxViewScan);
             timeBudgetMs = Math.Max(1000, timeBudgetMs);
 
-            bool capped = false;
-            if (views.Count > hardMaxViewScan && threshold == 0)
+            // Single document-wide pass over the Lines category. Detail lines are
+            // view-specific (OwnerViewId set) and grouped per view; model lines belong
+            // to the model (no owner view) and are reported as one project-wide count.
+            // The previous implementation ran one view-scoped collector PER VIEW for
+            // model lines — O(views) visibility graphs, the root cause of the TCP
+            // timeout/crash on 300+ view models — and double-counted each model line
+            // in every view it was visible in.
+            var detailLineCounts = new Dictionary<ElementId, int>();
+            int modelLinesInProject = 0;
+            if (includeDetailLines || includeModelLines)
             {
-                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
-                    $"Model has {views.Count} views. A full scan (threshold=0) would likely time out.",
-                    suggestion: $"Set threshold >= 1 to filter results, or limit the scan scope. " +
-                                $"Recommended: threshold >= 50 for models with 300+ views.");
-            }
-            if (views.Count > maxViews)
-            {
-                views = views.Take(maxViews).ToList();
-                capped = true;
+                var lines = new FilteredElementCollector(doc)
+                    .OfCategory(BuiltInCategory.OST_Lines)
+                    .WhereElementIsNotElementType();
+                foreach (var line in lines)
+                {
+                    var ownerViewId = line.OwnerViewId;
+                    if (ownerViewId == ElementId.InvalidElementId)
+                    {
+                        if (includeModelLines) modelLinesInProject++;
+                    }
+                    else if (includeDetailLines)
+                    {
+                        int current;
+                        detailLineCounts.TryGetValue(ownerViewId, out current);
+                        detailLineCounts[ownerViewId] = current + 1;
+                    }
+                }
             }
 
             var viewStats = new List<(int total, object data)>();
-            int totalLines = 0;
+            int totalDetailLines = 0;
             int skippedViews = 0;
             bool timedOut = false;
-
-            var detailLineCounts = includeDetailLines
-                ? CountDetailLinesByOwnerView(doc)
-                : new Dictionary<ElementId, int>();
 
             var stopwatch = Stopwatch.StartNew();
             foreach (var view in views)
@@ -89,22 +93,11 @@ public class LinesPerViewCountTool : ICortexTool
                 {
                     int detailLineCount;
                     detailLineCounts.TryGetValue(view.Id, out detailLineCount);
-                    int modelLineCount = 0;
+                    totalDetailLines += detailLineCount;
 
-                    if (includeModelLines)
+                    if (detailLineCount >= threshold)
                     {
-                        modelLineCount = new FilteredElementCollector(doc, view.Id)
-                            .OfCategory(BuiltInCategory.OST_GenericLines)
-                            .WhereElementIsNotElementType()
-                            .GetElementCount();
-                    }
-
-                    int total = detailLineCount + modelLineCount;
-                    totalLines += total;
-
-                    if (total >= threshold)
-                    {
-                        viewStats.Add((total, (object)new
+                        viewStats.Add((detailLineCount, (object)new
                         {
 #if REVIT2024_OR_GREATER
                             viewId = view.Id.Value,
@@ -114,8 +107,7 @@ public class LinesPerViewCountTool : ICortexTool
                             viewName    = view.Name,
                             viewType    = view.ViewType.ToString(),
                             detailLines = detailLineCount,
-                            modelLines  = modelLineCount,
-                            totalLines  = total
+                            totalLines  = detailLineCount
                         }));
                     }
                 }
@@ -135,12 +127,14 @@ public class LinesPerViewCountTool : ICortexTool
             return CortexResult<object>.Ok(new
             {
                 totalViewsScanned   = views.Count,
-                totalLinesInProject = totalLines,
+                totalLinesInProject = totalDetailLines + modelLinesInProject,
+                detailLinesInProject = totalDetailLines,
+                // Model lines are not view-specific, so they are reported once at
+                // project level instead of per view.
+                modelLinesInProject,
                 viewsAboveThreshold = sorted.Count,
                 returnedCount       = limited.Count,
                 truncated           = sorted.Count > limit,
-                capped,
-                maxViews,
                 timedOut,
                 timeBudgetMs,
                 threshold,
@@ -155,23 +149,4 @@ public class LinesPerViewCountTool : ICortexTool
         }
     }
 
-    private static Dictionary<ElementId, int> CountDetailLinesByOwnerView(Document doc)
-    {
-        var counts = new Dictionary<ElementId, int>();
-        var detailLines = new FilteredElementCollector(doc)
-            .OfCategory(BuiltInCategory.OST_Lines)
-            .WhereElementIsNotElementType();
-
-        foreach (var line in detailLines)
-        {
-            var ownerViewId = line.OwnerViewId;
-            if (ownerViewId == ElementId.InvalidElementId) continue;
-
-            int current;
-            counts.TryGetValue(ownerViewId, out current);
-            counts[ownerViewId] = current + 1;
-        }
-
-        return counts;
-    }
 }

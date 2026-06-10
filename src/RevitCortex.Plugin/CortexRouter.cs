@@ -127,13 +127,15 @@ public class CortexRouter
         {
             paramHash = HashParams(input);
             if (_session.Cache.TryGet(toolName, paramHash, cacheable.CacheScope,
-                    _session.DocumentVersion, out var cached))
+                    _session.DocumentVersion, out var cached, out var cachedBytes))
             {
                 stopwatch.Stop();
                 _auditLogger.LogWithPerf(toolName, BuildInputSummary(toolName, input),
                     cached.Success, cached.Error?.Code, elementsAffected: 0,
                     durationMs: stopwatch.ElapsedMilliseconds,
-                    responseBytes: EstimateResponseBytes(cached),
+                    // The entry's stored estimate: re-serializing the result on every
+                    // hit would defeat the point of caching it.
+                    responseBytes: cachedBytes,
                     errorMessage: cached.Error?.Message);
                 return cached;
             }
@@ -170,12 +172,16 @@ public class CortexRouter
             _session.ApproveAll = false;
         }
 
+        // One serialization serves both the audit byte count and the cache entry's
+        // estimate — Set used to re-serialize the same result a second time.
+        var responseBytes = EstimateResponseBytes(result);
+
         // Only cache successful results. Failures must always re-execute so a
         // transient error doesn't get stuck in the cache.
         if (cacheable != null && paramHash != null && result.Success)
         {
             _session.Cache.Set(toolName, paramHash, cacheable.CacheScope,
-                _session.DocumentVersion, result);
+                _session.DocumentVersion, result, knownBytes: responseBytes);
         }
 
         stopwatch.Stop();
@@ -183,7 +189,6 @@ public class CortexRouter
         // Audit log (schema v2): every invocation, with duration and response size.
         // send_code_to_revit also gets a code snapshot (truncated) + SHA-256 hash.
         var inputSummary = BuildInputSummary(toolName, input);
-        var responseBytes = EstimateResponseBytes(result);
         string? codeSnippet = null;
         string? codeHash = null;
         if (toolName == "send_code_to_revit")

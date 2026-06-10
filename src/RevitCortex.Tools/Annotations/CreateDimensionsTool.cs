@@ -248,6 +248,15 @@ public class CreateDimensionsTool : ICortexTool
                     dim.DimensionType = dt;
             }
         }
+        else
+        {
+            // The two anchor detail lines are only useful while the dimension that
+            // references them exists — without cleanup they accumulate as invisible
+            // orphans on every failed call.
+            doc.Delete(detailLine1.Id);
+            doc.Delete(detailLine2.Id);
+            warnings.Add("NewDimension returned null; anchor detail lines were removed");
+        }
     }
 
     private static Reference? GetBestReference(Element elem, View view)

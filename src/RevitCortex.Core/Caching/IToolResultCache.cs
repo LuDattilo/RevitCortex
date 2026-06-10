@@ -23,15 +23,31 @@ public interface IToolResultCache
         out CortexResult<object> result);
 
     /// <summary>
+    /// Same as <see cref="TryGet(string,string,CacheScope,long,out CortexResult{object})"/>
+    /// but also returns the entry's stored byte estimate, so hit paths don't have
+    /// to re-serialize the result just to measure it.
+    /// </summary>
+    bool TryGet(
+        string toolName,
+        string paramHash,
+        CacheScope scope,
+        long currentDocVersion,
+        out CortexResult<object> result,
+        out long estimatedBytes);
+
+    /// <summary>
     /// Store a successful result. Failures (CortexResult.Fail) MUST NOT be
-    /// passed here — caller is responsible for filtering.
+    /// passed here — caller is responsible for filtering. When the caller has
+    /// already serialized the result (e.g. for audit), pass the byte count via
+    /// <paramref name="knownBytes"/> to avoid a second serialization.
     /// </summary>
     void Set(
         string toolName,
         string paramHash,
         CacheScope scope,
         long currentDocVersion,
-        CortexResult<object> result);
+        CortexResult<object> result,
+        long? knownBytes = null);
 
     /// <summary>
     /// Drop all entries with the given scope. Other scopes are untouched.

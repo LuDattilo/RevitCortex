@@ -54,11 +54,16 @@ public class ListSchedulableFieldsTool : ICortexTool
             using (var tx = new Transaction(doc, "CortexTempSchedule"))
             {
                 tx.Start();
-                tempSchedule = scheduleType.ToLower() switch
+                // Normalize like CreateScheduleTool (strip separators) so 'material_takeoff',
+                // 'material-takeoff' and 'materialtakeoff' all hit the same branch; 'key' is
+                // the short alias documented by the server wrapper.
+                var normalizedType = scheduleType.ToLowerInvariant()
+                    .Replace(" ", "").Replace("_", "").Replace("-", "");
+                tempSchedule = normalizedType switch
                 {
-                    "material_takeoff" => ViewSchedule.CreateMaterialTakeoff(doc, categoryId),
-                    "key_schedule"     => ViewSchedule.CreateKeySchedule(doc, categoryId),
-                    _                  => ViewSchedule.CreateSchedule(doc, categoryId)
+                    "materialtakeoff"     => ViewSchedule.CreateMaterialTakeoff(doc, categoryId),
+                    "keyschedule" or "key" => ViewSchedule.CreateKeySchedule(doc, categoryId),
+                    _                     => ViewSchedule.CreateSchedule(doc, categoryId)
                 };
 
                 fields = tempSchedule.Definition.GetSchedulableFields()

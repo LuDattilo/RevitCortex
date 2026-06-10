@@ -39,8 +39,9 @@ public class ExportFamiliesTool : ICortexTool
             if (!Directory.Exists(outputDirectory))
                 Directory.CreateDirectory(outputDirectory);
 
+            // EditFamily throws on in-place families; mirror ListFamilySizesTool's guard.
             var families = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>()
-                .Where(f => f.IsEditable);
+                .Where(f => f.IsEditable && !f.IsInPlace);
 
             if (categories.Count > 0)
             {

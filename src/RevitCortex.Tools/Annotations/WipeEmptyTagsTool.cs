@@ -28,7 +28,18 @@ public class WipeEmptyTagsTool : ICortexTool
 
         var dryRun = input["dryRun"]?.Value<bool>() ?? true;
         var viewId = input["viewId"]?.Value<long>();
-        var categories = input["categories"]?.ToObject<List<string>>() ?? new List<string>();
+        // Accept both a JSON array and a comma-separated string: ToObject<List<string>>
+        // on a JValue throws, which used to crash the call when the wrapper forwarded
+        // the raw string.
+        List<string> categories;
+        var categoriesToken = input["categories"];
+        if (categoriesToken is JArray categoriesArray)
+            categories = categoriesArray.Select(t => t.ToString()).ToList();
+        else if (categoriesToken?.Type == JTokenType.String)
+            categories = categoriesToken.ToString()
+                .Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+        else
+            categories = new List<string>();
 
         try
         {
@@ -55,7 +66,9 @@ public class WipeEmptyTagsTool : ICortexTool
             {
                 var catIds = categories
                     .Select(c => Utilities.CategoryResolver.ResolveToId(doc, c))
-                    .Where(id => id != ElementId.InvalidElementId)
+                    // ResolveToId returns null for unrecognized names; a null passes the
+                    // InvalidElementId comparison and would NRE inside the HashSet.
+                    .Where(id => id != null && id != ElementId.InvalidElementId)
                     .ToHashSet();
                 tags = tags.Where(t => t.Category != null && catIds.Contains(t.Category.Id)).ToList();
             }

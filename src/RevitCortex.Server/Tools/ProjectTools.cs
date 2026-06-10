@@ -378,7 +378,7 @@ public static class ProjectTools
     {
         var p = new JObject { ["dryRun"] = dryRun };
         if (viewId != null) p["viewId"] = viewId;
-        if (categories != null) p["categories"] = categories;
+        if (categories != null) p["categories"] = JArray.Parse(categories);
         var result = await revit.ExecuteAsync("wipe_empty_tags", p, ct);
         return result.ToString();
     }
@@ -403,7 +403,7 @@ public static class ProjectTools
         [Description("Schedule element ID (alternative to scheduleName)")] long? scheduleId = null,
         [Description("Schedule name (alternative to scheduleId)")] string? scheduleName = null,
         [Description("Field names for add_field/remove_field actions")] string[]? fieldNames = null,
-        [Description("Sort field specs as JSON array: [{fieldName, ascending:true}]")] string? sortFields = null,
+        [Description("Sort field specs as JSON array: [{fieldName, sortOrder: \"ascending\"|\"descending\"}] (boolean alias 'ascending' also accepted)")] string? sortFields = null,
         [Description("Field to filter on (for set_filter). Must already be a field in the schedule")] string? filterField = null,
         [Description("Filter operator for set_filter: equal | not_equal | greater | less | contains | begins_with | ends_with | has_value | is_empty. Default: equal")] string? filterType = null,
         [Description("Filter value for set_filter (string or number). Omit for has_value/is_empty")] string? filterValue = null,
@@ -519,14 +519,13 @@ public static class ProjectTools
         return ToolResponseShaper.Shape("get_shared_parameters", result, compact, summaryOnly: false).ToString();
     }
 
-    [McpServerTool(Name = "lines_per_view_count"), Description("Count detail and/or model lines per view for performance auditing. Always set threshold >= 20 on large models; defaults to a guarded 100-view scan with a time budget.")]
+    [McpServerTool(Name = "lines_per_view_count"), Description("Count detail lines per view (single document pass, safe on any model size) plus a project-wide model line count. Model lines have no owner view, so they are reported once at project level, not per view.")]
     public static async Task<string> LinesPerViewCount(
         RevitConnectionManager revit,
-        [Description("Only report views at or above this line count. Default: 0")] int? threshold = null,
+        [Description("Only report views at or above this detail-line count. Default: 0")] int? threshold = null,
         [Description("Count detail lines. Default: true")] bool? includeDetailLines = null,
-        [Description("Count model lines. Default: true")] bool? includeModelLines = null,
+        [Description("Count model lines (project-wide total). Default: true")] bool? includeModelLines = null,
         [Description("Max views returned. Default: 200")] int? limit = null,
-        [Description("Max views scanned before capping. Default: 100, hard cap: 300")] int? maxViews = null,
         [Description("Time budget in milliseconds before returning partial results. Default: 15000")] int? timeBudgetMs = null,
         CancellationToken ct = default)
     {
@@ -535,7 +534,6 @@ public static class ProjectTools
         if (includeDetailLines != null) p["includeDetailLines"] = includeDetailLines;
         if (includeModelLines != null) p["includeModelLines"] = includeModelLines;
         if (limit != null) p["limit"] = limit;
-        if (maxViews != null) p["maxViews"] = maxViews;
         if (timeBudgetMs != null) p["timeBudgetMs"] = timeBudgetMs;
         var result = await revit.ExecuteAsync("lines_per_view_count", p, ct);
         return result.ToString();
@@ -563,7 +561,7 @@ public static class ProjectTools
     public static async Task<string> ListSchedulableFields(
         RevitConnectionManager revit,
         [Description("Category name (e.g. OST_Rooms). Default: OST_Rooms")] string? categoryName = null,
-        [Description("Schedule type: regular | key | material-takeoff. Default: regular")] string? scheduleType = null,
+        [Description("Schedule type: regular | key_schedule | material_takeoff (aliases: key, material-takeoff). Default: regular")] string? scheduleType = null,
         [Description("Return a compact payload. Default: false")] bool compact = false,
         [Description("Return names/counts only. Default: false")] bool summaryOnly = false,
         CancellationToken ct = default)

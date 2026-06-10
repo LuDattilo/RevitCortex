@@ -101,6 +101,7 @@ public class GetCurrentViewElementsTool : ICortexTool
             }
 
             IList<Element> elements;
+            int totalElementsInView;
             if (builtInCategories.Count > 0)
             {
                 var categoryFilter = new ElementMulticategoryFilter(builtInCategories);
@@ -108,19 +109,21 @@ public class GetCurrentViewElementsTool : ICortexTool
                     .WhereElementIsNotElementType()
                     .WherePasses(categoryFilter)
                     .ToElements();
+                totalElementsInView = new FilteredElementCollector(doc, activeView.Id)
+                    .GetElementCount();
             }
             else
             {
+                // Without a category filter the collector result IS the view total —
+                // don't run a second view-scoped collector just to count it.
                 elements = collector.ToElements();
+                totalElementsInView = elements.Count;
             }
 
-            // Get total count before hidden / limit filters
-            int totalElementsInView = new FilteredElementCollector(doc, activeView.Id)
-                .GetElementCount();
-
-            // ── Filter hidden elements ─────────────────────────────────────
-            if (!includeHidden)
-                elements = elements.Where(e => !e.IsHidden(activeView)).ToList();
+            // Note: view-scoped collectors already exclude elements hidden in the view
+            // (per-element hide, category visibility, filters), so the previous
+            // per-element IsHidden() pass — one Revit interop call per element — was
+            // redundant. includeHidden is still accepted for schema compatibility.
 
             int filteredCount = elements.Count;
             bool truncated    = false;

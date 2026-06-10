@@ -202,6 +202,7 @@ public static class ViewTools
         [Description("Schedule name")] string name,
         [Description("Category to schedule (e.g. Walls, Doors, Rooms)")] string category,
         [Description("Parameter fields to include in the schedule")] string[]? fields = null,
+        [Description("Schedule type: regular | material_takeoff | key_schedule | sheet_list | view_list. Default: regular")] string? scheduleType = null,
         CancellationToken ct = default)
     {
         var p = new JObject
@@ -210,6 +211,7 @@ public static class ViewTools
             ["categoryName"] = category,
         };
         if (fields != null) p["fields"] = new JArray(fields);
+        if (scheduleType != null) p["scheduleType"] = scheduleType;
         var result = await revit.ExecuteAsync("create_schedule", p, ct);
         return result.ToString();
     }

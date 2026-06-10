@@ -53,6 +53,14 @@ public class PurgeUnusedTool : ICortexTool
             var usedMaterialIds = new HashSet<ElementId>();
             foreach (var elem in new FilteredElementCollector(doc).WhereElementIsNotElementType())
             {
+                // Skip model categories that can never carry materials (rooms, grids,
+                // levels, lines, links...): GetMaterialIds on 100K+ elements blocks the
+                // UI thread for seconds. View-specific elements are kept because detail
+                // items can reference materials even though their category reports no
+                // material quantities — a false "unused" here would get deleted.
+                var cat = elem.Category;
+                if (cat == null) continue;
+                if (!cat.HasMaterialQuantities && !elem.ViewSpecific) continue;
                 foreach (var matId in elem.GetMaterialIds(false))
                     usedMaterialIds.Add(matId);
             }

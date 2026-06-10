@@ -34,6 +34,17 @@ public class ToolResultCache : IToolResultCache
         long currentDocVersion,
         out CortexResult<object> result)
     {
+        return TryGet(toolName, paramHash, scope, currentDocVersion, out result, out _);
+    }
+
+    public bool TryGet(
+        string toolName,
+        string paramHash,
+        CacheScope scope,
+        long currentDocVersion,
+        out CortexResult<object> result,
+        out long estimatedBytes)
+    {
         var key = MakeKey(toolName, paramHash);
         if (_entries.TryGetValue(key, out var entry))
         {
@@ -43,11 +54,13 @@ public class ToolResultCache : IToolResultCache
                 entry.HitCount++;
                 RecordHit(toolName);
                 result = entry.Result;
+                estimatedBytes = entry.EstimatedBytes;
                 return true;
             }
         }
         RecordMiss(toolName);
         result = null!;
+        estimatedBytes = 0;
         return false;
     }
 
@@ -56,9 +69,10 @@ public class ToolResultCache : IToolResultCache
         string paramHash,
         CacheScope scope,
         long currentDocVersion,
-        CortexResult<object> result)
+        CortexResult<object> result,
+        long? knownBytes = null)
     {
-        var bytes = EstimateBytes(result);
+        var bytes = knownBytes ?? EstimateBytes(result);
         var entry = new CachedEntry(toolName, paramHash, scope, result, currentDocVersion, bytes);
         var key = MakeKey(toolName, paramHash);
         _entries[key] = entry;

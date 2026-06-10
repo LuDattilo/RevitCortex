@@ -250,7 +250,7 @@ Questa sezione raccoglie i comandi per leggere, cercare, creare e modificare gli
 | `copy_elements` | Copia gli elementi tra viste o documenti con offset opzionale. | "Copia questi elementi nella vista del Piano 2 con offset 0,0,3500" |
 | `operate_element` | Esegue azioni rapide sugli elementi (es. seleziona, isola, nascondi). | "Seleziona questi elementi nella vista" |
 | `batch_rename` | Rinomina in blocco gli elementi con find/replace, prefisso o suffisso (anteprima con dryRun). | "Rinomina in anteprima i tipi sostituendo 'STD' con 'STANDARD'" |
-| `renumber_elements` | Rinumera gli elementi su un parametro con numero iniziale, incremento e ordinamento (anteprima con dryRun). | "Rinumera in anteprima le porte partendo da 1 ordinate per livello" |
+| `renumber_elements` | Rinumera gli elementi su un parametro con numero iniziale, incremento e ordinamento (anteprima con dryRun, richiede conferma). | "Rinumera in anteprima le porte partendo da 1 ordinate per livello" |
 | `rename_families` | Rinomina famiglie e/o tipi in blocco per categoria (anteprima con dryRun). | "Aggiungi il prefisso 'GPA_' a tutte le famiglie di porte, prima in anteprima" |
 | `color_elements` | Colora gli elementi di una categoria per valore di parametro (solo viste modello, non Tavole). | "Colora i muri in base al loro tipo nella pianta corrente" |
 | `set_element_phase` | Assegna la fase agli elementi (solo modelli con fasi; richiede conferma). | "Imposta la fase di creazione di questi elementi a 'Stato di progetto'" |
@@ -310,7 +310,7 @@ Comandi di sola lettura per capire com'è fatto il modello e dove sono i problem
 | `get_warnings` | Elenca gli avvisi (warning) di Revit, limitabili in numero. | "Mostrami i primi 10 avvisi del modello" |
 | `get_project_info` | Restituisce le informazioni di progetto e, su richiesta, livelli, fasi, workset e link. | "Dammi le info del progetto con livelli e fasi" |
 | `get_current_view_info` | Restituisce nome, tipo e proprietà della vista attualmente attiva in Revit. | "Su quale vista sono adesso?" |
-| `lines_per_view_count` | Conta le linee di dettaglio/modello per vista, utile per trovare le viste appesantite. | "Trova le viste con più di 50 linee" |
+| `lines_per_view_count` | Conta le linee di dettaglio per vista (passaggio singolo, sicuro anche su modelli grandi) più il totale di linee di modello a livello progetto. | "Trova le viste con più di 50 linee" |
 | `get_phases` | Elenca le fasi presenti nel progetto. | "Quali fasi ci sono nel modello?" |
 | `get_worksets` | Elenca i workset del modello condiviso. | "Mostrami i workset del progetto" |
 
@@ -347,7 +347,7 @@ Creazione, duplicazione, lettura, modifica ed esportazione degli abachi, più la
 | Comando | Cosa fa | Esempio di prompt naturale |
 |---------|---------|----------------------------|
 | `list_schedulable_fields` | Elenca i campi disponibili per un abaco di una data categoria/tipo. | "Quali campi posso mettere in un abaco delle porte? Solo i nomi" |
-| `create_schedule` | Crea un nuovo abaco per una categoria con i campi indicati. | "Crea un abaco delle porte con Contrassegno, Livello e Larghezza" |
+| `create_schedule` | Crea un nuovo abaco per una categoria con i campi indicati; `scheduleType` supporta regular, material_takeoff, key_schedule, sheet_list, view_list. | "Crea un abaco delle porte con Contrassegno, Livello e Larghezza" |
 | `create_preset_schedule` | Crea un abaco da un modello predefinito (preset) pronto all'uso. | "Crea l'abaco preimpostato dei locali" |
 | `get_schedule_data` | Legge le righe di un abaco esistente, con limite di righe impostabile. | "Leggi le prime 20 righe dell'abaco delle finestre" |
 | `modify_schedule` | Modifica un abaco (campi, ordinamenti, filtri, rinomina). | "Aggiungi un filtro all'abaco porte per mostrare solo il livello 1" |
@@ -653,7 +653,7 @@ Promemoria utili:
 |---------|---------|----------------------------|
 | `bulk_modify_parameter_values` | Imposta, cerca-e-sostituisce o azzera lo stesso parametro su molti elementi di una categoria (richiede conferma, supporta anteprima). | "Sui muri sostituisci nel parametro Commenti il testo 'TEMP' con 'DEFINITIVO', prima fammi l'anteprima." |
 | `clear_parameter_values` | Azzera il valore di un parametro su uno scope o categorie indicate (richiede conferma). | "Svuota il parametro Contrassegno su tutte le porte." |
-| `add_prefix_suffix` | Aggiunge un prefisso e/o un suffisso al valore di un parametro testuale (richiede conferma). | "Aggiungi il prefisso 'A-' al parametro Contrassegno delle porte." |
+| `add_prefix_suffix` | Aggiunge un prefisso e/o un suffisso al valore di un parametro testuale (anteprima con dryRun=true di default; impostare dryRun=false per applicare, richiede conferma). | "Aggiungi il prefisso 'A-' al parametro Contrassegno delle porte." |
 | `sync_csv_parameters` | Allinea valori di parametri diversi su elementi diversi a partire da dati CSV (supporta anteprima). | "Sincronizza i parametri dal CSV che ti incollo, ogni riga ha l'ID e i valori da scrivere, prima in anteprima." |
 | `transfer_parameters` | Copia i valori dei parametri da un elemento sorgente verso uno o piu elementi destinazione (supporta anteprima). | "Copia i parametri dall'elemento 606873 a questi altri tre, prima mostrami cosa cambierebbe." |
 

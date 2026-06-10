@@ -239,6 +239,10 @@ public class PbiActionEventHandler : IExternalEventHandler
             {
                 System.Diagnostics.Trace.WriteLine($"[PbiActionEventHandler] Execute error: {ex.Message}");
                 req.Result = null;
+                // Without this the HTTP listener falls through to its null-result
+                // branch and reports the generic "no document or cancelled" message,
+                // hiding the real failure from the Power BI visual.
+                req.Error = $"execute_error:{ex.Message}";
             }
             finally
             {
@@ -360,7 +364,9 @@ public class PbiActionEventHandler : IExternalEventHandler
         if (painted.Count > 0)
             _registry.Track(doc, view.Id, painted);
         tx.Commit();
-        return resolved.Count.ToString();
+        // Report what was actually painted: per-element SetElementOverrides failures
+        // are skipped above, so resolved.Count would overstate the result.
+        return painted.Count.ToString();
     }
 
     private string? ExecuteResetOverrides(UIApplication app, Document doc)

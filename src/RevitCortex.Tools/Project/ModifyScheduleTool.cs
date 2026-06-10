@@ -153,7 +153,14 @@ public class ModifyScheduleTool : ICortexTool
         foreach (var sf in sortFields)
         {
             var fieldName = sf["fieldName"]?.Value<string>();
-            var sortOrder = sf["sortOrder"]?.Value<string>() ?? "ascending";
+            var sortOrder = sf["sortOrder"]?.Value<string>();
+            if (sortOrder == null)
+            {
+                // Boolean alias {ascending: false} — the shape the wrapper documented
+                // historically; without this, descending sort was unreachable.
+                var ascending = sf["ascending"]?.Value<bool?>();
+                sortOrder = ascending == false ? "descending" : "ascending";
+            }
             if (string.IsNullOrEmpty(fieldName)) continue;
 
             for (int i = 0; i < def.GetFieldCount(); i++)

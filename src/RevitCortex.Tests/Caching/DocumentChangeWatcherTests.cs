@@ -26,8 +26,15 @@ public class DocumentChangeWatcherTests
             return false;
         }
 
+        public bool TryGet(string toolName, string paramHash, CacheScope scope,
+            long currentDocVersion, out CortexResult<object> result, out long estimatedBytes)
+        {
+            estimatedBytes = 0;
+            return TryGet(toolName, paramHash, scope, currentDocVersion, out result);
+        }
+
         public void Set(string toolName, string paramHash, CacheScope scope,
-            long currentDocVersion, CortexResult<object> result) { }
+            long currentDocVersion, CortexResult<object> result, long? knownBytes = null) { }
 
         public void InvalidateScope(CacheScope scope) => InvalidatedScopes.Add(scope);
         public void InvalidateAll() => InvalidateAllCount++;
