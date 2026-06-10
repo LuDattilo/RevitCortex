@@ -150,12 +150,12 @@ if ($SkipManifest) {
     Write-Step "Publishing GitHub release v$Version"
 
     $gh = Get-Command gh -ErrorAction SilentlyContinue
-    if (-not $gh) { throw "gh CLI not found in PATH — install GitHub CLI or run with -SkipManifest" }
+    if (-not $gh) { throw "gh CLI not found in PATH - install GitHub CLI or run with -SkipManifest" }
 
     # Idempotent: if the tag is already a release, just upload the asset (clobber)
     & gh release view "v$Version" --repo LuDattilo/revitcortex-releases 2>$null | Out-Null
     if ($LASTEXITCODE -eq 0) {
-        Write-Warn "release v$Version already exists — uploading asset with --clobber"
+        Write-Warn "release v$Version already exists - uploading asset with --clobber"
         & gh release upload "v$Version" $zipPath --repo LuDattilo/revitcortex-releases --clobber 2>&1 | ForEach-Object { Write-Host "    $_" }
         if ($LASTEXITCODE -ne 0) { throw "gh release upload failed" }
     } else {
@@ -228,7 +228,7 @@ if ($SkipManifest) {
         Write-Ok "manifest matches release (version + downloadUrl consistent)"
     } catch {
         Write-Fail $_.Exception.Message
-        throw "Verification failed: manifest is inconsistent — UpdateChecker will misbehave"
+        throw "Verification failed: manifest is inconsistent - UpdateChecker will misbehave"
     }
 
     Write-Warn "raw.githubusercontent.com CDN may take up to ~5 min to reflect the new manifest. Clients will see the update once that propagates."
