@@ -237,7 +237,7 @@ public static class UpdateChecker
             var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"-ExecutionPolicy Bypass -File \"{script}\"",
+                Arguments = $"-NonInteractive -ExecutionPolicy Bypass -File \"{script}\" -Silent",
                 Verb = "runas",
                 UseShellExecute = true,
             });

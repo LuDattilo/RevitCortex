@@ -1,4 +1,12 @@
 ﻿#requires -Version 5.1
+param(
+    # When set, skips all interactive Read-Host prompts and uses safe defaults:
+    #   - Defender exclusion: not added
+    #   - Claude client choice: Claude Desktop (option 1)
+    #   - "Press Enter" pauses: suppressed
+    # The in-app updater (UpdateChecker.LaunchInstaller) always passes this flag.
+    [switch] $Silent
+)
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
@@ -10,7 +18,8 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 #     user-scope fallback does not, but we try machine first for parity with Inno installer) ---
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "Requesting administrator privileges..." -ForegroundColor Yellow
-    Start-Process powershell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`""
+    $silentArg = if ($Silent) { ' -Silent' } else { '' }
+    Start-Process powershell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`"$silentArg"
     exit
 }
 
@@ -27,7 +36,7 @@ try {
     Write-Host "  Revit is not running" -ForegroundColor Gray
 } catch {
     Write-Host "  $_" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+    if (-not $Silent) { Read-Host "Press Enter to exit" }
     exit 1
 }
 
@@ -102,7 +111,7 @@ Write-Host "[2/5] Installing Revit plugin..." -ForegroundColor Yellow
 $addinTemplate = Join-Path $ScriptDir "RevitCortex.addin"
 if (-not (Test-Path $addinTemplate)) {
     Write-Host "  ERROR: RevitCortex.addin not found at $addinTemplate" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+    if (-not $Silent) { Read-Host "Press Enter to exit" }
     exit 1
 }
 
@@ -122,7 +131,7 @@ foreach ($ver in $foundVersions) {
 
 if ($deployFailures.Count -gt 0) {
     Write-Host "  Plugin install failed for: $($deployFailures -join ', ')" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+    if (-not $Silent) { Read-Host "Press Enter to exit" }
     exit 1
 }
 Write-Host "  Plugin installed for $($foundVersions.Count) Revit version(s)." -ForegroundColor Green
@@ -136,7 +145,7 @@ $serverTarget = Join-Path $env:USERPROFILE ".revitcortex\server"
 
 if (-not (Test-Path $serverSource)) {
     Write-Host "  ERROR: Server files not found at $serverSource" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+    if (-not $Silent) { Read-Host "Press Enter to exit" }
     exit 1
 }
 
@@ -147,15 +156,15 @@ Copy-Item "$serverSource\*" $serverTarget -Recurse -Force
 $serverExe = Join-Path $serverTarget "RevitCortex.Server.exe"
 if (-not (Test-Path $serverExe)) {
     Write-Host "  ERROR: Expected RevitCortex.Server.exe in server/ — check release package" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+    if (-not $Silent) { Read-Host "Press Enter to exit" }
     exit 1
 }
 
 # Unblock Zone.Identifier so Defender/SmartScreen don't block on first run
 Get-ChildItem $serverTarget -Recurse -File | ForEach-Object { Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue }
 
-# Defender exclusion (opt-in, idempotent) — remains from old installer
-if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
+# Defender exclusion (opt-in, idempotent) — skipped in Silent mode
+if (-not $Silent -and (Get-Command Add-MpPreference -ErrorAction SilentlyContinue)) {
     $existing = @()
     try { $mp = Get-MpPreference -ErrorAction SilentlyContinue; if ($mp -and $mp.ExclusionPath) { $existing = @($mp.ExclusionPath) } } catch {}
     if ($existing -notcontains $serverTarget) {
@@ -201,13 +210,20 @@ $gitOk = Ensure-Git
 Write-Host ""
 Write-Host "[5/5] Configure Claude client" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  How will you use RevitCortex?"
-Write-Host "  [1] Claude Desktop"
-Write-Host "  [2] Claude Code (CLI)"
-Write-Host "  [3] Both"
-Write-Host "  [4] Skip (configure later)"
-Write-Host ""
-$choice = Read-Host "  Enter choice (1-4)"
+
+if ($Silent) {
+    # Non-interactive update: always configure Claude Desktop (safe default).
+    $choice = "1"
+    Write-Host "  Silent mode: configuring Claude Desktop automatically." -ForegroundColor Gray
+} else {
+    Write-Host "  How will you use RevitCortex?"
+    Write-Host "  [1] Claude Desktop"
+    Write-Host "  [2] Claude Code (CLI)"
+    Write-Host "  [3] Both"
+    Write-Host "  [4] Skip (configure later)"
+    Write-Host ""
+    $choice = Read-Host "  Enter choice (1-4)"
+}
 
 $claudeDesktopConfigured = $false
 $claudeCodeConfigured    = $false
@@ -265,4 +281,4 @@ Write-Host "  Next steps:" -ForegroundColor Yellow
 Write-Host "  1. Restart Revit" -ForegroundColor White
 Write-Host "  2. Restart Claude Desktop / Claude Code" -ForegroundColor White
 Write-Host ""
-Read-Host "Press Enter to close"
+if (-not $Silent) { Read-Host "Press Enter to close" }
