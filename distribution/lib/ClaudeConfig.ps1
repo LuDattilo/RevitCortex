@@ -34,7 +34,16 @@ function ConvertTo-HashtableDeep {
             return $result
         }
         if ($obj -is [System.Collections.IList] -and $obj -isnot [string]) {
-            return @($obj | ForEach-Object { ConvertTo-HashtableDeep $_ })
+            # PowerShell enumerates collections written to the output stream:
+            # a plain `return @(...)` collapses 0 elements to nothing (ConvertTo-Json
+            # then emits {}) and 1 element to a bare scalar — Claude Desktop rejects
+            # the resulting config and resets it. Build the array in expression
+            # context and prepend the unary comma so it leaves the function as ONE object.
+            $items = New-Object System.Collections.ArrayList
+            foreach ($element in $obj) {
+                [void]$items.Add((ConvertTo-HashtableDeep $element))
+            }
+            return , $items.ToArray()
         }
         return $obj
     }
