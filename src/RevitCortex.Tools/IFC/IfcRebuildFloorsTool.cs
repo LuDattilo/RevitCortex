@@ -76,6 +76,12 @@ public class IfcRebuildFloorsTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
         }
 
+        // One TransactionGroup per invocation: the N per-element commits collapse
+        // into a single undo step, and a mid-run failure can no longer leave a
+        // fragmented undo stack behind.
+        using TransactionGroup? txGroup = dryRun ? null : new TransactionGroup(doc!, "RevitCortex: Rebuild Floors");
+        txGroup?.Start();
+
         foreach (var ds in candidates)
         {
             var solids = IfcGeometryHelper.GetSolids(ds);
@@ -142,12 +148,15 @@ public class IfcRebuildFloorsTool : ICortexTool
             try
             {
                 using var tx = new Transaction(doc!, "RevitCortex: Rebuild Floor");
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
 
                 var curveLoops = new List<CurveLoop> { footprint };
                 var newFloor = Floor.Create(doc!, curveLoops, floorType.Id, level.Id);
 
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    throw new InvalidOperationException(
+                        "Revit rolled back the transaction: " + TransactionFailureHandling.Describe(txFailures));
 
                 rebuilt++;
                 results.Add(new
@@ -172,6 +181,9 @@ public class IfcRebuildFloorsTool : ICortexTool
                 });
             }
         }
+
+        if (txGroup != null && txGroup.GetStatus() == TransactionStatus.Started)
+            txGroup.Assimilate();
 
         return CortexResult<object>.Ok(new
         {

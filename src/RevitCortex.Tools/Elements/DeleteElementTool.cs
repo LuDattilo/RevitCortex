@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -82,11 +83,59 @@ public class DeleteElementTool : ICortexTool
         // DryRun — return preview without touching the model
         if (dryRun)
         {
+            // Probe the real cascade with the tx-sandbox pattern: doc.Delete returns
+            // every element the deletion would drag along (dependent views, tags,
+            // sketches...), RollBack discards the change. Without this, previewing a
+            // Level deletion reported 1 element while the real delete removed ~100.
+            var dependentCount = 0;
+            List<object>? dependentSample = null;
+            string? cascadePreviewError = null;
+
+            if (validElements.Count > 0)
+            {
+                try
+                {
+                    List<ElementId> wouldDeleteIds;
+                    using (var probeTx = new Transaction(doc, "RevitCortex: Delete Preview"))
+                    {
+                        TransactionFailureHandling.SuppressWarnings(probeTx);
+                        probeTx.Start();
+                        wouldDeleteIds = doc.Delete(validElements.Select(ve => ve.Id).ToList()).ToList();
+                        probeTx.RollBack();
+                    }
+
+                    // Elements are restored after RollBack, so names resolve again.
+                    var requested = new HashSet<ElementId>(validElements.Select(ve => ve.Id));
+                    var dependents = wouldDeleteIds.Where(id => !requested.Contains(id)).ToList();
+                    dependentCount = dependents.Count;
+                    dependentSample = dependents.Take(20)
+                        .Select(id => doc.GetElement(id))
+                        .Where(e => e != null)
+                        .Select(e => (object)new
+                        {
+                            elementId = GetElementIdLong(e!),
+                            name = e!.Name,
+                            category = e.Category?.Name
+                        })
+                        .ToList();
+                }
+                catch (Exception ex)
+                {
+                    cascadePreviewError = ex.Message;
+                }
+            }
+
             return CortexResult<object>.Ok(new
             {
-                message    = $"DryRun: {validElements.Count} element(s) would be deleted. Set dryRun=false to execute.",
+                message = cascadePreviewError == null
+                    ? $"DryRun: {validElements.Count} element(s) requested; deletion would cascade to {dependentCount} dependent element(s) ({validElements.Count + dependentCount} total). Set dryRun=false to execute."
+                    : $"DryRun: {validElements.Count} element(s) would be deleted (cascade preview unavailable). Set dryRun=false to execute.",
                 dryRun     = true,
                 wouldDelete = validInfo,
+                dependentCount,
+                totalWouldDelete = validElements.Count + dependentCount,
+                dependentSample,
+                cascadePreviewError,
                 invalidIds,
                 validCount  = validElements.Count,
                 invalidCount = invalidIds.Count
@@ -108,11 +157,15 @@ public class DeleteElementTool : ICortexTool
         {
             ICollection<ElementId> deletedIds;
             using var tx = new Transaction(doc, "RevitCortex: Delete Elements");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             try
             {
                 deletedIds = doc.Delete(validElements.Select(ve => ve.Id).ToList());
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the deletion: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
             }
             catch
             {

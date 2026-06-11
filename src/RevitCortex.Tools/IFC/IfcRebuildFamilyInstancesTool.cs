@@ -71,6 +71,12 @@ public class IfcRebuildFamilyInstancesTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
         }
 
+        // One TransactionGroup per invocation: the N per-element commits collapse
+        // into a single undo step, and a mid-run failure can no longer leave a
+        // fragmented undo stack behind.
+        using TransactionGroup? txGroup = dryRun ? null : new TransactionGroup(doc!, "RevitCortex: Rebuild Family Instances");
+        txGroup?.Start();
+
         foreach (var ds in candidates)
         {
             var bb = ds.get_BoundingBox(null);
@@ -161,10 +167,11 @@ public class IfcRebuildFamilyInstancesTool : ICortexTool
 
             try
             {
-                if (!symbol.IsActive) symbol.Activate();
-
                 using var tx = new Transaction(doc!, "RevitCortex: Place Family Instance");
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
+                // H-IFC-ACT: Activate() writes to the document — must run inside the transaction.
+                if (!symbol.IsActive) symbol.Activate();
 
                 FamilyInstance inst;
                 if (hostWall != null && (isDoor || isWindow))
@@ -178,7 +185,9 @@ public class IfcRebuildFamilyInstancesTool : ICortexTool
                         center, symbol, level, StructuralType.NonStructural);
                 }
 
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    throw new InvalidOperationException(
+                        "Revit rolled back the transaction: " + TransactionFailureHandling.Describe(txFailures));
 
                 rebuilt++;
                 results.Add(new
@@ -201,6 +210,9 @@ public class IfcRebuildFamilyInstancesTool : ICortexTool
                 });
             }
         }
+
+        if (txGroup != null && txGroup.GetStatus() == TransactionStatus.Started)
+            txGroup.Assimilate();
 
         return CortexResult<object>.Ok(new { dryRun, totalCandidates = candidates.Count, rebuilt, skipped, results });
     }

@@ -32,6 +32,7 @@ public class GetMaterialQuantitiesTool : ICortexTool
         var categoryFilters      = input["categoryFilters"]?.ToObject<List<string>>() ?? new List<string>();
         var selectedElementsOnly = input["selectedElementsOnly"]?.Value<bool>() ?? false;
         var maxResults           = input["maxResults"]?.Value<int>() ?? 50;
+        var maxElements          = input["maxElements"]?.Value<int>() ?? 20000;
 
         try
         {
@@ -64,11 +65,32 @@ public class GetMaterialQuantitiesTool : ICortexTool
                 elements = collector.ToList();
             }
 
+            // GetMaterialArea/GetMaterialVolume are geometry-backed and run on the
+            // Revit UI thread: an unbounded full-model pass freezes Revit far past
+            // the 120s dispatcher timeout, and partial sums would be silently wrong.
+            // Over-cap is therefore a structured failure, not a truncated result.
+            if (elements.Count > maxElements)
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"{elements.Count} elements match, above the cap of {maxElements}. Processing them all would freeze Revit's UI thread.",
+                    suggestion: "Narrow the query with categoryFilters or selectedElementsOnly, or raise maxElements explicitly if you accept the wait.");
+
             // Accumulate material quantities
             var materialData = new Dictionary<ElementId, (string name, string matClass, double area, double volume, int elementCount, List<long> elementIds)>();
 
+            // Budget kept under the 120s dispatcher timeout so the caller receives
+            // this structured error instead of the generic dispatcher Timeout while
+            // Revit's UI thread keeps grinding.
+            const int TimeBudgetMs = 90000;
+            var elapsed = System.Diagnostics.Stopwatch.StartNew();
+            var processed = 0;
+
             foreach (var elem in elements)
             {
+                if ((++processed % 500) == 0 && elapsed.ElapsedMilliseconds > TimeBudgetMs)
+                    return CortexResult<object>.Fail(CortexErrorCode.Timeout,
+                        $"Time budget exceeded after {processed}/{elements.Count} elements; partial totals would be misleading and were discarded.",
+                        suggestion: "Narrow the query with categoryFilters or selectedElementsOnly.");
+
                 ICollection<ElementId> matIds;
                 try { matIds = elem.GetMaterialIds(false); }
                 catch { continue; }

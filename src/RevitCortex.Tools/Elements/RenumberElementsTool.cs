@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -70,6 +71,7 @@ public class RenumberElementsTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
             Transaction? tx = dryRun ? null : new Transaction(doc, "RevitCortex: Renumber Elements");
+            var txFailures = tx != null ? TransactionFailureHandling.SuppressWarnings(tx) : null;
             try
             {
                 tx?.Start();
@@ -110,7 +112,10 @@ public class RenumberElementsTool : ICortexTool
                     currentNumber += increment;
                 }
 
-                tx?.Commit();
+                if (tx != null && tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures!)}",
+                        suggestion: "Fix the reported model errors and retry.");
             }
             catch
             {

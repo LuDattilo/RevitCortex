@@ -50,8 +50,10 @@ public class WorkflowRoomDocumentationTool : ICortexTool
 
             var offset = offsetMm / MmPerFoot;
             var createdViews = new List<object>();
+            var failures = new List<object>();
 
             using var tx = new Transaction(doc, "RevitCortex: Room Documentation");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             var planVft = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
@@ -84,7 +86,10 @@ public class WorkflowRoomDocumentationTool : ICortexTool
                             callout.Scale = 50;
                             createdViews.Add(new { id = ToolHelpers.GetElementIdValue(callout.Id), name = callout.Name, type = "callout" });
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            failures.Add(new { roomNumber, roomName, type = "callout", reason = ex.Message });
+                        }
                     }
                 }
 
@@ -103,17 +108,25 @@ public class WorkflowRoomDocumentationTool : ICortexTool
                                 createdViews.Add(new { id = ToolHelpers.GetElementIdValue(sectionView.Id), name = sectionView.Name, type = $"section_{dir}" });
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            failures.Add(new { roomNumber, roomName, type = $"section_{dir}", reason = ex.Message });
+                        }
                     }
                 }
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 roomCount = rooms.Count,
                 createdViewCount = createdViews.Count,
-                createdViews
+                createdViews,
+                failedCount = failures.Count,
+                failures = failures.Take(50).ToList()
             });
         }
         catch (Exception ex)

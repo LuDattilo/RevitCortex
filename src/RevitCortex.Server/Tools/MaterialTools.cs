@@ -90,12 +90,14 @@ public static class MaterialTools
         [Description("Category filters (e.g. Walls, Floors)")] string[]? categoryFilters = null,
         [Description("Restrict to the current Revit selection. Default: false")] bool? selectedElementsOnly = null,
         [Description("Max rows returned. Default: 50")] int? maxResults = null,
+        [Description("Cap on elements processed (default 20000). Above the cap the tool fails with a structured error instead of freezing Revit — narrow with categoryFilters/selectedElementsOnly or raise this deliberately.")] int? maxElements = null,
         CancellationToken ct = default)
     {
         var p = new JObject();
         if (categoryFilters != null) p["categoryFilters"] = new JArray(categoryFilters);
         if (selectedElementsOnly != null) p["selectedElementsOnly"] = selectedElementsOnly;
         if (maxResults != null) p["maxResults"] = maxResults;
+        if (maxElements != null) p["maxElements"] = maxElements;
         var result = await revit.ExecuteAsync("get_material_quantities", p, ct);
         return result.ToString();
     }

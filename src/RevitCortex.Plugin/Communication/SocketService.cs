@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -16,6 +17,7 @@ public class SocketService
     private Thread? _listenerThread;
     private readonly CortexRouter _router;
     private readonly int _port;
+    private readonly ConcurrentDictionary<TcpClient, byte> _activeClients = new();
 
     public bool IsRunning => _isRunning;
 
@@ -39,6 +41,15 @@ public class SocketService
     {
         _isRunning = false;
         _listener?.Stop();
+
+        // Close the active client connections too: a connection accepted before
+        // Stop() would otherwise keep serving requests — e.g. stale commands
+        // reaching a document that OnDocumentClosing is tearing down.
+        foreach (var client in _activeClients.Keys)
+        {
+            try { client.Close(); } catch { /* already gone */ }
+        }
+        _activeClients.Clear();
     }
 
     private void ListenForClients()
@@ -70,6 +81,15 @@ public class SocketService
     private void HandleClient(object? state)
     {
         var client = (TcpClient)state!;
+        _activeClients.TryAdd(client, 0);
+        // Covers the accept-vs-Stop race: a client registered after Stop()'s
+        // sweep must not survive it.
+        if (!_isRunning)
+        {
+            _activeClients.TryRemove(client, out _);
+            client.Close();
+            return;
+        }
         try
         {
             using var stream = client.GetStream();
@@ -89,6 +109,7 @@ public class SocketService
         }
         finally
         {
+            _activeClients.TryRemove(client, out _);
             client.Close();
         }
     }

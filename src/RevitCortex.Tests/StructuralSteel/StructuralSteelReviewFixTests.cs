@@ -103,18 +103,21 @@ public class StructuralSteelReviewFixTests
         "add_steel_fabrication_info",
         "add_steel_solid_cut",
         "add_steel_instance_void_cut",
+        // 2026-06-11 dryRun-uniformity pass: the five mutators below gained real
+        // dryRun support (plugin preview + wrapper parameter), closing the open
+        // alternative resolution of review Fix 3.
+        "modify_steel_connection_inputs",
+        "set_steel_connection_approval",
+        "set_steel_connection_status",
+        "remove_steel_solid_cut",
+        "remove_steel_instance_void_cut",
     };
 
     // Write tools that DO NOT preview — they confirm then write (no dryRun parameter on the wrapper).
     private static readonly string[] NonPreviewMutators =
     {
-        "modify_steel_connection_inputs",
-        "set_steel_connection_approval",
-        "set_steel_connection_status",
         "set_steel_connection_default_order",
-        "remove_steel_solid_cut",
         "set_steel_solid_cut_face_splitting",
-        "remove_steel_instance_void_cut",
         "set_steel_fabrication_unique_id",
     };
 

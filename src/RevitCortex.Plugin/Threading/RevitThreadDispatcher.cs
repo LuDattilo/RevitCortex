@@ -54,7 +54,7 @@ public class RevitThreadDispatcher
             _handler.ClearPreparedExecution();
             return CortexResult<object>.Fail(CortexErrorCode.Timeout,
                 $"Tool '{tool.Name}' timed out after {timeoutMs}ms",
-                suggestion: "The operation took too long. Try with fewer elements.");
+                suggestion: "The operation took too long. If it was already running it may still complete inside Revit after this error (it would be logged as completed_after_timeout in the audit log) — verify the model state before retrying. Try with fewer elements.");
         }
 
         return _handler.Result ?? CortexResult<object>.Fail(

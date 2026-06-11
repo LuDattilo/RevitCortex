@@ -57,12 +57,14 @@ public class AddPrefixSuffixTool : ICortexTool
             var preview = new List<object>();
 
             Transaction? tx = null;
+            TransactionFailureHandling.FailureCapture? txFailures = null;
             if (!dryRun)
             {
                 if (!session.RequestConfirmation("modify parameters on", elements.Count))
                     return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
                 tx = new Transaction(doc, "RevitCortex: Add Prefix/Suffix");
+                txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
             }
 
@@ -125,8 +127,13 @@ public class AddPrefixSuffixTool : ICortexTool
 
                 if (tx != null)
                 {
-                    tx.Commit();
+                    var committed = tx.Commit() == TransactionStatus.Committed;
                     tx.Dispose();
+                    tx = null;
+                    if (!committed)
+                        return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                            $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures!)}",
+                            suggestion: "Fix the reported model errors and retry.");
                 }
 
                 var result = new Dictionary<string, object>
@@ -145,9 +152,10 @@ public class AddPrefixSuffixTool : ICortexTool
             }
             catch
             {
-                if (tx != null && tx.GetStatus() == TransactionStatus.Started)
+                if (tx != null)
                 {
-                    tx.RollBack();
+                    if (tx.GetStatus() == TransactionStatus.Started)
+                        tx.RollBack();
                     tx.Dispose();
                 }
                 throw;

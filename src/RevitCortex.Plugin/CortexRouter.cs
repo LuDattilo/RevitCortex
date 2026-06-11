@@ -57,6 +57,18 @@ public class CortexRouter
         "ifc_analyze_", "ifc_compare_"
     };
 
+    /// <summary>
+    /// Write-named tools vetted for inline UI-thread execution: they open no
+    /// Transaction and show no Revit UI (verified at adoption time). The inline
+    /// path runs OUTSIDE a Revit API context (modeless WPF handlers), where a
+    /// Transaction would throw — keep this list minimal and audited.
+    /// </summary>
+    private static readonly HashSet<string> InlineUiThreadAllowedTools =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "push_to_powerbi",
+    };
+
     public CortexRouter(CortexSession session, IDocumentAnalyzer analyzer, AuditLogger? auditLogger = null)
     {
         _session = session;
@@ -157,6 +169,16 @@ public class CortexRouter
             {
                 var timeoutSeconds = (tool as ICommandTimeoutTool)?.CommandTimeoutSeconds ?? 120;
                 result = _dispatcher.Execute(tool, input, _session, timeoutSeconds * 1000);
+            }
+            else if (onUiThread && !IsReadOnlyTool(toolName)
+                     && !InlineUiThreadAllowedTools.Contains(toolName))
+            {
+                // The inline path runs on the UI thread but outside a Revit API
+                // context: a tool opening a Transaction here would throw inside
+                // Revit. Only read-only tools and the vetted allowlist may pass.
+                result = CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
+                    $"Tool '{toolName}' cannot run inline on the UI thread outside a Revit API context",
+                    suggestion: "Call the tool through the MCP/TCP bridge so it is dispatched via ExternalEvent.");
             }
             else
             {

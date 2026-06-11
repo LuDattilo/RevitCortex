@@ -594,7 +594,7 @@ public class ManageProjectParametersTool : ICortexTool
         if (!string.IsNullOrEmpty(single)) requestedNames.Add(single!);
 
         var targetGroup = input["targetGroup"]?.Value<string>();
-        var dryRun = input["dryRun"]?.Value<bool>() ?? false;
+        var dryRun = ToolHelpers.GetDryRun(input);
 
         if (requestedNames.Count == 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,

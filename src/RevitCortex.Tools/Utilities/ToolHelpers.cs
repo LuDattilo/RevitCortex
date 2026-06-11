@@ -1,4 +1,5 @@
 using Autodesk.Revit.DB;
+using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 
@@ -74,5 +75,16 @@ public static class ToolHelpers
 #else
         return new ElementId((int)rawId);
 #endif
+    }
+
+    /// <summary>
+    /// Shared dryRun reader: preview-first by default. Destructive tools across the
+    /// codebase default to dryRun=true; per-tool copy-paste produced divergent
+    /// implicit defaults (the steel suite's `?.Value&lt;bool?&gt;() == true` meant
+    /// "execute when omitted"). Always read the flag through this helper.
+    /// </summary>
+    public static bool GetDryRun(JObject input, bool defaultValue = true)
+    {
+        return input["dryRun"]?.Value<bool>() ?? defaultValue;
     }
 }

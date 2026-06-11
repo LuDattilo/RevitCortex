@@ -168,7 +168,7 @@ public static class ParameterTools
         [Description("Parameter names array — for set_group bulk operation, e.g. [\"BCA_RES_Stato-Conservazione\",\"BCA_CME_Codice-Tariffa\"]")] string[]? parameterNames = null,
         [Description("Target group for set_group action. Short names: IdentityData, Data, Constraints, Geometry, Graphics, Materials, Text, General, Phasing, Visibility, Construction, Electrical, ElectricalEngineering, ElectricalLighting, ElectricalLoads, Mechanical, MechanicalAirflow, Plumbing, FireProtection, Ifc, AnalysisResults, Structural, StructuralAnalysis. A full ForgeTypeId is also accepted.")] string? targetGroup = null,
         [Description("New name — only used by 'rename' (which returns API-limitation guidance for project parameters; use global parameters if you need rename).")] string? newName = null,
-        [Description("Preview only (set_group). Default: false. When true, returns planned changes without applying.")] bool? dryRun = null,
+        [Description("Preview only (set_group). Default: true (preview); set false to apply the changes.")] bool? dryRun = null,
         CancellationToken ct = default)
     {
         var p = new JObject { ["action"] = action };

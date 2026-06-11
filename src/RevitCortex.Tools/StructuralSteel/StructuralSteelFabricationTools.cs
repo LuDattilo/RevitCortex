@@ -56,7 +56,7 @@ public class AddSteelFabricationInfoTool : ICortexTool
                 "No valid elements resolved",
                 context: skipped.Count > 0 ? new Dictionary<string, object> { ["skipped"] = skipped } : null);
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new
             {
                 dryRun = true,

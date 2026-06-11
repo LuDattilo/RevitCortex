@@ -62,7 +62,7 @@ public class CreateGenericSteelConnectionTool : ICortexTool
                 "Fewer than 2 valid elements resolved for the connection",
                 context: skipped.Count > 0 ? new Dictionary<string, object> { ["skipped"] = skipped } : null);
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new { dryRun = true, wouldConnect = ids.Select(i => ToolHelpers.GetElementIdValue(i)).ToList(), skipped });
 
         if (!session.RequestConfirmation("create generic steel connection", ids.Count))
@@ -131,7 +131,7 @@ public class CreateSteelConnectionTool : ICortexTool
 
         bool inputPointsIgnored = input["inputPoints"] is JArray ipArr && ipArr.Count > 0;
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new
             {
                 dryRun = true,
@@ -248,6 +248,17 @@ public class ModifySteelConnectionInputsTool : ICortexTool
                 context: skipped.Count > 0 ? new Dictionary<string, object> { ["skipped"] = skipped } : null);
 
         bool isAdd = action == StructuralSteelToolHelpers.ConnectionInputAction.AddElementIds;
+
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                action = isAdd ? "add_element_ids" : "remove_element_ids",
+                connectionId = ToolHelpers.GetElementIdValue(handler!),
+                wouldModify = ids.Select(i => ToolHelpers.GetElementIdValue(i)).ToList(),
+                skipped
+            });
+
         if (!session.RequestConfirmation(isAdd ? "add elements to steel connection" : "remove elements from steel connection", ids.Count))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
@@ -336,7 +347,7 @@ public class SetSteelConnectionTypeTool : ICortexTool
         if (inputPointCount > 0) willLose.Add("inputPoints");
         if (inputReferenceCount > 0) willLose.Add("inputReferences");
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new
             {
                 dryRun = true,
@@ -440,6 +451,14 @@ public class SetSteelConnectionApprovalTool : ICortexTool
         var (approvalId, approvalError) = ResolveApprovalTypeId(doc!, input);
         if (approvalError != null) return approvalError;
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                connectionId = ToolHelpers.GetElementIdValue(handler!),
+                wouldSetApprovalTypeId = ToolHelpers.GetElementIdValue(approvalId)
+            });
+
         if (!session.RequestConfirmation("set steel connection approval", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
@@ -524,6 +543,14 @@ public class SetSteelConnectionStatusTool : ICortexTool
         if (statusError != null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, statusError);
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                connectionId = ToolHelpers.GetElementIdValue(handler!),
+                wouldSetCodeCheckingStatus = status.ToString()
+            });
+
         if (!session.RequestConfirmation("set steel connection status", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
@@ -605,7 +632,7 @@ public class DeleteSteelConnectionTool : ICortexTool
 
         var id = ToolHelpers.GetElementIdValue(handler);
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new { dryRun = true, wouldDelete = id });
 
         if (!session.RequestConfirmation("delete steel connection", 1))

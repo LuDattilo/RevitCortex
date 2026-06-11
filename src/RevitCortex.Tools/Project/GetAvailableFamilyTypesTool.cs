@@ -53,29 +53,41 @@ public class GetAvailableFamilyTypesTool : ICortexTool
             if (categoryList.Count > 0)
             {
                 var validCatIds = new List<long>();
+                var unresolvedCategories = new List<string>();
                 foreach (var catName in categoryList)
                 {
                     var catId = CategoryResolver.ResolveToId(doc, catName);
                     if (catId != null && catId != ElementId.InvalidElementId)
+                    {
 #if REVIT2024_OR_GREATER
                         validCatIds.Add(catId.Value);
 #else
                         validCatIds.Add((long)catId.IntegerValue);
 #endif
+                    }
+                    else
+                    {
+                        unresolvedCategories.Add(catName);
+                    }
                 }
 
-                if (validCatIds.Count > 0)
+                // A category that fails to resolve must never silently widen the
+                // result set: skipping it (or dropping the whole filter at zero
+                // matches) used to return the entire model's types as Ok.
+                if (unresolvedCategories.Count > 0)
+                    return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                        $"These categories could not be resolved in this document: {string.Join(", ", unresolvedCategories)}",
+                        suggestion: "Use OST_* BuiltInCategory codes (e.g. OST_Doors, OST_StairsRailing) or the exact localized display name; the category must exist in the document.");
+
+                allElements = allElements.Where(et =>
                 {
-                    allElements = allElements.Where(et =>
-                    {
-                        if (et.Category == null) return false;
+                    if (et.Category == null) return false;
 #if REVIT2024_OR_GREATER
-                        return validCatIds.Contains(et.Category.Id.Value);
+                    return validCatIds.Contains(et.Category.Id.Value);
 #else
-                        return validCatIds.Contains((long)et.Category.Id.IntegerValue);
+                    return validCatIds.Contains((long)et.Category.Id.IntegerValue);
 #endif
-                    });
-                }
+                });
             }
 
             // Name filter

@@ -99,7 +99,7 @@ public class CreateSteelStructuralConnectionTypeTool : ICortexTool
                 $"Family symbol {symbolId} is not valid for a {applyTo} structural connection type",
                 suggestion: "Pick a connection family symbol whose category matches the applyTo target.");
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new { dryRun = true, familySymbolId = symbolId, applyTo = applyTo.ToString(), name });
 
         if (!session.RequestConfirmation("create steel connection type", 1))
@@ -168,7 +168,7 @@ public class CreateSteelConnectionHandlerTypeTool : ICortexTool
             guid = Guid.NewGuid();
         }
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new { dryRun = true, name, familyName, guid = guid.ToString() });
 
         if (!session.RequestConfirmation("create steel connection handler type", 1))
@@ -220,7 +220,7 @@ public class CreateDefaultSteelConnectionHandlerTypeTool : ICortexTool
         var (doc, error) = ToolHelpers.RequireDocument(session);
         if (error != null) return error;
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new { dryRun = true, note = "Would create the default structural connection handler type." });
 
         if (!session.RequestConfirmation("create default steel connection handler type", 1))
@@ -302,7 +302,7 @@ public class SetSteelConnectionTypeFamilySymbolTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Family symbol {symbolId} is not valid for this {applyTo} connection type");
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new { dryRun = true, connectionTypeId = typeIdToken, familySymbolId = symbolId, applyTo = applyTo.ToString() });
 
         if (!session.RequestConfirmation("set steel connection type family symbol", 1))
@@ -396,7 +396,7 @@ public class ManageSteelApprovalTypeTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Approval type name '{name}' is not valid (it may already exist or contain illegal characters)");
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new { dryRun = true, action = "create", name });
 
         if (!session.RequestConfirmation("create steel approval type", 1))

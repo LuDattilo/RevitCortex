@@ -85,6 +85,7 @@ public class BatchRenameTool : ICortexTool
                     return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
                 using var tx = new Transaction(doc, "RevitCortex: Batch Rename");
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
 
                 foreach (var elem in elements)
@@ -104,7 +105,10 @@ public class BatchRenameTool : ICortexTool
                     }
                 }
 
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
             }
             else
             {

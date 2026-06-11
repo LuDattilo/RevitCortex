@@ -90,13 +90,15 @@ public class CreateStructuralFramingSystemTool : ICortexTool
                 if (!beamType.IsActive) beamType.Activate();
                 // direction = beam run direction (along Y); is3D = false (planar).
                 var bs = BeamSystem.Create(doc, profile, level, XYZ.BasisY, false);
-                // Apply the requested layout: fixed spacing.
+                // Apply the requested layout: fixed spacing. A failure here still
+                // commits the BeamSystem, so it must be reported, not swallowed.
+                string? layoutWarning = null;
                 try
                 {
                     bs.LayoutRule = new LayoutRuleFixedDistance(spacing, BeamSystemJustifyType.Beginning);
                     bs.BeamType = beamType;
                 }
-                catch { /* layout/type assignment best-effort */ }
+                catch (Exception ex) { layoutWarning = ex.Message; }
                 btx.Commit();
 
                 return CortexResult<object>.Ok(new
@@ -106,7 +108,11 @@ public class CreateStructuralFramingSystemTool : ICortexTool
                     beamTypeName = beamType.Name,
                     levelName = level.Name,
                     spacingMm,
-                    message = $"Created associative beam system {ToolHelpers.GetElementIdValue(bs.Id)}"
+                    layoutApplied = layoutWarning == null,
+                    layoutWarning,
+                    message = layoutWarning == null
+                        ? $"Created associative beam system {ToolHelpers.GetElementIdValue(bs.Id)}"
+                        : $"Created associative beam system {ToolHelpers.GetElementIdValue(bs.Id)}, but the layout/beam type was NOT applied: {layoutWarning}"
                 });
             }
 

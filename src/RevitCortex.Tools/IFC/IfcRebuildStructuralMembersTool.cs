@@ -73,6 +73,12 @@ public class IfcRebuildStructuralMembersTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
         }
 
+        // One TransactionGroup per invocation: the N per-element commits collapse
+        // into a single undo step, and a mid-run failure can no longer leave a
+        // fragmented undo stack behind.
+        using TransactionGroup? txGroup = dryRun ? null : new TransactionGroup(doc!, "RevitCortex: Rebuild Structural Members");
+        txGroup?.Start();
+
         foreach (var ds in candidates)
         {
             var catName = ds.Category?.Name ?? "";
@@ -142,13 +148,16 @@ public class IfcRebuildStructuralMembersTool : ICortexTool
                         continue;
                     }
 
-                    if (!symbol.IsActive) symbol.Activate();
-
                     using var tx = new Transaction(doc!, "RevitCortex: Rebuild Column");
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
+                    // H-IFC-ACT: Activate() writes to the document — must run inside the transaction.
+                    if (!symbol.IsActive) symbol.Activate();
                     var inst = doc!.Create.NewFamilyInstance(
                         profile.CenterPoint, symbol, level, StructuralType.Column);
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new InvalidOperationException(
+                            "Revit rolled back the transaction: " + TransactionFailureHandling.Describe(txFailures));
 
                     rebuilt++;
                     results.Add(new
@@ -228,14 +237,17 @@ public class IfcRebuildStructuralMembersTool : ICortexTool
                         continue;
                     }
 
-                    if (!symbol.IsActive) symbol.Activate();
-
                     using var tx = new Transaction(doc!, "RevitCortex: Rebuild Beam");
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
+                    // H-IFC-ACT: Activate() writes to the document — must run inside the transaction.
+                    if (!symbol.IsActive) symbol.Activate();
                     var line = Line.CreateBound(profile.StartPoint, profile.EndPoint);
                     var inst = doc!.Create.NewFamilyInstance(
                         line, symbol, level, StructuralType.Beam);
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new InvalidOperationException(
+                            "Revit rolled back the transaction: " + TransactionFailureHandling.Describe(txFailures));
 
                     rebuilt++;
                     results.Add(new
@@ -258,6 +270,9 @@ public class IfcRebuildStructuralMembersTool : ICortexTool
                 }
             }
         }
+
+        if (txGroup != null && txGroup.GetStatus() == TransactionStatus.Started)
+            txGroup.Assimilate();
 
         return CortexResult<object>.Ok(new { dryRun, totalCandidates = candidates.Count, rebuilt, skipped, results });
     }

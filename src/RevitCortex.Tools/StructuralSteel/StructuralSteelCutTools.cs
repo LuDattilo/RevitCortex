@@ -66,7 +66,7 @@ public class AddSteelSolidCutTool : ICortexTool
                 $"Element {cutterId} cannot cut {targetId}: {reason}",
                 suggestion: "Use check_steel_cut_eligibility to test a pair first.");
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new
             {
                 dryRun = true,
@@ -168,6 +168,13 @@ public class RemoveSteelSolidCutTool : ICortexTool
 
         var cutterId = ToolHelpers.GetElementIdValue(cutter!);
         var targetId = ToolHelpers.GetElementIdValue(target!);
+
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                wouldRemoveSolidCut = new { cutElementId = cutterId, targetElementId = targetId }
+            });
 
         if (!session.RequestConfirmation("remove solid cut", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
@@ -279,7 +286,7 @@ public class AddSteelInstanceVoidCutTool : ICortexTool
                 $"Element {targetId} cannot be cut with a void instance",
                 suggestion: "Use check_steel_cut_eligibility to test a pair first.");
 
-        if (input["dryRun"]?.Value<bool?>() == true)
+        if (ToolHelpers.GetDryRun(input))
             return CortexResult<object>.Ok(new
             {
                 dryRun = true,
@@ -336,6 +343,13 @@ public class RemoveSteelInstanceVoidCutTool : ICortexTool
 
         var voidId = ToolHelpers.GetElementIdValue(voidInstance!);
         var targetId = ToolHelpers.GetElementIdValue(target!);
+
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                wouldRemoveInstanceVoidCut = new { voidInstanceId = voidId, targetElementId = targetId }
+            });
 
         if (!session.RequestConfirmation("remove instance void cut", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");

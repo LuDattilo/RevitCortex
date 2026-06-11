@@ -235,16 +235,15 @@ public static class ProjectTools
     public static async Task<string> CreateRoom(
         RevitConnectionManager revit,
         [Description("Level element ID where the room will be placed")] long levelId,
-        [Description("X coordinate for room placement")] double x,
-        [Description("Y coordinate for room placement")] double y,
+        [Description("X coordinate for room placement, in mm")] double x,
+        [Description("Y coordinate for room placement, in mm")] double y,
         [Description("Room name")] string? name = null,
         CancellationToken ct = default)
     {
         var p = new JObject
         {
             ["levelId"] = levelId,
-            ["x"] = x,
-            ["y"] = y,
+            ["location"] = new JObject { ["x"] = x, ["y"] = y, ["z"] = 0 },
         };
         if (name != null) p["name"] = name;
         var result = await revit.ExecuteAsync("create_room", p, ct);

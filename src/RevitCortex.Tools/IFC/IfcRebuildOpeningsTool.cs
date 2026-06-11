@@ -84,6 +84,12 @@ public class IfcRebuildOpeningsTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
         }
 
+        // One TransactionGroup per invocation: the N per-element commits collapse
+        // into a single undo step, and a mid-run failure can no longer leave a
+        // fragmented undo stack behind.
+        using TransactionGroup? txGroup = dryRun ? null : new TransactionGroup(doc!, "RevitCortex: Rebuild Openings");
+        txGroup?.Start();
+
         foreach (var openingDs in openingCandidates)
         {
             var bb = openingDs.get_BoundingBox(null);
@@ -131,6 +137,7 @@ public class IfcRebuildOpeningsTool : ICortexTool
             try
             {
                 using var tx = new Transaction(doc!, "RevitCortex: Create Opening");
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
 
                 if (hostElement is Wall wall)
@@ -157,7 +164,9 @@ public class IfcRebuildOpeningsTool : ICortexTool
                     doc!.Create.NewOpening(hostElement, curveArray, true);
                 }
 
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    throw new InvalidOperationException(
+                        "Revit rolled back the transaction: " + TransactionFailureHandling.Describe(txFailures));
 
                 created++;
                 results.Add(new
@@ -178,6 +187,9 @@ public class IfcRebuildOpeningsTool : ICortexTool
                 });
             }
         }
+
+        if (txGroup != null && txGroup.GetStatus() == TransactionStatus.Started)
+            txGroup.Assimilate();
 
         return CortexResult<object>.Ok(new { dryRun, totalCandidates = openingCandidates.Count, created, skipped, results });
     }
