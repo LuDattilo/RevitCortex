@@ -226,7 +226,7 @@ Questa sezione raccoglie i comandi per leggere, cercare, creare e modificare gli
 
 | Comando | Cosa fa | Esempio di prompt naturale |
 |---------|---------|----------------------------|
-| `create_room` | Crea un vano su un livello in una posizione (x, y). | "Crea un vano chiamato Ufficio sul Piano 1 in posizione 5000, 3000" |
+| `create_room` | Crea un vano su un livello in una posizione (x, y) in mm. | "Crea un vano chiamato Ufficio sul Piano 1 in posizione 5000, 3000" |
 | `create_floor` | Crea un pavimento da un contorno di punti o dal perimetro di un vano. | "Crea un pavimento seguendo il contorno di questo vano" |
 | `create_filled_region` | Crea una regione riempita in una vista da un contorno (con eventuali fori). | "Disegna una regione riempita su questa area della pianta" |
 | `create_grid` | Crea o gestisce griglie (singole o matrice con passo X/Y). | "Crea una griglia 5x4 con passo 6000 mm" |
@@ -256,7 +256,7 @@ Questa sezione raccoglie i comandi per leggere, cercare, creare e modificare gli
 | `set_element_phase` | Assegna la fase agli elementi (solo modelli con fasi; richiede conferma). | "Imposta la fase di creazione di questi elementi a 'Stato di progetto'" |
 | `set_element_workset` | Assegna il workset agli elementi (solo modelli workshared; richiede conferma). | "Sposta questi muri nel workset Architettura" |
 | `set_material_properties` | Modifica le proprietà dei materiali (anteprima con dryRun; richiede conferma). | "Cambia il colore di questo materiale, prima in anteprima" |
-| `delete_element` | Cancella uno o più elementi (anteprima con dryRun; richiede conferma). | "Cancella in anteprima questi elementi, poi eliminali" |
+| `delete_element` | Cancella uno o più elementi (anteprima con dryRun; richiede conferma). Il dryRun ora calcola anche la cascata reale: `dependentCount`/`totalWouldDelete` includono viste e dipendenti che la cancellazione trascinerebbe (es. Level → ~100 viste). | "Cancella in anteprima questi elementi, poi eliminali" |
 
 #### Selezioni salvate
 
@@ -321,7 +321,7 @@ Strumenti per ispezionare famiglie e tipi, esaminare i parametri condivisi e ver
 | Comando | Cosa fa | Esempio di prompt naturale |
 |---------|---------|----------------------------|
 | `audit_families` | Verifica le famiglie del progetto (inutilizzate, di sistema, ordinabili) per categoria. | "Verifica le famiglie delle porte ed escludi quelle inutilizzate" |
-| `get_available_family_types` | Elenca i tipi di famiglia disponibili, filtrabili per categoria e nome. | "Elenca i tipi di famiglia disponibili per i muri in versione compatta" |
+| `get_available_family_types` | Elenca i tipi di famiglia disponibili, filtrabili per categoria e nome. Una categoria non risolvibile (es. codice OST errato) ora produce un errore `InvalidInput` con l'elenco dei nomi non risolti, invece di ignorare silenziosamente il filtro. | "Elenca i tipi di famiglia disponibili per i muri in versione compatta" |
 | `list_family_sizes` | Elenca le famiglie ordinate per dimensione/peso su disco, utile per alleggerire il file. | "Mostrami le 10 famiglie più pesanti del modello" |
 | `get_shared_parameters` | Elenca i parametri condivisi presenti, filtrabili per categoria. | "Quali parametri condivisi ci sono sulle porte?" |
 | `export_shared_parameter_file` | Esporta il file dei parametri condivisi (.txt) in un percorso indicato. | "Esporta il file dei parametri condivisi sul desktop" |
@@ -335,7 +335,7 @@ Lettura, creazione, duplicazione ed eliminazione dei materiali, più l'estrazion
 |---------|---------|----------------------------|
 | `get_materials` | Elenca tutti i materiali del progetto. | "Elenca i materiali del modello in versione compatta" |
 | `get_material_properties` | Restituisce le proprietà di un materiale (per ID o per nome). | "Mostrami le proprietà del materiale Calcestruzzo" |
-| `get_material_quantities` | Estrae le quantità di materiale per categoria o sulla selezione corrente. | "Dammi le quantità di materiale dei muri" |
+| `get_material_quantities` | Estrae le quantità di materiale per categoria o sulla selezione corrente. Cap di sicurezza `maxElements` (default 20000): oltre il cap il tool fallisce con errore strutturato invece di congelare Revit — restringere con `categoryFilters` o alzare il cap esplicitamente. | "Dammi le quantità di materiale dei muri" |
 | `create_material` | Crea un nuovo materiale con nome, classe e colore opzionali. | "Crea un materiale Acciaio S275 di classe metallo, colore grigio" |
 | `duplicate_material` | Duplica un materiale esistente con un nuovo nome. | "Duplica il materiale Calcestruzzo chiamandolo Calcestruzzo C30/37" |
 | `delete_material` | Elimina un materiale per ID o per nome (richiede conferma). | "Elimina il materiale Test inutilizzato" |
@@ -641,7 +641,7 @@ Promemoria utili:
 | Comando | Cosa fa | Esempio di prompt naturale |
 |---------|---------|----------------------------|
 | `add_shared_parameter` | Aggiunge un parametro condiviso a una o piu categorie del modello. | "Aggiungi il parametro condiviso WBS_Code ai muri e ai pavimenti, come parametro di istanza testo." |
-| `manage_project_parameters` | Crea, elenca, rinomina o sposta i parametri di progetto e le loro categorie associate (richiede conferma). | "Crea un parametro di progetto 'Lotto' di tipo testo associato a porte e finestre." |
+| `manage_project_parameters` | Crea, elenca, rinomina o sposta i parametri di progetto e le loro categorie associate (richiede conferma). L'azione `set_group` è ora preview-first: `dryRun` default `true`, passare `false` per applicare. | "Crea un parametro di progetto 'Lotto' di tipo testo associato a porte e finestre." |
 | `manage_global_parameters` | Crea, modifica, rinomina o ordina i parametri globali, anche con formule. | "Crea un parametro globale 'Altezza_Standard' impostato a 3000 mm." |
 | `get_cache_stats` | Mostra le statistiche della cache interna di RevitCortex (parametri e metadati memorizzati). | "Quanti elementi ci sono in cache adesso?" |
 | `clear_cache` | Svuota la cache interna per forzare una rilettura aggiornata del modello. | "Pulisci la cache, ho appena modificato il modello a mano." |
@@ -836,7 +836,7 @@ Comandi distruttivi specifici per i sistemi di armatura ad area/percorso e per l
 
 Questa disciplina copre la modellazione e la gestione delle strutture in acciaio in Revit: connessioni (giunti) strutturali, tagli geometrici tra elementi (solid cut e instance void cut), proprietà di fabbricazione (fabrication ID, link materiali), flussi di approvazione e l'ispezione delle API di acciaio disponibili.
 
-Le categorie acciaio rientrano tipicamente in `OST_StructuralFraming` (travi, controventi) e `OST_StructuralColumns` (pilastri). Le coordinate dei punti di input sono in millimetri. Molti comandi di scrittura supportano `dryRun` per l'anteprima e diversi comandi distruttivi richiedono conferma prima di eseguire.
+Le categorie acciaio rientrano tipicamente in `OST_StructuralFraming` (travi, controventi) e `OST_StructuralColumns` (pilastri). Le coordinate dei punti di input sono in millimetri. Tutti i comandi di scrittura acciaio con `dryRun` sono ora **preview-first** (default `true`, come il resto della suite): senza `dryRun: false` restituiscono l'anteprima senza modificare il modello. Anche `modify_steel_connection_inputs`, `set_steel_connection_approval`, `set_steel_connection_status`, `remove_steel_solid_cut` e `remove_steel_instance_void_cut` supportano ora `dryRun`. I comandi distruttivi richiedono comunque conferma prima di eseguire.
 
 #### Diagnostica e capacità del modello
 

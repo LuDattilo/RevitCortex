@@ -94,7 +94,7 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 ## Riassegnazione Massiva del "Group Parameter Under"
 
-**Sequenza:** `manage_project_parameters` action=`list` (discovery nomi) -> `manage_project_parameters` action=`set_group` con `dryRun: true` -> verificare `plannedCount` -> rieseguire senza `dryRun`
+**Sequenza:** `manage_project_parameters` action=`list` (discovery nomi) -> `manage_project_parameters` action=`set_group` con `dryRun: true` -> verificare `plannedCount` -> rieseguire con `dryRun: false` (dal 2026-06-11 il default e' true: senza il flag esplicito resta in anteprima)
 **Parametri chiave:**
 - `parameterNames: string[]` — bulk; in alternativa `parameterName` singolo
 - `targetGroup` — short name (`IdentityData`, `Data`, `Geometry`, `Constraints`, `Materials`, `Ifc`, `Construction`, `Phasing`, `Visibility`, `Graphics`, `Structural`, ...) o ForgeTypeId completo

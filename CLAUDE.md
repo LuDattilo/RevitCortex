@@ -325,6 +325,8 @@ Use a dedicated session per distinct BIM task. Do not mix QA tasks with authorin
 | `set_element_phase` | Available only on models with phases (`doc.Phases > 0`) | Check `phases` in `get_project_info`, NOT `isWorkshared` -- phases are independent of worksharing |
 | `create_grid` | Label ignored if already exists in model | Use non-conflicting labels; the tool adds a warning in the response |
 | `lines_per_view_count` | Model lines are not view-specific | Reported once at project level (`modelLinesInProject`), not per view; per-view counts cover detail lines only |
+| `get_material_quantities` | Cap `maxElements` (default 20000) + budget 90s: oltre il cap o il budget il tool fallisce con errore strutturato invece di congelare Revit | Restringere con `categoryFilters`/`selectedElementsOnly`, o alzare `maxElements` deliberatamente |
+| Steel write tools (`*_steel_*` con dryRun) | Dal 2026-06-11 `dryRun` default `true` (preview-first, come il resto della suite); vale anche per `modify_steel_connection_inputs`, `set_steel_connection_approval/status`, `remove_steel_solid_cut`, `remove_steel_instance_void_cut` | Passare `dryRun: false` per eseguire davvero |
 
 ### Token Estimates by Task Type
 
@@ -353,6 +355,8 @@ When the user cancels, tools return a `CortexResult.Fail` with `CortexErrorCode.
 **Tools with confirmation:** delete_element, delete_selection, delete_material, purge_unused, wipe_empty_tags, set_element_parameters, set_compound_structure, batch_rename, override_graphics, set_element_phase, set_element_workset, change_element_type, load_family.
 
 When adding new destructive tools, always call `session.RequestConfirmation("action_verb", elementCount)` before the Transaction.
+
+When opening a Transaction in a write tool, also call `TransactionFailureHandling.SuppressWarnings(tx)` (in `RevitCortex.Tools/Utilities`) right after creating it and check `tx.Commit() != TransactionStatus.Committed`: without the preprocessor any Revit warning at Commit opens a modal TaskDialog that freezes the MCP bridge; without the commit check a Revit-side rollback would be reported as success. Read dryRun via `ToolHelpers.GetDryRun(input)` (default true, preview-first).
 
 ## UI Components
 
