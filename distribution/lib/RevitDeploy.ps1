@@ -14,14 +14,31 @@ function Test-RevitRunning {
 function Assert-RevitClosed {
     <#
     .SYNOPSIS
-        Verify Revit is not running. Prompt user to close if it is, loop until closed or aborted.
+        Verify Revit is not running.
+        Interactive mode: prompt the user to close Revit and wait for ENTER.
+        Non-interactive mode (in-app updater): POLL until Revit exits. The plugin
+        launches this installer while Revit is still open and only shuts Revit down
+        ~1.5-2s later, so we must wait for the process to disappear rather than
+        prompt (Read-Host throws under powershell -NonInteractive) or throw outright
+        (Revit is still running at that exact instant).
     #>
-    param([switch] $NonInteractive)
+    param(
+        [switch] $NonInteractive,
+        [int] $TimeoutSeconds = 120
+    )
+
+    if ($NonInteractive) {
+        $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+        while (Test-RevitRunning) {
+            if ((Get-Date) -gt $deadline) {
+                throw "Revit is still running after $TimeoutSeconds seconds. Close Revit and re-run the installer."
+            }
+            Start-Sleep -Milliseconds 500
+        }
+        return
+    }
 
     while (Test-RevitRunning) {
-        if ($NonInteractive) {
-            throw "Revit is running. Close Revit and re-run the installer."
-        }
         Write-Host ""
         Write-Host "  Revit is currently running. The installer cannot write plugin DLLs while Revit has them locked." -ForegroundColor Yellow
         $choice = Read-Host "  Close Revit manually, then press ENTER to continue (or type 'q' to abort)"

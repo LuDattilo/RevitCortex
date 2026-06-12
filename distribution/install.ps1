@@ -32,7 +32,9 @@ Write-Host ""
 # --- Step 0: Verify Revit is not running (lock DLLs if it is) ---
 Write-Host "[0/5] Pre-flight checks..." -ForegroundColor Yellow
 try {
-    Assert-RevitClosed
+    # In silent mode the launcher (UpdateChecker) runs us with -NonInteractive and
+    # closes Revit a moment after launch; wait for it instead of prompting.
+    Assert-RevitClosed -NonInteractive:$Silent
     Write-Host "  Revit is not running" -ForegroundColor Gray
 } catch {
     Write-Host "  $_" -ForegroundColor Red
@@ -82,13 +84,13 @@ foreach ($ver in $configMap.Keys) {
 
 if ($foundVersions.Count -eq 0 -and $skippedVersions.Count -eq 0) {
     Write-Host "  ERROR: No supported Revit installation found (2023-2027)." -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+    if (-not $Silent) { Read-Host "Press Enter to exit" }
     exit 1
 }
 
 if ($foundVersions.Count -eq 0) {
     Write-Host "  ERROR: Revit $($skippedVersions -join ', ') detected but this package does not include a plugin build for those versions." -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+    if (-not $Silent) { Read-Host "Press Enter to exit" }
     exit 1
 }
 
