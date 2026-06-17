@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using RevitCortex.Core.Caching;
 using RevitCortex.Core.Discovery;
@@ -85,7 +86,22 @@ public class CortexSession
     public bool AutoMode
     {
         get { lock (_approveAllLock) { return _autoMode; } }
-        set { lock (_approveAllLock) { _autoMode = value; } }
+        set
+        {
+            bool changed;
+            lock (_approveAllLock)
+            {
+                changed = _autoMode != value;
+                _autoMode = value;
+            }
+            // Diagnostic breadcrumb: every real AutoMode flip, regardless of path
+            // (dialog "Auto", Stop Auto, Reinitialize on document boundary). Lets a
+            // live DebugView capture show whether Auto is being silently reset
+            // mid-batch. Logged outside the lock so a slow trace listener can't
+            // stall confirmation checks on other threads.
+            if (changed)
+                Trace.WriteLine($"[RevitCortex][automode] AutoMode -> {value}");
+        }
     }
     private bool _autoMode;
 
@@ -139,11 +155,21 @@ public class CortexSession
         {
             // Auto-approved by Auto mode. Signal activity so the UI keeps the
             // Auto mode window alive through this burst of operations.
+            Trace.WriteLine($"[RevitCortex][confirm] '{action}' count={elementCount} -> auto-approved (AutoMode ON)");
             AutoModeActivity?.Invoke();
             return true;
         }
-        if (ApproveAll) return true;
+        if (ApproveAll)
+        {
+            Trace.WriteLine($"[RevitCortex][confirm] '{action}' count={elementCount} -> auto-approved (ApproveAll ON)");
+            return true;
+        }
 
+        // Reaching here means the native confirmation dialog is about to be shown.
+        // If a user reports per-element prompts "while Auto is on", this line in the
+        // log proves AutoMode was actually OFF at decision time (the window/state
+        // desync), as opposed to the prompt coming from the MCP client layer.
+        Trace.WriteLine($"[RevitCortex][confirm] '{action}' count={elementCount} -> showing dialog (AutoMode OFF, ApproveAll OFF)");
         var result = ConfirmAction?.Invoke(action, elementCount, description);
         if (result == null)
         {

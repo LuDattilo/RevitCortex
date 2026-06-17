@@ -374,8 +374,23 @@ public class CortexRouter
         var caps = new DocumentCapabilities();
         _analyzer.Analyze(document, caps);
 
+        // Reinitialize() clears AutoMode, but Core has no reference to the UI and
+        // cannot close the floating "Auto mode ON" window. Capture the prior state
+        // so we can fire the notification here when Auto was actually on. Without
+        // this, a document open/switch/server-start leaves the window showing
+        // "Auto mode ON" while confirmations have silently resumed — the exact
+        // state/UI desync users hit. Mirrors RevitCortexApp.OnDocumentClosing,
+        // which already notifies after its own Reinitialize call.
+        bool wasAutoMode = _session.AutoMode;
+
         _session.Reinitialize(caps, locale ?? "en");
         _session.Store.Set("activeDocument", document);
+
+        if (wasAutoMode)
+        {
+            Trace.WriteLine("[RevitCortex][automode] reset by document reinitialize (open/switch/server-start); closing Auto window");
+            RevitCortex.Plugin.UI.ConfirmationHelper.NotifyAutoModeChanged(false);
+        }
     }
 
     public IReadOnlyList<string> GetAvailableToolNames()

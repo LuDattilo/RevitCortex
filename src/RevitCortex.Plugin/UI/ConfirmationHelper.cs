@@ -81,14 +81,24 @@ public static class ConfirmationHelper
             "Cancel this operation");
 
         var result = dialog.Show();
-        if (result == TaskDialogResult.CommandLink2) return null;  // Yes to All
-        if (result == TaskDialogResult.CommandLink1) return true;  // Yes
+        if (result == TaskDialogResult.CommandLink2)
+        {
+            System.Diagnostics.Trace.WriteLine($"[RevitCortex][confirm] dialog '{action}' -> user clicked 'Yes to All' (per-call; reset after each tool)");
+            return null;  // Yes to All
+        }
+        if (result == TaskDialogResult.CommandLink1)
+        {
+            System.Diagnostics.Trace.WriteLine($"[RevitCortex][confirm] dialog '{action}' -> user clicked 'Yes'");
+            return true;  // Yes
+        }
         if (result == TaskDialogResult.CommandLink3)
         {
+            System.Diagnostics.Trace.WriteLine($"[RevitCortex][confirm] dialog '{action}' -> user clicked 'Auto' (AutoMode ON, persists until Stop/doc-change)");
             session.AutoMode = true;
             AutoModeChanged?.Invoke(true);
             return true; // proceed with current operation
         }
+        System.Diagnostics.Trace.WriteLine($"[RevitCortex][confirm] dialog '{action}' -> user clicked 'No'/closed");
         return false; // No (or closed)
     }
 
