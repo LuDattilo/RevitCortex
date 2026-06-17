@@ -156,4 +156,55 @@ public class CortexRouterTests
         Assert.True(result.Success);
         Assert.True(session.AutoMode); // must survive the tool call
     }
+
+    [Fact]
+    public void OnDocumentChanged_WhenAutoModeWasOn_ResetsAndNotifiesUi()
+    {
+        // A document open/switch/server-start calls Reinitialize, which clears
+        // AutoMode. Core can't reach the UI, so the router must fire the UI
+        // notification — otherwise the floating "Auto mode ON" window lingers
+        // while confirmations have silently resumed (the reported desync).
+        var router = CreateRouter(out var session);
+        session.AutoMode = true;
+
+        int notifyCount = 0;
+        bool lastActive = true;
+        Action<bool> handler = active => { notifyCount++; lastActive = active; };
+        RevitCortex.Plugin.UI.ConfirmationHelper.AutoModeChanged += handler;
+        try
+        {
+            router.OnDocumentChanged(new object(), "en");
+        }
+        finally
+        {
+            RevitCortex.Plugin.UI.ConfirmationHelper.AutoModeChanged -= handler;
+        }
+
+        Assert.False(session.AutoMode);   // reset by Reinitialize
+        Assert.Equal(1, notifyCount);     // UI notified exactly once
+        Assert.False(lastActive);         // notified that Auto is now OFF
+    }
+
+    [Fact]
+    public void OnDocumentChanged_WhenAutoModeWasOff_DoesNotNotify()
+    {
+        // No spurious notification when Auto was already off — avoids needless
+        // window churn on every routine document event.
+        var router = CreateRouter(out var session);
+        Assert.False(session.AutoMode);
+
+        int notifyCount = 0;
+        Action<bool> handler = _ => notifyCount++;
+        RevitCortex.Plugin.UI.ConfirmationHelper.AutoModeChanged += handler;
+        try
+        {
+            router.OnDocumentChanged(new object(), "en");
+        }
+        finally
+        {
+            RevitCortex.Plugin.UI.ConfirmationHelper.AutoModeChanged -= handler;
+        }
+
+        Assert.Equal(0, notifyCount);
+    }
 }
