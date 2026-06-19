@@ -80,6 +80,7 @@ public class CreateColorLegendTool : ICortexTool
             // Apply overrides
             int coloredCount = 0;
             using var tx = new Transaction(doc, "RevitCortex: Create Color Legend");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             try
@@ -112,7 +113,10 @@ public class CreateColorLegendTool : ICortexTool
                 if (createLegendView)
                     legendViewId = CreateLegend(doc, legendTitle, colorMap, groups);
 
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
 
                 var colorEntries = colorMap.Select(kvp => new
                 {

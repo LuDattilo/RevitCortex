@@ -62,10 +62,14 @@ public class AddLinkedFileTool : ICortexTool
             if (Math.Abs(positionX) > 0.001 || Math.Abs(positionY) > 0.001 || Math.Abs(positionZ) > 0.001)
             {
                 using var tx = new Transaction(doc, "RevitCortex: Position Linked File");
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
                 var offset = new XYZ(positionX / MmPerFoot, positionY / MmPerFoot, positionZ / MmPerFoot);
                 ElementTransformUtils.MoveElement(doc, instance.Id, offset);
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
             }
 
             return CortexResult<object>.Ok(new

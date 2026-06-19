@@ -168,9 +168,13 @@ public class ManageProjectParametersTool : ICortexTool
             bool inserted;
             using (var tx = new Transaction(doc, "RevitCortex: Create Project Parameter"))
             {
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
                 inserted = doc.ParameterBindings.Insert(definition, binding);
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
             }
 
             if (!inserted)
@@ -242,6 +246,7 @@ public class ManageProjectParametersTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Delete Project Parameter"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             if (isShared)
@@ -271,7 +276,10 @@ public class ManageProjectParametersTool : ICortexTool
                 }
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         // Verify: re-scan the bindings. The parameter must no longer be present.
@@ -367,6 +375,7 @@ public class ManageProjectParametersTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Change Parameter Binding Type"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             var freshMap = doc.ParameterBindings;
             freshMap.Remove(targetDef);
@@ -380,7 +389,10 @@ public class ManageProjectParametersTool : ICortexTool
                     $"Revit rejected re-binding '{parameterName}'. The parameter may be built-in or Revit-owned.",
                     suggestion: "Instance/type toggle only works on user-created project parameters.");
             }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         return CortexResult<object>.Ok(new
@@ -563,10 +575,14 @@ public class ManageProjectParametersTool : ICortexTool
         // then mutating via the same reference silently fails. ReInsert against a built-in
         // Revit-owned parameter (e.g. 'Material') returns false by design.
         using var tx = new Transaction(doc, "RevitCortex: Modify Project Parameter");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var freshMap = doc.ParameterBindings;
         bool persistReInsert = freshMap.ReInsert(targetDef, newBinding);
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         if (!persistReInsert)
             return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
@@ -688,6 +704,7 @@ public class ManageProjectParametersTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Set Parameter Group"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             foreach (var def in modifiable)
             {
@@ -702,7 +719,10 @@ public class ManageProjectParametersTool : ICortexTool
                     failed.Add(new { name = def.Name, error = ex.Message });
                 }
             }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         return CortexResult<object>.Ok(new

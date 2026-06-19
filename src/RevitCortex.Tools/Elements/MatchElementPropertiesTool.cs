@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -60,6 +61,7 @@ public class MatchElementPropertiesTool : ICortexTool
             var results     = new List<object>();
 
             using var tx = new Transaction(doc, "RevitCortex: Match Element Properties");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             try
@@ -113,7 +115,10 @@ public class MatchElementPropertiesTool : ICortexTool
                     });
                 }
 
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
             }
             catch
             {

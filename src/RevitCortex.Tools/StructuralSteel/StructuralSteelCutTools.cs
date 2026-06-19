@@ -79,12 +79,16 @@ public class AddSteelSolidCutTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc!, "RevitCortex: Add Solid Cut");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             // ARG ORDER: (doc, solidToBeCut=target, cuttingSolid=cutter, splitFaces).
             SolidSolidCutUtils.AddCutBetweenSolids(doc!, target!, cutter!, splitFaces);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = "Solid cut added (generic Revit geometry cut, not steel-specific)",
@@ -180,11 +184,15 @@ public class RemoveSteelSolidCutTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc!, "RevitCortex: Remove Solid Cut");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             SolidSolidCutUtils.RemoveCutBetweenSolids(doc!, cutter!, target!);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = "Solid cut removed (generic Revit geometry cut, not steel-specific)",
@@ -232,11 +240,15 @@ public class SetSteelSolidCutFaceSplittingTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc!, "RevitCortex: Set Solid Cut Face Splitting");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             SolidSolidCutUtils.SplitFacesOfCuttingSolid(cutter!, target!, split.Value);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = "Solid cut face-splitting updated (generic Revit geometry cut, not steel-specific)",
@@ -299,12 +311,16 @@ public class AddSteelInstanceVoidCutTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc!, "RevitCortex: Add Instance Void Cut");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             // ARG ORDER: (doc, element=target, cuttingInstance=void).
             InstanceVoidCutUtils.AddInstanceVoidCut(doc!, target!, voidInstance!);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = "Instance void cut added (generic Revit geometry cut, not steel-specific)",
@@ -355,12 +371,16 @@ public class RemoveSteelInstanceVoidCutTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc!, "RevitCortex: Remove Instance Void Cut");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             // ARG ORDER: (doc, element=target, cuttingInstance=void).
             InstanceVoidCutUtils.RemoveInstanceVoidCut(doc!, target!, voidInstance!);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = "Instance void cut removed (generic Revit geometry cut, not steel-specific)",

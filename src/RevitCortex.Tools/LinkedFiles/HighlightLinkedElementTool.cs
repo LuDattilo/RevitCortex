@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.LinkedFiles;
 
@@ -110,6 +111,7 @@ public class HighlightLinkedElementTool : ICortexTool
                 if (targetView != null)
                 {
                     using var tx = new Transaction(doc, "RevitCortex: Highlight Linked Element");
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
 
                     targetView.IsSectionBoxActive = true;
@@ -119,7 +121,10 @@ public class HighlightLinkedElementTool : ICortexTool
                         Max = new XYZ(correctedMax.X + offset, correctedMax.Y + offset, correctedMax.Z + offset)
                     });
 
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                            $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                            suggestion: "Fix the reported model errors and retry.");
 
                     uiDoc.ActiveView = targetView;
                     sectionBoxViewName = targetView.Name;

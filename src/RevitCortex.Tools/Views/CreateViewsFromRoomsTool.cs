@@ -46,6 +46,7 @@ public class CreateViewsFromRoomsTool : ICortexTool
             var warnings = new List<string>();
 
             using var tx = new Transaction(doc, "RevitCortex: Create Views From Rooms");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             foreach (var rid in roomIds)
@@ -108,7 +109,10 @@ public class CreateViewsFromRoomsTool : ICortexTool
                 }
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 createdViewCount = createdViews.Count,

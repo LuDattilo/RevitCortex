@@ -149,6 +149,7 @@ public class CreatePointBasedElementTool : ICortexTool
         }
 
         using var tx = new Transaction(doc, "RevitCortex: Create Point-Based Element");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -249,7 +250,8 @@ public class CreatePointBasedElementTool : ICortexTool
                 createdIds.Add(ToolHelpers.GetElementIdValue(instance.Id));
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                warnings.Add($"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}");
         }
         catch
         {

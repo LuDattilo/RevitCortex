@@ -104,6 +104,7 @@ public class ManageGlobalParametersTool : ICortexTool
         var initialValue = input["value"]?.Value<string>();
 
         using var tx = new Transaction(doc, "RevitCortex: Create Global Parameter");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
 #if REVIT2023_OR_GREATER
@@ -115,7 +116,10 @@ public class ManageGlobalParametersTool : ICortexTool
         if (!string.IsNullOrEmpty(initialValue))
             ApplyStringValue(gp, initialValue!);
 
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {
@@ -146,9 +150,13 @@ public class ManageGlobalParametersTool : ICortexTool
                 $"Parameter '{name}' is driven by a formula and cannot be set directly");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Global Parameter Value");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         ApplyStringValue(gp, value);
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new { action = "set", name, value });
     }
@@ -168,9 +176,13 @@ public class ManageGlobalParametersTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Delete Global Parameter");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         doc.Delete(gp.Id);
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new { action = "delete", name });
     }
@@ -197,9 +209,13 @@ public class ManageGlobalParametersTool : ICortexTool
                 $"A global parameter named '{newName}' already exists.");
 
         using var tx = new Transaction(doc, "RevitCortex: Rename Global Parameter");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         gp.Name = newName;
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new { action = "rename", oldName = name, newName });
     }
@@ -226,11 +242,15 @@ public class ManageGlobalParametersTool : ICortexTool
                 $"Global parameter '{name}' not found");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Global Parameter Formula");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             gp.SetFormula(formula);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
         catch (Exception ex)
         {
@@ -267,11 +287,15 @@ public class ManageGlobalParametersTool : ICortexTool
         bool moved;
         using (var tx = new Transaction(doc, "RevitCortex: Reorder Global Parameter"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             moved = up
                 ? GlobalParametersManager.MoveParameterUpOrder(doc, gp.Id)
                 : GlobalParametersManager.MoveParameterDownOrder(doc, gp.Id);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         return CortexResult<object>.Ok(new
@@ -295,9 +319,13 @@ public class ManageGlobalParametersTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Sort Global Parameters"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             GlobalParametersManager.SortParameters(doc, sortOrder);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         return CortexResult<object>.Ok(new { action = "sort", order = sortOrder.ToString() });

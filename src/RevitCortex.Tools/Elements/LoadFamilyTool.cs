@@ -55,11 +55,15 @@ public class LoadFamilyTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Load Family");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         if (doc.LoadFamily(familyPath, out var family))
         {
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             var types = family.GetFamilySymbolIds()
                 .Select(id => doc.GetElement(id) as FamilySymbol)
                 .Where(fs => fs != null)
@@ -122,9 +126,13 @@ public class LoadFamilyTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "Source family type not found");
 
         using var tx = new Transaction(doc, "RevitCortex: Duplicate Family Type");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var newType = sourceType.Duplicate(newTypeName) as FamilySymbol;
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {

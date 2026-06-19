@@ -122,6 +122,7 @@ public class AddSharedParameterTool : ICortexTool
                 : (ElementBinding)app.Create.NewTypeBinding(categorySet);
 
             using var tx = new Transaction(doc, "RevitCortex: Add Shared Parameter");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             try
@@ -133,7 +134,10 @@ public class AddSharedParameterTool : ICortexTool
                     success = doc.ParameterBindings.ReInsert(definition, binding);
                 }
 
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
 
                 var guid = definition is ExternalDefinition extDef ? extDef.GUID.ToString() : "";
 

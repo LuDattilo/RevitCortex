@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -83,9 +84,13 @@ public class SelectFromPowerBiTool : ICortexTool
                 case "isolate":
                     using (var tx = new Transaction(doc, "RevitCortex: Isolate from PBI"))
                     {
+                        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                         tx.Start();
                         doc.ActiveView.IsolateElementsTemporary(validIds);
-                        tx.Commit();
+                        if (tx.Commit() != TransactionStatus.Committed)
+                            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                                suggestion: "Fix the reported model errors and retry.");
                     }
                     uiDoc.Selection.SetElementIds(validIds);
                     uiDoc.ShowElements(validIds);

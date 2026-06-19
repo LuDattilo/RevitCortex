@@ -80,6 +80,7 @@ public class CreateViewFilterTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No valid categories resolved");
 
         using var tx = new Transaction(doc, "RevitCortex: Create View Filter");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         var filter = ParameterFilterElement.Create(doc, filterName, catIds);
@@ -139,7 +140,10 @@ public class CreateViewFilterTool : ICortexTool
             }
         }
 
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {
@@ -171,6 +175,7 @@ public class CreateViewFilterTool : ICortexTool
         if (view == null) return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "View not found");
 
         using var tx = new Transaction(doc, "RevitCortex: Apply View Filter");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         view.AddFilter(filter.Id);
@@ -189,7 +194,10 @@ public class CreateViewFilterTool : ICortexTool
             view.SetFilterOverrides(filter.Id, overrides);
         }
 
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {

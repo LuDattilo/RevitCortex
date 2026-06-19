@@ -85,6 +85,7 @@ public class ApplyViewTemplateTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Apply View Template");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         int applied = 0;
         foreach (var vid in viewIds)
@@ -96,7 +97,10 @@ public class ApplyViewTemplateTool : ICortexTool
 #endif
             if (view != null && !view.IsTemplate) { view.ViewTemplateId = template.Id; applied++; }
         }
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
         return CortexResult<object>.Ok(new { appliedCount = applied, templateName = template.Name });
     }
 
@@ -109,6 +113,7 @@ public class ApplyViewTemplateTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Remove View Template");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         int removed = 0;
         foreach (var vid in viewIds)
@@ -120,7 +125,10 @@ public class ApplyViewTemplateTool : ICortexTool
 #endif
             if (view != null && !view.IsTemplate) { view.ViewTemplateId = ElementId.InvalidElementId; removed++; }
         }
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
         return CortexResult<object>.Ok(new { removedCount = removed });
     }
 }

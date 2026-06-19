@@ -88,9 +88,13 @@ public class IfcExportBasicTool : ICortexTool, ICommandTimeoutTool
                 options.FamilyMappingFile = mappingFile;
 
             using var tx = new Transaction(doc!, "RevitCortex: Export IFC");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             var exportResult = doc!.Export(outputDirectory, fileName, options);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
 
             var outputPath = Path.Combine(outputDirectory, fileName + ".ifc");
 

@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -100,11 +101,27 @@ public class OperateElementTool : ICortexTool
                 elementCount = elementIds.Count
             });
         }
+        catch (TransactionRolledBackException trbe)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {trbe.Message}",
+                suggestion: "Fix the reported model errors and retry.");
+        }
         catch (Exception ex)
         {
             return CortexResult<object>.Fail(CortexErrorCode.Unknown,
                 $"Operation '{action}' failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Raised by the action helpers when a Commit() does not return
+    /// TransactionStatus.Committed, so Execute can surface a structured
+    /// TransactionFailed result instead of a generic Unknown error.
+    /// </summary>
+    private sealed class TransactionRolledBackException : Exception
+    {
+        public TransactionRolledBackException(string message) : base(message) { }
     }
 
     // ── Action dispatcher ──────────────────────────────────────────────────
@@ -129,9 +146,11 @@ public class OperateElementTool : ICortexTool
                 int[] colorValue = ParseColorArray(colorToken);
                 using (var tx = new Transaction(doc, "RevitCortex: Set Element Color"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
                     SetElementsColor(doc, elementIds, colorValue);
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new TransactionRolledBackException(TransactionFailureHandling.Describe(txFailures));
                 }
                 uiDoc.ShowElements(elementIds);
                 return $"Set color on {elementIds.Count} element(s)";
@@ -141,68 +160,82 @@ public class OperateElementTool : ICortexTool
                 int transparency = Math.Max(0, Math.Min(100, transparencyToken?.Value<int>() ?? 50));
                 using (var tx = new Transaction(doc, "RevitCortex: Set Element Transparency"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
                     var overrideSettings = new OverrideGraphicSettings();
                     overrideSettings.SetSurfaceTransparency(transparency);
                     foreach (var id in elementIds)
                         doc.ActiveView.SetElementOverrides(id, overrideSettings);
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new TransactionRolledBackException(TransactionFailureHandling.Describe(txFailures));
                 }
                 return $"Set transparency to {transparency}% on {elementIds.Count} element(s)";
 
             case "hide":
                 using (var tx = new Transaction(doc, "RevitCortex: Hide Elements"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
                     doc.ActiveView.HideElements(elementIds);
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new TransactionRolledBackException(TransactionFailureHandling.Describe(txFailures));
                 }
                 return $"Hidden {elementIds.Count} element(s)";
 
             case "temphide":
                 using (var tx = new Transaction(doc, "RevitCortex: Temp Hide Elements"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
                     doc.ActiveView.HideElementsTemporary(elementIds);
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new TransactionRolledBackException(TransactionFailureHandling.Describe(txFailures));
                 }
                 return $"Temporarily hidden {elementIds.Count} element(s)";
 
             case "isolate":
                 using (var tx = new Transaction(doc, "RevitCortex: Isolate Elements"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
                     doc.ActiveView.IsolateElementsTemporary(elementIds);
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new TransactionRolledBackException(TransactionFailureHandling.Describe(txFailures));
                 }
                 return $"Isolated {elementIds.Count} element(s)";
 
             case "unhide":
                 using (var tx = new Transaction(doc, "RevitCortex: Unhide Elements"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
                     doc.ActiveView.UnhideElements(elementIds);
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new TransactionRolledBackException(TransactionFailureHandling.Describe(txFailures));
                 }
                 return $"Unhidden {elementIds.Count} element(s)";
 
             case "resetisolate":
                 using (var tx = new Transaction(doc, "RevitCortex: Reset Isolation"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
                     doc.ActiveView.DisableTemporaryViewMode(TemporaryViewMode.TemporaryHideIsolate);
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new TransactionRolledBackException(TransactionFailureHandling.Describe(txFailures));
                 }
                 return "Isolation reset on active view";
 
             case "delete":
                 using (var tx = new Transaction(doc, "RevitCortex: Delete Elements"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
                     try
                     {
                         var deleted = doc.Delete(elementIds);
-                        tx.Commit();
+                        if (tx.Commit() != TransactionStatus.Committed)
+                            throw new TransactionRolledBackException(TransactionFailureHandling.Describe(txFailures));
                         var dependent = deleted.Count - elementIds.Count;
                         return dependent > 0
                             ? $"Deleted {deleted.Count} element(s) ({elementIds.Count} requested + {dependent} dependent)"
@@ -287,10 +320,12 @@ public class OperateElementTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Create Section Box"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             targetView.IsSectionBoxActive = true;
             targetView.SetSectionBox(boundingBox);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                throw new TransactionRolledBackException(TransactionFailureHandling.Describe(txFailures));
         }
 
         uiDoc.ShowElements(elementIds);

@@ -39,6 +39,7 @@ public class CreateTextNoteTool : ICortexTool
         var warnings = new List<string>();
 
         using var tx = new Transaction(doc, "RevitCortex: Create Text Notes");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         try
@@ -65,7 +66,10 @@ public class CreateTextNoteTool : ICortexTool
                     warnings.Add($"Failed to create text note: {ex.Message}");
                 }
             }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
         catch
         {

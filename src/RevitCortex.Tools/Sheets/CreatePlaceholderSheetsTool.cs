@@ -54,6 +54,7 @@ public class CreatePlaceholderSheetsTool : ICortexTool
 
         var results = new List<object>();
         using var tx = new Transaction(doc, "RevitCortex: Create Placeholder Sheets");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         foreach (var sd in sheetsArray)
@@ -68,7 +69,10 @@ public class CreatePlaceholderSheetsTool : ICortexTool
             results.Add(new { sheetId = ToolHelpers.GetElementIdValue(sheet.Id), number = sheet.SheetNumber, name = sheet.Name });
         }
 
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
         return CortexResult<object>.Ok(new { createdCount = results.Count, sheets = results });
     }
 
@@ -120,6 +124,7 @@ public class CreatePlaceholderSheetsTool : ICortexTool
 
         var results = new List<object>();
         using var tx = new Transaction(doc, "RevitCortex: Convert Placeholder Sheets");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         foreach (var sid in sheetIds)
@@ -152,7 +157,10 @@ public class CreatePlaceholderSheetsTool : ICortexTool
             });
         }
 
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
         return CortexResult<object>.Ok(new { convertedCount = results.Count(r => ((dynamic)r).success), sheets = results });
     }
 
@@ -167,6 +175,7 @@ public class CreatePlaceholderSheetsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Delete Placeholder Sheets");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         int deleted = 0;
         foreach (var sid in sheetIds)
@@ -178,7 +187,10 @@ public class CreatePlaceholderSheetsTool : ICortexTool
 #endif
             if (sheet != null) { doc.Delete(sheet.Id); deleted++; }
         }
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
         return CortexResult<object>.Ok(new { deletedCount = deleted });
     }
 }

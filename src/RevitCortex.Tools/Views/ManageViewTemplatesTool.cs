@@ -69,6 +69,7 @@ public class ManageViewTemplatesTool : ICortexTool
 
         var results = new List<object>();
         using var tx = new Transaction(doc, "RevitCortex: Duplicate View Templates");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         foreach (var tid in templateIds)
         {
@@ -99,7 +100,10 @@ public class ManageViewTemplatesTool : ICortexTool
             if (newView != null)
                 results.Add(new { originalId = tid, newId = ToolHelpers.GetElementIdValue(newId), newName = newView.Name });
         }
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
         return CortexResult<object>.Ok(new { duplicatedCount = results.Count, templates = results });
     }
 
@@ -109,6 +113,7 @@ public class ManageViewTemplatesTool : ICortexTool
         if (!session.RequestConfirmation("delete view template(s)", templateIds.Count))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
         using var tx = new Transaction(doc, "RevitCortex: Delete View Templates");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         int deleted = 0;
         foreach (var tid in templateIds)
@@ -120,7 +125,10 @@ public class ManageViewTemplatesTool : ICortexTool
 #endif
             if (template != null && template.IsTemplate) { doc.Delete(template.Id); deleted++; }
         }
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
         return CortexResult<object>.Ok(new { deletedCount = deleted });
     }
 
@@ -140,10 +148,14 @@ public class ManageViewTemplatesTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "View template not found");
 
         using var tx = new Transaction(doc, "RevitCortex: Rename View Template");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var oldName = template.Name;
         template.Name = newName;
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
         return CortexResult<object>.Ok(new { oldName, newName, templateId });
     }
 }

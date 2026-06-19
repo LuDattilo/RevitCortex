@@ -234,6 +234,7 @@ public class CreateSurfaceBasedElementTool : ICortexTool
         }
 
         using var tx = new Transaction(doc, "RevitCortex: Create Surface Element");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -287,7 +288,8 @@ public class CreateSurfaceBasedElementTool : ICortexTool
                 }
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                warnings.Add($"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}");
         }
         catch
         {

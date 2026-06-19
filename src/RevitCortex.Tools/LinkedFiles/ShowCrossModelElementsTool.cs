@@ -234,6 +234,7 @@ public class ShowCrossModelElementsTool : ICortexTool
 
                 using (var tx = new Transaction(doc, "RevitCortex: Show Cross Model Elements"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
 
                     foreach (var marker in pendingMarkers)
@@ -284,7 +285,10 @@ public class ShowCrossModelElementsTool : ICortexTool
                             isolateView.IsolateElementsTemporary(isolateIds.ToList());
                     }
 
-                    tx.Commit();
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                            $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                            suggestion: "Fix the reported model errors and retry.");
                 }
 
                 if (targetView != null)

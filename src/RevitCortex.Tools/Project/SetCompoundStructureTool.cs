@@ -132,6 +132,7 @@ public class SetCompoundStructureTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Replace Compound Structure"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             cs.SetLayers(newLayers);
 
@@ -155,7 +156,10 @@ public class SetCompoundStructureTool : ICortexTool
             }
 
             hostType.SetCompoundStructure(cs);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         return CortexResult<object>.Ok(new
@@ -210,10 +214,14 @@ public class SetCompoundStructureTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Add Compound Structure Layer"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             cs.SetLayers(existingLayers);
             hostType.SetCompoundStructure(cs);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         return CortexResult<object>.Ok(new
@@ -267,10 +275,14 @@ public class SetCompoundStructureTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Remove Compound Structure Layer"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             cs.SetLayers(existingLayers);
             hostType.SetCompoundStructure(cs);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         return CortexResult<object>.Ok(new
@@ -370,10 +382,14 @@ public class SetCompoundStructureTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Modify Compound Structure Layer"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             cs.SetLayers(existingLayers);
             hostType.SetCompoundStructure(cs);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         return CortexResult<object>.Ok(new
@@ -451,9 +467,13 @@ public class SetCompoundStructureTool : ICortexTool
 
         using (var tx = new Transaction(doc, "RevitCortex: Set Compound Structure Wrapping"))
         {
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             hostType.SetCompoundStructure(cs);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
 
         return CortexResult<object>.Ok(new

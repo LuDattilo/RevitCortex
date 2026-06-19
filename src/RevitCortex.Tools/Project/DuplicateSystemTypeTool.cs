@@ -95,9 +95,13 @@ public class DuplicateSystemTypeTool : ICortexTool
             // Duplicate
             using (var tx = new Transaction(doc, "RevitCortex: Duplicate System Type"))
             {
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
                 var newType = sourceType.Duplicate(newName);
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
 
                 long newIdValue;
 #if REVIT2024_OR_GREATER
@@ -140,9 +144,13 @@ public class DuplicateSystemTypeTool : ICortexTool
 
         var oldName = type.Name;
         using var tx = new Transaction(doc, "RevitCortex: Rename Type");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         type.Name = newName;
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new { action = "rename", typeId = ToolHelpers.GetElementIdValue(type.Id), oldName, newName });
     }
@@ -157,9 +165,13 @@ public class DuplicateSystemTypeTool : ICortexTool
 
         var name = type!.Name;
         using var tx = new Transaction(doc, "RevitCortex: Delete Type");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var deleted = doc.Delete(type.Id);
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {
