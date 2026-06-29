@@ -15,7 +15,7 @@ namespace RevitCortex.Tools.IFC;
 /// sets of options that map to common IFC MVDs. Extra key-value overrides
 /// are passed via IFCExportOptions.AddOption().
 /// </summary>
-[ToolSafety(true, false)]
+[ToolSafety(false, false)]
 public class IfcExportWithConfigurationTool : ICortexTool, ICommandTimeoutTool
 {
     public string Name => "ifc_export_with_configuration";

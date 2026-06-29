@@ -13,7 +13,7 @@ namespace RevitCortex.Tools.IFC;
 /// <summary>
 /// Exports the active document to IFC using standard IFCExportOptions.
 /// </summary>
-[ToolSafety(true, false)]
+[ToolSafety(false, false)]
 public class IfcExportBasicTool : ICortexTool, ICommandTimeoutTool
 {
     public string Name => "ifc_export_basic";
