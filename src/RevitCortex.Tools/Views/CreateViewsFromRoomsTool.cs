@@ -40,6 +40,16 @@ public class CreateViewsFromRoomsTool : ICortexTool
         if (roomIds.Count == 0)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "roomIds array is required");
 
+        var normalizedViewType = viewType.ToLowerInvariant();
+        if (normalizedViewType != "callout" &&
+            normalizedViewType != "section" &&
+            normalizedViewType != "elevation")
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                $"Invalid viewType '{viewType}'",
+                suggestion: "Use one of: callout, section, elevation");
+        }
+
         try
         {
             var offset = offsetMm / MmPerFoot;
@@ -68,7 +78,7 @@ public class CreateViewsFromRoomsTool : ICortexTool
                     .Replace("{RoomName}", roomName)
                     .Replace("{RoomNumber}", roomNumber);
 
-                switch (viewType.ToLowerInvariant())
+                switch (normalizedViewType)
                 {
                     case "section":
                         var sectionView = CreateSectionFromBB(doc, bb, offset, "north");

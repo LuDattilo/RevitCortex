@@ -49,4 +49,14 @@ public class CreateViewsFromRoomsElevationSourceTests
         Assert.Contains("ex.GetType().FullName", src);
         Assert.Contains("string.IsNullOrWhiteSpace(message)", src);
     }
+
+    [Fact]
+    public void ViewTypeValidation_RejectsUnknownValuesInsteadOfFallingBackToCallout()
+    {
+        var src = ReadTool();
+
+        Assert.Contains("Invalid viewType", src);
+        Assert.Contains("Use one of: callout, section, elevation", src);
+        Assert.Contains("normalizedViewType", src);
+    }
 }
