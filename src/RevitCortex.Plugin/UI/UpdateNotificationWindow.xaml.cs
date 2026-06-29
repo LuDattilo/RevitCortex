@@ -1,6 +1,7 @@
 using RevitCortex.Plugin.Updates;
 using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -173,13 +174,13 @@ public partial class UpdateNotificationWindow : Window
                 t.Tick += (_, _) =>
                 {
                     t.Stop();
-                    try { Application.Current?.Shutdown(); } catch { }
+                    CloseRevit();
                 };
                 t.Start();
                 break;
 
             case NotifState.Installing:
-                try { Application.Current?.Shutdown(); } catch { }
+                CloseRevit();
                 break;
         }
     }
@@ -200,6 +201,36 @@ public partial class UpdateNotificationWindow : Window
                 Close();
                 break;
         }
+    }
+
+    // ── Closing Revit ────────────────────────────────────────────────────────
+
+    private const uint WM_CLOSE = 0x0010;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    /// <summary>
+    /// Closes the Revit process gracefully. Revit is a native Win32 application, so
+    /// Application.Current.Shutdown() does not terminate it (Application.Current is
+    /// typically null in the add-in). We post WM_CLOSE to the Revit main window, which
+    /// triggers Revit's normal shutdown — including unsaved-changes prompts. The elevated
+    /// installer waits for Revit to exit, so this lets the update finish unattended.
+    /// </summary>
+    private static void CloseRevit()
+    {
+        try
+        {
+            var handle = Process.GetCurrentProcess().MainWindowHandle;
+            if (handle != IntPtr.Zero)
+            {
+                PostMessage(handle, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                return;
+            }
+        }
+        catch { /* fall back to WPF shutdown below */ }
+
+        try { Application.Current?.Shutdown(); } catch { }
     }
 
     // ── Download polling ─────────────────────────────────────────────────────
