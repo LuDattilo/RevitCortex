@@ -35,6 +35,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///   action          (string, optional): "select" (default) or "isolate".
 ///   maxElements     (int, optional): Safety cap, default 5000.
 /// </summary>
+[ToolSafety(false, false)]
 public class PbiQueryTool : ICortexTool
 {
     public string Name => "pbi_query";

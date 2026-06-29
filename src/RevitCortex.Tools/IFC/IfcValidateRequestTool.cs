@@ -11,6 +11,7 @@ namespace RevitCortex.Tools.IFC;
 /// Validates an IFC file path: checks existence, extension, file size,
 /// and reads the IFC header line to detect schema version.
 /// </summary>
+[ToolSafety(true, false)]
 public class IfcValidateRequestTool : ICortexTool
 {
     public string Name => "ifc_validate_request";

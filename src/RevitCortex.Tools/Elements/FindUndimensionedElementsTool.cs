@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// QA/audit tool — finds elements in specified categories that have no dimension reference in the target view.
 /// Mirrors the fork's FindUndimensionedElementsEventHandler logic.
 /// </summary>
+[ToolSafety(true, false)]
 public class FindUndimensionedElementsTool : ICortexTool
 {
     public string Name => "find_undimensioned_elements";

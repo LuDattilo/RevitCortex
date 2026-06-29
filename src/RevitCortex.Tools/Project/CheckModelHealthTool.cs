@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// Comprehensive BIM model health audit returning score (0-100), grade (A-F),
 /// and detailed breakdown with actionable recommendations.
 /// </summary>
+[ToolSafety(true, false)]
 public class CheckModelHealthTool : ICortexTool
 {
     public string Name => "check_model_health";

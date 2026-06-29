@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Workflows;
 /// <summary>
 /// Auto-generates room documentation: callout views and optional sections from rooms.
 /// </summary>
+[ToolSafety(false, false)]
 public class WorkflowRoomDocumentationTool : ICortexTool
 {
     public string Name => "workflow_room_documentation";

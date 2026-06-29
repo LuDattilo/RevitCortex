@@ -10,6 +10,7 @@ namespace RevitCortex.Tools.Meta;
 /// tool is suspected of returning stale data, or to reset hit-rate
 /// telemetry between experiments.
 /// </summary>
+[ToolSafety(true, false)]
 public class ClearCacheTool : ICortexTool
 {
     public string Name => "clear_cache";

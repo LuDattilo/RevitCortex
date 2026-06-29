@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.IFC;
 /// Compares an original IFC DirectShape with its rebuilt native Revit element.
 /// Reports volume difference, bounding box overlap, and geometric similarity.
 /// </summary>
+[ToolSafety(true, false)]
 public class IfcCompareOriginalVsRebuiltTool : ICortexTool
 {
     public string Name => "ifc_compare_original_vs_rebuilt";

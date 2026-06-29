@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Elements;
 /// Supports center_to_center, closest_points, and bounding_box measure types.
 /// Mirrors the fork's MeasureBetweenElementsEventHandler logic.
 /// </summary>
+[ToolSafety(true, false)]
 public class MeasureBetweenElementsTool : ICortexTool
 {
     public string Name => "measure_between_elements";

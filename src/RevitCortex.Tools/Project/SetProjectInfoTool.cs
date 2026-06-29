@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Project;
 /// Writes editable Project Information fields (name, number, address, author,
 /// organization, status, client, etc.). Write counterpart of <c>get_project_info</c>.
 /// </summary>
+[ToolSafety(false, false)]
 public class SetProjectInfoTool : ICortexTool
 {
     public string Name => "set_project_info";

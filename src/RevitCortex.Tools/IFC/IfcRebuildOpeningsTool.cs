@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.IFC;
 /// Uses Document.Create.NewOpening for rectangular wall openings and
 /// curve-based floor/roof openings.
 /// </summary>
+[ToolSafety(false, false)]
 public class IfcRebuildOpeningsTool : ICortexTool
 {
     public string Name => "ifc_rebuild_openings";

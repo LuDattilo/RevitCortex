@@ -53,6 +53,7 @@ namespace RevitCortex.Tools.StructuralSteel;
 // =====================================================================================
 
 /// <summary>Reports which version-gated + provider-dependent steel features the running Revit supports.</summary>
+[ToolSafety(true, false)]
 public class GetStructuralSteelApiCapabilitiesTool : ICortexTool
 {
     public string Name => "get_structural_steel_api_capabilities";
@@ -110,6 +111,7 @@ public class GetStructuralSteelApiCapabilitiesTool : ICortexTool
 }
 
 /// <summary>Lists structural connection handlers (id, type id/name, connected element count). Capped.</summary>
+[ToolSafety(true, false)]
 public class ListSteelConnectionHandlersTool : ICortexTool
 {
     public string Name => "list_steel_connection_handlers";
@@ -163,6 +165,7 @@ public class ListSteelConnectionHandlersTool : ICortexTool
 }
 
 /// <summary>Lists structural connection types (id, name, family symbol id, applyTo). Capped.</summary>
+[ToolSafety(true, false)]
 public class ListSteelConnectionTypesTool : ICortexTool
 {
     public string Name => "list_steel_connection_types";
@@ -221,6 +224,7 @@ public class ListSteelConnectionTypesTool : ICortexTool
 }
 
 /// <summary>Lists structural connection handler types (id, name, connection GUID, kind flags). Capped.</summary>
+[ToolSafety(true, false)]
 public class ListSteelConnectionHandlerTypesTool : ICortexTool
 {
     public string Name => "list_steel_connection_handler_types";
@@ -276,6 +280,7 @@ public class ListSteelConnectionHandlerTypesTool : ICortexTool
 }
 
 /// <summary>Lists structural connection approval types (id, name). Capped.</summary>
+[ToolSafety(true, false)]
 public class ListSteelApprovalTypesTool : ICortexTool
 {
     public string Name => "list_steel_approval_types";
@@ -321,6 +326,7 @@ public class ListSteelApprovalTypesTool : ICortexTool
 }
 
 /// <summary>Lists installed structural connection providers (best-effort; the public registry is not queryable).</summary>
+[ToolSafety(true, false)]
 public class ListSteelConnectionProvidersTool : ICortexTool
 {
     public string Name => "list_steel_connection_providers";
@@ -345,6 +351,7 @@ public class ListSteelConnectionProvidersTool : ICortexTool
 }
 
 /// <summary>Reads one structural connection handler's readable state (type, connected ids, origin, status flags).</summary>
+[ToolSafety(true, false)]
 public class GetSteelConnectionDataTool : ICortexTool
 {
     public string Name => "get_steel_connection_data";
@@ -413,6 +420,7 @@ public class GetSteelConnectionDataTool : ICortexTool
 }
 
 /// <summary>Reads one connection type's readable data (kind, family symbol, applyTo / handler-type flags).</summary>
+[ToolSafety(true, false)]
 public class GetSteelConnectionTypeDataTool : ICortexTool
 {
     public string Name => "get_steel_connection_type_data";
@@ -469,6 +477,7 @@ public class GetSteelConnectionTypeDataTool : ICortexTool
 }
 
 /// <summary>Reads the document-wide structural connection settings.</summary>
+[ToolSafety(true, false)]
 public class GetSteelConnectionSettingsTool : ICortexTool
 {
     public string Name => "get_steel_connection_settings";
@@ -505,6 +514,7 @@ public class GetSteelConnectionSettingsTool : ICortexTool
 }
 
 /// <summary>Reads SteelElementProperties summary for an element (presence + fabrication unique id).</summary>
+[ToolSafety(true, false)]
 public class GetSteelElementPropertiesTool : ICortexTool
 {
     public string Name => "get_steel_element_properties";
@@ -554,6 +564,7 @@ public class GetSteelElementPropertiesTool : ICortexTool
 }
 
 /// <summary>Reports the steel fabrication external-id mapping for an element (not exposed by the SDK).</summary>
+[ToolSafety(true, false)]
 public class GetSteelExternalIdMapTool : ICortexTool
 {
     public string Name => "get_steel_external_id_map";
@@ -593,6 +604,7 @@ public class GetSteelExternalIdMapTool : ICortexTool
 }
 
 /// <summary>Reports the steel material links for an element (not exposed by the SDK).</summary>
+[ToolSafety(true, false)]
 public class GetSteelMaterialLinksTool : ICortexTool
 {
     public string Name => "get_steel_material_links";
@@ -629,6 +641,7 @@ public class GetSteelMaterialLinksTool : ICortexTool
 }
 
 /// <summary>Reports steel fabrication warnings (not exposed by the SDK; falls back to a note).</summary>
+[ToolSafety(true, false)]
 public class GetSteelElementWarningsTool : ICortexTool
 {
     public string Name => "get_steel_element_warnings";
@@ -673,6 +686,7 @@ public class GetSteelElementWarningsTool : ICortexTool
 }
 
 /// <summary>Reads solid-solid and instance-void cut relationships for an element.</summary>
+[ToolSafety(true, false)]
 public class GetSteelCutDataTool : ICortexTool
 {
     public string Name => "get_steel_cut_data";
@@ -735,6 +749,7 @@ public class GetSteelCutDataTool : ICortexTool
 }
 
 /// <summary>Document-wide structural steel summary: counts of handlers, types, steel-property elements, cuts.</summary>
+[ToolSafety(true, false)]
 public class AnalyzeStructuralSteelModelTool : ICortexTool
 {
     public string Name => "analyze_structural_steel_model";

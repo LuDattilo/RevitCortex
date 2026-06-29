@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// Creates one or more surface-based elements: floors, ceilings, or roofs.
 /// Mirrors the fork's CreateSurfaceElementEventHandler logic.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateSurfaceBasedElementTool : ICortexTool
 {
     public string Name => "create_surface_based_element";

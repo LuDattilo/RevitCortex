@@ -17,6 +17,7 @@ namespace RevitCortex.Tools.Elements;
 /// Supports Rooms, Doors, Windows, Parking, or a custom parameterName.
 /// Mirrors the fork's RenumberElementsEventHandler logic.
 /// </summary>
+[ToolSafety(false, true)]
 public class RenumberElementsTool : ICortexTool
 {
     public string Name => "renumber_elements";

@@ -42,6 +42,7 @@ namespace RevitCortex.Tools.StructuralSteel;
 /// to enumerate registered providers, so this returns availability=false with an explanatory
 /// note rather than throwing. Read-only.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetStructuralConnectionProviderRegistryTool : ICortexTool
 {
     public string Name => "get_structural_connection_provider_registry";
@@ -72,6 +73,7 @@ public class GetStructuralConnectionProviderRegistryTool : ICortexTool
 /// (StructuralConnectionsProviderData) is opaque and provider-filled via callback, with no
 /// public reader, so this reports unavailability rather than throwing. Read-only.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetStructuralConnectionProviderDataTool : ICortexTool
 {
     public string Name => "get_structural_connection_provider_data";
@@ -99,6 +101,7 @@ public class GetStructuralConnectionProviderDataTool : ICortexTool
 /// populated ConnectionValidationInfo for an existing handler, so this returns the handler's own
 /// CodeCheckingStatus (the only readable validation state) plus an explanatory note. Read-only.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetStructuralConnectionValidationInfoTool : ICortexTool
 {
     public string Name => "get_structural_connection_validation_info";

@@ -16,6 +16,7 @@ namespace RevitCortex.Tools.Elements;
 /// area bounding box, or a custom axis-aligned bounding box defined in mm.
 /// Mirrors the fork's GetElementsInSpatialVolumeEventHandler logic.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetElementsInSpatialVolumeTool : ICortexTool
 {
     public string Name => "get_elements_in_spatial_volume";

@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// Lists all project parameters (shared and project-specific) with their
 /// bindings, parameter types, and applicable categories.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetSharedParametersTool : ICortexTool
 {
     public string Name => "get_shared_parameters";

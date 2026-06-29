@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.IFC;
 /// Subsequent ifc_export_basic and ifc_export_with_configuration calls
 /// will use this mapping file automatically.
 /// </summary>
+[ToolSafety(true, false)]
 public class IfcSetFamilyMappingFileTool : ICortexTool
 {
     public string Name => "ifc_set_family_mapping_file";

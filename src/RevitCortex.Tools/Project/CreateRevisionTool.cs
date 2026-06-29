@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Lists, creates, or assigns revisions to sheets.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateRevisionTool : ICortexTool
 {
     public string Name => "create_revision";

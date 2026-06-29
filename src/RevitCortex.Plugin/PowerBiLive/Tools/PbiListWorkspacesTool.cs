@@ -11,6 +11,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 /// Lists Power BI workspaces (groups) the signed-in user can access.
 /// Read-only (works in RevitCortex read-only mode).
 /// </summary>
+[ToolSafety(true, false)]
 public class PbiListWorkspacesTool : ICortexTool
 {
     public string Name => "pbi_list_workspaces";

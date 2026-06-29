@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Creates a room at the specified location point inside enclosed walls.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateRoomTool : ICortexTool
 {
     public string Name => "create_room";

@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Gets or sets project units (length, area, volume, angle, slope, etc.).
 /// </summary>
+[ToolSafety(false, false)]
 public class ManageProjectUnitsTool : ICortexTool
 {
     public string Name => "manage_project_units";

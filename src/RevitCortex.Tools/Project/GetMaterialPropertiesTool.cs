@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// Retrieves detailed properties for a specific material including
 /// structural and thermal asset data.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetMaterialPropertiesTool : ICortexTool
 {
     public string Name => "get_material_properties";

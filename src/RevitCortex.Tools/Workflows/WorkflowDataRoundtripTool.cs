@@ -17,6 +17,7 @@ namespace RevitCortex.Tools.Workflows;
 /// Step 1 (export): Creates an Excel file with element data.
 /// Step 2 (import): User edits externally, then uses import_from_excel to re-import.
 /// </summary>
+[ToolSafety(true, false)]
 public class WorkflowDataRoundtripTool : ICortexTool
 {
     public string Name => "workflow_data_roundtrip";

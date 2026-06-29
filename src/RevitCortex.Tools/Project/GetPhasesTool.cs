@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Lists all project phases with sequence order and optionally phase filters.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetPhasesTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_phases";

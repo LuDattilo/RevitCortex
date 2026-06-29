@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.IFC;
 /// Reconstructs walls from IFC-imported DirectShape elements using Wall.Create.
 /// Extracts wall profile (base line + height + thickness) and finds matching WallType.
 /// </summary>
+[ToolSafety(false, false)]
 public class IfcRebuildWallsTool : ICortexTool
 {
     public string Name => "ifc_rebuild_walls";

@@ -43,6 +43,7 @@ namespace RevitCortex.Tools.Rebar;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// <summary>Sets document-level reinforcement settings. Only provided fields are changed.</summary>
+[ToolSafety(false, false)]
 public class SetReinforcementSettingsTool : ICortexTool
 {
     public string Name => "set_reinforcement_settings";
@@ -177,6 +178,7 @@ internal static class RoundingManagerHelper
 }
 
 /// <summary>Reads the rebar length-rounding configuration (document default or element override).</summary>
+[ToolSafety(true, false)]
 public class GetRebarRoundingTool : ICortexTool
 {
     public string Name => "get_rebar_rounding";
@@ -210,6 +212,7 @@ public class GetRebarRoundingTool : ICortexTool
 }
 
 /// <summary>Reads the document fabric length-rounding configuration.</summary>
+[ToolSafety(true, false)]
 public class GetFabricRoundingTool : ICortexTool
 {
     public string Name => "get_fabric_rounding";
@@ -235,6 +238,7 @@ public class GetFabricRoundingTool : ICortexTool
 }
 
 /// <summary>Sets rebar length-rounding rules (document default or element override).</summary>
+[ToolSafety(false, false)]
 public class ManageRebarRoundingTool : ICortexTool
 {
     public string Name => "manage_rebar_rounding";
@@ -301,6 +305,7 @@ public class ManageRebarRoundingTool : ICortexTool
 }
 
 /// <summary>Sets the document fabric length-rounding rules.</summary>
+[ToolSafety(false, false)]
 public class ManageFabricRoundingTool : ICortexTool
 {
     public string Name => "manage_fabric_rounding";
@@ -343,6 +348,7 @@ public class ManageFabricRoundingTool : ICortexTool
 }
 
 /// <summary>Reads rebar numbering / schedule marks (single bar or category-wide).</summary>
+[ToolSafety(true, false)]
 public class GetRebarNumberingTool : ICortexTool
 {
     public string Name => "get_rebar_numbering";
@@ -431,6 +437,7 @@ public class GetRebarNumberingTool : ICortexTool
 }
 
 /// <summary>Manages rebar numbering: set a schedule mark, or report that renumber/remove-gaps have no API.</summary>
+[ToolSafety(false, false)]
 public class ManageRebarNumberingTool : ICortexTool
 {
     public string Name => "manage_rebar_numbering";
@@ -515,6 +522,7 @@ public class ManageRebarNumberingTool : ICortexTool
 }
 
 /// <summary>Creates a rebar bending detail in a view (Revit 2024+).</summary>
+[ToolSafety(false, false)]
 public class CreateRebarBendingDetailTool : ICortexTool
 {
     public string Name => "create_rebar_bending_detail";
@@ -604,6 +612,7 @@ public class CreateRebarBendingDetailTool : ICortexTool
 }
 
 /// <summary>Modifies a rebar bending detail's position/rotation (Revit 2024+).</summary>
+[ToolSafety(false, false)]
 public class ModifyRebarBendingDetailTool : ICortexTool
 {
     public string Name => "modify_rebar_bending_detail";
@@ -663,6 +672,7 @@ public class ModifyRebarBendingDetailTool : ICortexTool
 }
 
 /// <summary>Reads a rebar bending detail's host/view/position data (Revit 2024+).</summary>
+[ToolSafety(true, false)]
 public class GetRebarBendingDetailDataTool : ICortexTool
 {
     public string Name => "get_rebar_bending_detail_data";

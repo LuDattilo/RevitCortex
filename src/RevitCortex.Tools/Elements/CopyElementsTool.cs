@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Elements;
 /// Offsets are in mm and converted to internal units (feet).
 /// Mirrors the fork's CopyElementsEventHandler logic.
 /// </summary>
+[ToolSafety(false, false)]
 public class CopyElementsTool : ICortexTool
 {
     public string Name => "copy_elements";

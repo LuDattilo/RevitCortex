@@ -34,6 +34,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///   Pro: 8 refreshes/day per dataset. Premium / PPU: 48/day. Hitting the
 ///   quota returns HTTP 400 with code RefreshOverLimit.
 /// </summary>
+[ToolSafety(false, false)]
 public class PbiTriggerRefreshTool : ICortexTool
 {
     public string Name => "pbi_trigger_refresh";

@@ -10,6 +10,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// <summary>
 /// Moves a linked file instance by a delta offset or to an absolute position (in mm).
 /// </summary>
+[ToolSafety(false, false)]
 public class MoveLinkInstanceTool : ICortexTool
 {
     public string Name => "move_link_instance";

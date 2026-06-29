@@ -11,6 +11,7 @@ namespace RevitCortex.Tools.IFC;
 /// <summary>
 /// Lists available IFC export configurations (built-in presets).
 /// </summary>
+[ToolSafety(true, false)]
 public class IfcListExportConfigurationsTool : ICortexTool
 {
     public string Name => "ifc_list_export_configurations";

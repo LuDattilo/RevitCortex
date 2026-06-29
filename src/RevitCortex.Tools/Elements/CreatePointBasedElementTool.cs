@@ -16,6 +16,7 @@ namespace RevitCortex.Tools.Elements;
 /// Mirrors the fork's CreatePointElementEventHandler logic, including wall-hosted placement,
 /// door/window facing auto-detection, and rotation support.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreatePointBasedElementTool : ICortexTool
 {
     public string Name => "create_point_based_element";

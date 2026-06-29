@@ -16,6 +16,7 @@ namespace RevitCortex.Tools.Elements;
 /// (equals, contains, greater_than, etc.). Supports scope filtering
 /// (whole model, active view, selection) and instance/type parameter lookup.
 /// </summary>
+[ToolSafety(true, false)]
 public class FilterByParameterValueTool : ICortexTool
 {
     public string Name => "filter_by_parameter_value";

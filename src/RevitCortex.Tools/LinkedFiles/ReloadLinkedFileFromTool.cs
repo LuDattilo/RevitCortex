@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// <summary>
 /// Reloads a linked Revit file from a different file path.
 /// </summary>
+[ToolSafety(false, true)]
 public class ReloadLinkedFileFromTool : ICortexTool
 {
     public string Name => "reload_linked_file_from";

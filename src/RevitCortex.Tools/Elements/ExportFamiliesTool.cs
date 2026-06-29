@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Exports loaded families as .rfa files to a specified folder.
 /// </summary>
+[ToolSafety(true, false)]
 public class ExportFamiliesTool : ICortexTool
 {
     public string Name => "export_families";

@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Duplicates a Revit schedule by ID or name with a new name.
 /// </summary>
+[ToolSafety(false, false)]
 public class DuplicateScheduleTool : ICortexTool
 {
     public string Name => "duplicate_schedule";

@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Annotations;
 /// <summary>
 /// Imports a CSV/TSV file as a formatted table of text notes in a drafting or legend view.
 /// </summary>
+[ToolSafety(false, false)]
 public class ImportTableTool : ICortexTool
 {
     public string Name => "import_table";

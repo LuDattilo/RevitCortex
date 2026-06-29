@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Elements;
 /// Imports data from Excel (.xlsx) into Revit element parameters.
 /// Requires an ElementId column to match elements.
 /// </summary>
+[ToolSafety(false, true)]
 public class ImportFromExcelTool : ICortexTool
 {
     public string Name => "import_from_excel";

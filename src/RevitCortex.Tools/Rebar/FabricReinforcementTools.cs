@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Rebar;
 /// Creates a fabric area system on a host (auto-distributes fabric sheets). Boundary mode (no curves)
 /// or explicit boundary (curves[] mm forming a closed loop). Major direction fixed at creation.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateFabricAreaTool : ICortexTool
 {
     public string Name => "create_fabric_area";
@@ -114,6 +115,7 @@ public class CreateFabricAreaTool : ICortexTool
 /// Creates a single fabric sheet in a host. Flat by default; a bendProfile[] (mm curves forming a
 /// closed loop) produces a bent sheet.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateFabricSheetTool : ICortexTool
 {
     public string Name => "create_fabric_sheet";
@@ -186,6 +188,7 @@ public class CreateFabricSheetTool : ICortexTool
 }
 
 /// <summary>Positions an existing fabric sheet inside a host with an optional translation (mm).</summary>
+[ToolSafety(false, false)]
 public class PlaceFabricSheetTool : ICortexTool
 {
     public string Name => "place_fabric_sheet";
@@ -238,6 +241,7 @@ public class PlaceFabricSheetTool : ICortexTool
 }
 
 /// <summary>Sets the bend profile (closed curve loop in mm) of an existing bent fabric sheet.</summary>
+[ToolSafety(false, false)]
 public class SetFabricSheetBendProfileTool : ICortexTool
 {
     public string Name => "set_fabric_sheet_bend_profile";
@@ -299,6 +303,7 @@ public class SetFabricSheetBendProfileTool : ICortexTool
 }
 
 /// <summary>Removes a fabric area reinforcement system (DESTRUCTIVE).</summary>
+[ToolSafety(false, true)]
 public class RemoveFabricReinforcementSystemTool : ICortexTool
 {
     public string Name => "remove_fabric_reinforcement_system";
@@ -345,6 +350,7 @@ public class RemoveFabricReinforcementSystemTool : ICortexTool
 }
 
 /// <summary>Reads core data of a fabric area system (read-only).</summary>
+[ToolSafety(true, false)]
 public class GetFabricAreaDataTool : ICortexTool
 {
     public string Name => "get_fabric_area_data";
@@ -391,6 +397,7 @@ public class GetFabricAreaDataTool : ICortexTool
 }
 
 /// <summary>Reads core data of a fabric sheet (read-only).</summary>
+[ToolSafety(true, false)]
 public class GetFabricSheetDataTool : ICortexTool
 {
     public string Name => "get_fabric_sheet_data";
@@ -432,6 +439,7 @@ public class GetFabricSheetDataTool : ICortexTool
 }
 
 /// <summary>Reads the wire layout (diameter + distance, mm) of a fabric sheet in one direction (read-only).</summary>
+[ToolSafety(true, false)]
 public class GetFabricWireDataTool : ICortexTool
 {
     public string Name => "get_fabric_wire_data";

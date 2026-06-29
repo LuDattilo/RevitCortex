@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Annotations;
 /// <summary>
 /// Tags all or specified rooms in the current view.
 /// </summary>
+[ToolSafety(false, false)]
 public class TagRoomsTool : ICortexTool
 {
     public string Name => "tag_rooms";

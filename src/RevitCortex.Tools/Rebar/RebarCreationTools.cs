@@ -16,6 +16,7 @@ namespace RevitCortex.Tools.Rebar;
 /// Input (mm): hostId, shapeId|shapeName, barTypeId|barTypeName, origin{x,y,z}, xVec{x,y,z}, yVec{x,y,z},
 /// optional layout{...}. Returns created rebar id + applied layout.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateRebarFromShapeTool : ICortexTool
 {
     public string Name => "create_rebar_from_shape";
@@ -108,6 +109,7 @@ public class CreateRebarFromShapeTool : ICortexTool
 /// plane normal. Hooks optional via startHookId/endHookId. Version-aware: uses BarTerminationsData
 /// on Revit 2026+, the legacy hook overload on 2023-2025.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateRebarFromCurvesTool : ICortexTool
 {
     public string Name => "create_rebar_from_curves";
@@ -219,6 +221,7 @@ public class CreateRebarFromCurvesTool : ICortexTool
 /// Creates an unconstrained free-form rebar from one or more curve loops (mm) in a host.
 /// Does NOT accept arbitrary server code — only the unconstrained curve-loop path.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateFreeFormRebarTool : ICortexTool
 {
     public string Name => "create_free_form_rebar";
@@ -303,6 +306,7 @@ public class CreateFreeFormRebarTool : ICortexTool
 }
 
 /// <summary>Re-applies a layout rule to an existing shape-driven rebar.</summary>
+[ToolSafety(false, false)]
 public class SetRebarLayoutTool : ICortexTool
 {
     public string Name => "set_rebar_layout";
@@ -349,6 +353,7 @@ public class SetRebarLayoutTool : ICortexTool
 }
 
 /// <summary>Changes the RebarShape of a shape-driven rebar.</summary>
+[ToolSafety(false, false)]
 public class SetRebarShapeTool : ICortexTool
 {
     public string Name => "set_rebar_shape";
@@ -388,6 +393,7 @@ public class SetRebarShapeTool : ICortexTool
 }
 
 /// <summary>Reassigns a rebar to a new valid host.</summary>
+[ToolSafety(false, false)]
 public class SetRebarHostTool : ICortexTool
 {
     public string Name => "set_rebar_host";
@@ -426,6 +432,7 @@ public class SetRebarHostTool : ICortexTool
 }
 
 /// <summary>Sets unobscured/solid presentation of a rebar in a view (post-2024 API).</summary>
+[ToolSafety(false, false)]
 public class SetRebarVisibilityTool : ICortexTool
 {
     public string Name => "set_rebar_visibility";
@@ -467,6 +474,7 @@ public class SetRebarVisibilityTool : ICortexTool
 }
 
 /// <summary>Sets the hook type at one or both ends of a rebar (works on all Revit versions).</summary>
+[ToolSafety(false, false)]
 public class SetRebarHooksTool : ICortexTool
 {
     public string Name => "set_rebar_hooks";
@@ -516,6 +524,7 @@ public class SetRebarHooksTool : ICortexTool
 }
 
 /// <summary>Sets full termination data on a rebar end (Revit 2026+ only).</summary>
+[ToolSafety(false, false)]
 public class SetRebarTerminationsTool : ICortexTool
 {
     public string Name => "set_rebar_terminations";
@@ -563,6 +572,7 @@ public class SetRebarTerminationsTool : ICortexTool
 }
 
 /// <summary>Moves a single bar within a shape-driven set.</summary>
+[ToolSafety(false, false)]
 public class MoveRebarInSetTool : ICortexTool
 {
     public string Name => "move_rebar_in_set";
@@ -610,6 +620,7 @@ public class MoveRebarInSetTool : ICortexTool
 }
 
 /// <summary>Shows/hides a single bar of a set in a view.</summary>
+[ToolSafety(false, false)]
 public class IncludeExcludeRebarBarsTool : ICortexTool
 {
     public string Name => "include_exclude_rebar_bars";
@@ -655,6 +666,7 @@ public class IncludeExcludeRebarBarsTool : ICortexTool
 /// duplicate set for the remaining positions, so each piece can be edited independently.
 /// Implemented via ElementTransformUtils copy + layout adjustment (the API has no single Split call).
 /// </summary>
+[ToolSafety(false, true)]
 public class SplitRebarTool : ICortexTool
 {
     public string Name => "split_rebar";
@@ -746,6 +758,7 @@ public class SplitRebarTool : ICortexTool
 /// Toggles whether a shape-driven rebar set produces varying-length bars from its constraints
 /// (the "Varying Rebar Set" command). Revit 2025+ only; returns a version error on older targets.
 /// </summary>
+[ToolSafety(false, false)]
 public class SetRebarVaryingTool : ICortexTool
 {
     public string Name => "set_rebar_varying";
@@ -812,6 +825,7 @@ public class SetRebarVaryingTool : ICortexTool
 /// length (mm) of each bar position so a varying set's per-bar differences are visible. Revit 2025+,
 /// read-only; returns a version error on older targets.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetRebarVaryingDataTool : ICortexTool
 {
     public string Name => "get_rebar_varying_data";

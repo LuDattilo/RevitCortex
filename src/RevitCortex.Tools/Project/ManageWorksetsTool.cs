@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// Creates, renames, deletes, opens, closes, or sets the active workset.
 /// Write counterpart of <c>get_worksets</c>; only available for workshared documents.
 /// </summary>
+[ToolSafety(false, true)]
 public class ManageWorksetsTool : ICortexTool
 {
     public string Name => "manage_worksets";

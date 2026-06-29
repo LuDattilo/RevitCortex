@@ -11,6 +11,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Duplicates an existing material with a new name, copying all properties and assets.
 /// </summary>
+[ToolSafety(false, false)]
 public class DuplicateMaterialTool : ICortexTool
 {
     public string Name => "duplicate_material";

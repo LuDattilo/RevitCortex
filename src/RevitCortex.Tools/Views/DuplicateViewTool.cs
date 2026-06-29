@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Duplicates one or more views with optional naming prefix/suffix.
 /// </summary>
+[ToolSafety(false, false)]
 public class DuplicateViewTool : ICortexTool
 {
     public string Name => "duplicate_view";

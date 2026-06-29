@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Project;
 /// Returns comprehensive project metadata: name, address, author, phases,
 /// worksets, Revit links, and levels.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetProjectInfoTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_project_info";

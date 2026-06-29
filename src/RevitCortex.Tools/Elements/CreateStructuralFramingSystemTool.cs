@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Creates a beam system (structural framing system) from boundary on a level.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateStructuralFramingSystemTool : ICortexTool
 {
     public string Name => "create_structural_framing_system";

@@ -10,6 +10,7 @@ using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
+[ToolSafety(false, true)]
 public class SetElementParametersTool : ICortexTool
 {
     public string Name => "set_element_parameters";

@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// Highlights an element inside a linked model by selecting the link instance,
 /// creating a section box around the element, and zooming to it.
 /// </summary>
+[ToolSafety(false, false)]
 public class HighlightLinkedElementTool : ICortexTool
 {
     public string Name => "highlight_linked_element";

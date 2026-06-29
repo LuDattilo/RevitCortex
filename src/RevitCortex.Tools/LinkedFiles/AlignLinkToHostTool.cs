@@ -10,6 +10,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// <summary>
 /// Aligns a link instance to the host project's internal origin or shared coordinates.
 /// </summary>
+[ToolSafety(false, false)]
 public class AlignLinkToHostTool : ICortexTool
 {
     public string Name => "align_link_to_host";

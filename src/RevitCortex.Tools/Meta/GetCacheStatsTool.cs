@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Meta;
 /// itself cached (every call should reflect current state). Useful for
 /// inspecting which cached tools are paying for themselves.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetCacheStatsTool : ICortexTool
 {
     public string Name => "get_cache_stats";

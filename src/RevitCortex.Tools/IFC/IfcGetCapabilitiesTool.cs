@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.IFC;
 /// Reports IFC capabilities: supported versions, available actions, and
 /// whether the open-source revit-ifc add-in is installed.
 /// </summary>
+[ToolSafety(true, false)]
 public class IfcGetCapabilitiesTool : ICortexTool
 {
     public string Name => "ifc_get_capabilities";

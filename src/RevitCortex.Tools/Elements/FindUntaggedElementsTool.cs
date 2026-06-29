@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// QA/audit tool — finds elements in specified categories that have no tag in the target view.
 /// Mirrors the fork's FindUntaggedElementsEventHandler logic.
 /// </summary>
+[ToolSafety(true, false)]
 public class FindUntaggedElementsTool : ICortexTool
 {
     public string Name => "find_untagged_elements";

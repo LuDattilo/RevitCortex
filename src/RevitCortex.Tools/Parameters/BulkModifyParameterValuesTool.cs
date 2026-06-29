@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Parameters;
 /// <summary>
 /// Bulk set, prefix, suffix, find/replace, or clear parameter values on elements.
 /// </summary>
+[ToolSafety(false, true)]
 public class BulkModifyParameterValuesTool : ICortexTool
 {
     public string Name => "bulk_modify_parameter_values";

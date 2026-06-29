@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Elements;
 /// hide, temphide, isolate, unhide, resetisolate, delete.
 /// Input uses a "data" wrapper to match the fork's OperateElementEventHandler schema.
 /// </summary>
+[ToolSafety(false, true)]
 public class OperateElementTool : ICortexTool
 {
     public string Name => "operate_element";

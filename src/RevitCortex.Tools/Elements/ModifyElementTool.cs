@@ -9,6 +9,7 @@ using RevitCortex.Core.Tools;
 
 namespace RevitCortex.Tools.Elements;
 
+[ToolSafety(false, false)]
 public class ModifyElementTool : ICortexTool
 {
     public string Name => "modify_element";

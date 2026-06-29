@@ -5,6 +5,7 @@ using RevitCortex.Core.Tools;
 
 namespace RevitCortex.Tools.Meta;
 
+[ToolSafety(true, false)]
 public class SayHelloTool : ICortexTool
 {
     public string Name => "say_hello";

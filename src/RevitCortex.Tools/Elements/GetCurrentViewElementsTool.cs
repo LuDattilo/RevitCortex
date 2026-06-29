@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// Returns elements visible in the current active view, with optional category
 /// and field filtering. Mirrors the fork's GetCurrentViewElementsEventHandler logic.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetCurrentViewElementsTool : ICortexTool
 {
     public string Name => "get_current_view_elements";

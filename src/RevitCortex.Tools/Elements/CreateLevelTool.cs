@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Creates a new level at the specified elevation, optionally with floor/ceiling plan views.
 /// </summary>
+[ToolSafety(false, true)]
 public class CreateLevelTool : ICortexTool
 {
     public string Name => "create_level";

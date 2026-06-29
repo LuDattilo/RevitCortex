@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Creates a linear or radial array of elements by copying.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateArrayTool : ICortexTool
 {
     public string Name => "create_array";

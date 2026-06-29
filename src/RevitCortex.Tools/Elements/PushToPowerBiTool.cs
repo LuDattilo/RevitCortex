@@ -17,6 +17,7 @@ namespace RevitCortex.Tools.Elements;
 /// Exports Revit element data (parameters) to a CSV file on a local/OneDrive folder
 /// so that Power BI can pick it up via scheduled refresh from SharePoint/OneDrive.
 /// </summary>
+[ToolSafety(true, false)]
 public class PushToPowerBiTool : ICortexTool
 {
     public string Name => "push_to_powerbi";

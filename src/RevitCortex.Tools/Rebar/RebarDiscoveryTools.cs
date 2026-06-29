@@ -12,6 +12,7 @@ using RevitCortex.Tools.Utilities;
 namespace RevitCortex.Tools.Rebar;
 
 /// <summary>Lists all RebarBarType elements (id, name, model/nominal diameter in mm).</summary>
+[ToolSafety(true, false)]
 public class ListRebarBarTypesTool : ICortexTool
 {
     public string Name => "list_rebar_bar_types";
@@ -44,6 +45,7 @@ public class ListRebarBarTypesTool : ICortexTool
 }
 
 /// <summary>Lists all RebarHookType elements (id, name, hook angle in degrees).</summary>
+[ToolSafety(true, false)]
 public class ListRebarHookTypesTool : ICortexTool
 {
     public string Name => "list_rebar_hook_types";
@@ -76,6 +78,7 @@ public class ListRebarHookTypesTool : ICortexTool
 }
 
 /// <summary>Lists all RebarShape elements (id, name).</summary>
+[ToolSafety(true, false)]
 public class ListRebarShapesTool : ICortexTool
 {
     public string Name => "list_rebar_shapes";
@@ -106,6 +109,7 @@ public class ListRebarShapesTool : ICortexTool
 }
 
 /// <summary>Lists all RebarCoverType elements (id, name, clear cover in mm).</summary>
+[ToolSafety(true, false)]
 public class ListRebarCoverTypesTool : ICortexTool
 {
     public string Name => "list_rebar_cover_types";
@@ -137,6 +141,7 @@ public class ListRebarCoverTypesTool : ICortexTool
 }
 
 /// <summary>Lists fabric reinforcement types (FabricSheetType + FabricAreaType).</summary>
+[ToolSafety(true, false)]
 public class ListRebarFabricTypesTool : ICortexTool
 {
     public string Name => "list_rebar_fabric_types";
@@ -171,6 +176,7 @@ public class ListRebarFabricTypesTool : ICortexTool
 }
 
 /// <summary>Reports reinforcement hosted in an element: validity, rebar/area/path/fabric counts, common cover.</summary>
+[ToolSafety(true, false)]
 public class GetRebarHostDataTool : ICortexTool
 {
     public string Name => "get_rebar_host_data";
@@ -243,6 +249,7 @@ public class GetRebarHostDataTool : ICortexTool
 }
 
 /// <summary>Reads a single rebar's core data: type, host, layout rule, quantity, total length, volume.</summary>
+[ToolSafety(true, false)]
 public class GetRebarElementDataTool : ICortexTool
 {
     public string Name => "get_rebar_element_data";
@@ -294,6 +301,7 @@ public class GetRebarElementDataTool : ICortexTool
 }
 
 /// <summary>Returns centerline curves (mm) for one bar position of a rebar. Opt-in detail.</summary>
+[ToolSafety(true, false)]
 public class GetRebarGeometryTool : ICortexTool
 {
     public string Name => "get_rebar_geometry";
@@ -340,6 +348,7 @@ public class GetRebarGeometryTool : ICortexTool
 }
 
 /// <summary>Lists the constrained handles on a rebar (read-only summary).</summary>
+[ToolSafety(true, false)]
 public class GetRebarConstraintsTool : ICortexTool
 {
     public string Name => "get_rebar_constraints";
@@ -381,6 +390,7 @@ public class GetRebarConstraintsTool : ICortexTool
 }
 
 /// <summary>Reads document-level reinforcement settings.</summary>
+[ToolSafety(true, false)]
 public class GetReinforcementSettingsTool : ICortexTool
 {
     public string Name => "get_reinforcement_settings";
@@ -413,6 +423,7 @@ public class GetReinforcementSettingsTool : ICortexTool
 }
 
 /// <summary>Lists rebar splice types (Revit 2025+ only).</summary>
+[ToolSafety(true, false)]
 public class ListRebarSpliceTypesTool : ICortexTool
 {
     public string Name => "list_rebar_splice_types";
@@ -459,6 +470,7 @@ public class ListRebarSpliceTypesTool : ICortexTool
 }
 
 /// <summary>Reports which version-gated reinforcement APIs the running Revit supports.</summary>
+[ToolSafety(true, false)]
 public class GetRebarApiCapabilitiesTool : ICortexTool
 {
     public string Name => "get_rebar_api_capabilities";

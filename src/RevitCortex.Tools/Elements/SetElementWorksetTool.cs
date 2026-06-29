@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// IsDynamic = true — only available when the document is workshared.
 /// Mirrors the fork's SetElementWorksetEventHandler logic.
 /// </summary>
+[ToolSafety(false, false)]
 public class SetElementWorksetTool : ICortexTool
 {
     public string Name => "set_element_workset";

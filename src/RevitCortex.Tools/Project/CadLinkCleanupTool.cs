@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Analyzes and cleans up imported/linked CAD files in the model.
 /// </summary>
+[ToolSafety(false, true)]
 public class CadLinkCleanupTool : ICortexTool
 {
     public string Name => "cad_link_cleanup";

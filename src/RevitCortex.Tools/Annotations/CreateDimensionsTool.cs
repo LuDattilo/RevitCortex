@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Annotations;
 /// <summary>
 /// Creates one or more dimension annotations between points or element references.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateDimensionsTool : ICortexTool
 {
     public string Name => "create_dimensions";

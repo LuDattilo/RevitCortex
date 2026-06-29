@@ -16,6 +16,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// Since MCP cannot trigger interactive element picking, this reads the current UI selection
 /// and identifies any RevitLinkInstance elements, reporting their status and element summary.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetSelectedLinkedElementsTool : ICortexTool
 {
     public string Name => "get_selected_linked_elements";

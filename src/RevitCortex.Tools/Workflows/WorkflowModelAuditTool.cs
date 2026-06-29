@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Workflows;
 /// <summary>
 /// Comprehensive model audit combining health check, warnings, and family analysis.
 /// </summary>
+[ToolSafety(true, false)]
 public class WorkflowModelAuditTool : ICortexTool
 {
     public string Name => "workflow_model_audit";

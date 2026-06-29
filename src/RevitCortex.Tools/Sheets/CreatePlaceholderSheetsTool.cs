@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Sheets;
 /// <summary>
 /// Creates, lists, converts, or deletes placeholder sheets.
 /// </summary>
+[ToolSafety(false, true)]
 public class CreatePlaceholderSheetsTool : ICortexTool
 {
     public string Name => "create_placeholder_sheets";

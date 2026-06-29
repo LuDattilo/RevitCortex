@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.IFC;
 /// Links an IFC file into the active document using RevitLinkType.CreateFromIFC.
 /// Creates an intermediate .ifc.RVT file and a RevitLinkInstance.
 /// </summary>
+[ToolSafety(false, false)]
 public class IfcLinkTool : ICortexTool
 {
     public string Name => "ifc_link";

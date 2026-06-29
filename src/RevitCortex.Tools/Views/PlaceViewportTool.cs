@@ -11,6 +11,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Places a view on a sheet at the specified position.
 /// </summary>
+[ToolSafety(false, false)]
 public class PlaceViewportTool : ICortexTool
 {
     public string Name => "place_viewport";

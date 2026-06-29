@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Sheets;
 /// Duplicates a sheet including all annotations and detail items.
 /// Views can optionally be duplicated with detailing.
 /// </summary>
+[ToolSafety(false, false)]
 public class DuplicateSheetWithContentTool : ICortexTool
 {
     public string Name => "duplicate_sheet_with_content";

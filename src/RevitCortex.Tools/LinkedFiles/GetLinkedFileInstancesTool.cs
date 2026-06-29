@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// Lists all linked file types with their instances, load status, path, and transform data.
 /// Groups instances by their parent RevitLinkType.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetLinkedFileInstancesTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_linked_file_instances";

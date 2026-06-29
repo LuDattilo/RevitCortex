@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Modifies an existing schedule: add/remove fields, set/clear filters, set/clear sorting, rename, display options.
 /// </summary>
+[ToolSafety(false, true)]
 public class ModifyScheduleTool : ICortexTool
 {
     public string Name => "modify_schedule";

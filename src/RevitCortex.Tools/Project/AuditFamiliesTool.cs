@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Project;
 /// Comprehensive family audit with health scores, unused detection, in-place identification,
 /// and instance counts. Merges audit_families and check_family_health.
 /// </summary>
+[ToolSafety(true, false)]
 public class AuditFamiliesTool : ICortexTool
 {
     public string Name => "audit_families";

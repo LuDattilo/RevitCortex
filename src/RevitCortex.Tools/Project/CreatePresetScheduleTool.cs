@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Project;
 /// Creates preset schedules: door_by_room, window_by_room, room_finish,
 /// material_takeoff, sheet_list, view_list.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreatePresetScheduleTool : ICortexTool
 {
     public string Name => "create_preset_schedule";

@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.IFC;
 /// Reconstructs floors from IFC-imported DirectShape elements using Floor.Create.
 /// Extracts the bottom face footprint as a CurveLoop for the floor profile.
 /// </summary>
+[ToolSafety(false, false)]
 public class IfcRebuildFloorsTool : ICortexTool
 {
     public string Name => "ifc_rebuild_floors";

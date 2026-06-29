@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.IFC;
 /// Reconstructs roofs from IFC-imported DirectShape elements using NewFootPrintRoof.
 /// Extracts the bottom face footprint for the roof profile.
 /// </summary>
+[ToolSafety(false, false)]
 public class IfcRebuildRoofsTool : ICortexTool
 {
     public string Name => "ifc_rebuild_roofs";

@@ -24,6 +24,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///   clearIfEmpty  (bool, optional):   If true, DELETE existing rows even when nothing is selected.
 ///                                     Default: false (returns warning without touching PBI).
 /// </summary>
+[ToolSafety(false, true)]
 public class PbiPublishSelectionTool : ICortexTool
 {
     public string Name => "pbi_publish_selection";

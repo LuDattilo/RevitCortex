@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// <summary>
 /// Adds a new Revit link to the current document from a file path.
 /// </summary>
+[ToolSafety(false, false)]
 public class AddLinkedFileTool : ICortexTool
 {
     public string Name => "add_linked_file";

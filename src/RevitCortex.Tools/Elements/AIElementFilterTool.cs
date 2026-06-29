@@ -16,6 +16,7 @@ namespace RevitCortex.Tools.Elements;
 /// view-visibility and bounding-box filters, all combinable via logical AND.
 /// Mirrors the fork's AIElementFilterEventHandler filtering logic.
 /// </summary>
+[ToolSafety(true, false)]
 public class AIElementFilterTool : ICortexTool
 {
     public string Name => "ai_element_filter";

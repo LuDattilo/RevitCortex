@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.IFC;
 /// Lists IFC-imported elements that pass the rebuildability confidence threshold.
 /// Works best after ifc_analyze_rebuildability has been called (uses cached results).
 /// </summary>
+[ToolSafety(true, false)]
 public class IfcListRebuildCandidatesTool : ICortexTool
 {
     public string Name => "ifc_list_rebuild_candidates";

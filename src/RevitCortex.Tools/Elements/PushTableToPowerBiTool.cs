@@ -24,6 +24,7 @@ namespace RevitCortex.Tools.Elements;
 /// The companion to push_to_powerbi: same output folder, same metadata sidecar,
 /// same drillthrough URL pattern works if rows include an ElementId column.
 /// </summary>
+[ToolSafety(true, false)]
 public class PushTableToPowerBiTool : ICortexTool
 {
     public string Name => "push_table_to_powerbi";

@@ -17,6 +17,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// <summary>
 /// Read-only listing of Autodesk Revit Coordination Models.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetCoordinationModelsTool : ICortexTool, ICacheableTool
 {
     private const int DefaultMaxInstances = 100;

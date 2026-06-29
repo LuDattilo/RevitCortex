@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Parameters;
 /// <summary>
 /// Clears parameter values on elements by category, view, or selection scope.
 /// </summary>
+[ToolSafety(false, true)]
 public class ClearParameterValuesTool : ICortexTool
 {
     public string Name => "clear_parameter_values";

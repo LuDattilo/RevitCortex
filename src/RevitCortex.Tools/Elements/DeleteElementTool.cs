@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Elements;
 /// Defaults to dryRun=true for safety — preview what would be deleted before committing.
 /// Mirrors the fork's DeleteElementEventHandler logic.
 /// </summary>
+[ToolSafety(false, true)]
 public class DeleteElementTool : ICortexTool
 {
     public string Name => "delete_element";

@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.IFC;
 /// Opens or imports an IFC file using Application.OpenIFCDocument with IFCImportOptions.
 /// Action "open" creates a new Revit document; action "link" creates a reference.
 /// </summary>
+[ToolSafety(false, true)]
 public class IfcOpenOrImportTool : ICortexTool
 {
     public string Name => "ifc_open_or_import";

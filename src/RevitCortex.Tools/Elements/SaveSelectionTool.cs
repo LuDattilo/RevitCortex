@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Saves the current selection or specified element IDs as a named selection filter.
 /// </summary>
+[ToolSafety(false, true)]
 public class SaveSelectionTool : ICortexTool
 {
     public string Name => "save_selection";

@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Rebar;
 /// Creates an area reinforcement system on a host. Either covers the host boundary (no curves) or
 /// uses an explicit boundary (curves[] in mm). Major direction is mandatory and fixed at creation.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateAreaReinforcementTool : ICortexTool
 {
     public string Name => "create_area_reinforcement";
@@ -126,6 +127,7 @@ public class CreateAreaReinforcementTool : ICortexTool
 /// Creates a path reinforcement system on a host edge. Requires an explicit boundary (curves[] in mm).
 /// 'flip' chooses the side; major bar direction follows the path.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreatePathReinforcementTool : ICortexTool
 {
     public string Name => "create_path_reinforcement";
@@ -214,6 +216,7 @@ public class CreatePathReinforcementTool : ICortexTool
 }
 
 /// <summary>Toggles a named reinforcement layer of an area reinforcement system active/inactive.</summary>
+[ToolSafety(false, false)]
 public class SetAreaReinforcementLayersTool : ICortexTool
 {
     public string Name => "set_area_reinforcement_layers";
@@ -276,6 +279,7 @@ public class SetAreaReinforcementLayersTool : ICortexTool
 }
 
 /// <summary>Sets writable options on a path reinforcement system (additional offset; bar orientations).</summary>
+[ToolSafety(false, false)]
 public class SetPathReinforcementOptionsTool : ICortexTool
 {
     public string Name => "set_path_reinforcement_options";
@@ -364,6 +368,7 @@ public class SetPathReinforcementOptionsTool : ICortexTool
 /// Converts an area OR path reinforcement system into standalone rebar elements (DESTRUCTIVE: the
 /// system is replaced by individual bars).
 /// </summary>
+[ToolSafety(false, true)]
 public class ConvertRebarSystemToRebarsTool : ICortexTool
 {
     public string Name => "convert_rebar_system_to_rebars";
@@ -425,6 +430,7 @@ public class ConvertRebarSystemToRebarsTool : ICortexTool
 }
 
 /// <summary>Removes an area OR path reinforcement system (DESTRUCTIVE).</summary>
+[ToolSafety(false, true)]
 public class RemoveRebarSystemTool : ICortexTool
 {
     public string Name => "remove_rebar_system";
@@ -481,6 +487,7 @@ public class RemoveRebarSystemTool : ICortexTool
 }
 
 /// <summary>Reads core data of an area reinforcement system (read-only).</summary>
+[ToolSafety(true, false)]
 public class GetAreaReinforcementDataTool : ICortexTool
 {
     public string Name => "get_area_reinforcement_data";
@@ -524,6 +531,7 @@ public class GetAreaReinforcementDataTool : ICortexTool
 }
 
 /// <summary>Reads core data of a path reinforcement system (read-only).</summary>
+[ToolSafety(true, false)]
 public class GetPathReinforcementDataTool : ICortexTool
 {
     public string Name => "get_path_reinforcement_data";

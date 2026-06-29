@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Finds and removes unused families, types, and materials.
 /// </summary>
+[ToolSafety(false, true)]
 public class PurgeUnusedTool : ICortexTool
 {
     public string Name => "purge_unused";

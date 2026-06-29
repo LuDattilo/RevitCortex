@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.IFC;
 /// Tags IFC-imported elements that cannot be rebuilt as native Revit elements.
 /// Sets a value in the Comments parameter to mark them for manual review.
 /// </summary>
+[ToolSafety(false, true)]
 public class IfcTagUnreconstructableElementsTool : ICortexTool
 {
     public string Name => "ifc_tag_unreconstructable_elements";

@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Project;
 /// Exports multiple views/sheets to DWG, DXF, DGN, or image formats.
 /// PDF export requires Revit 2023+ PDF export API.
 /// </summary>
+[ToolSafety(true, false)]
 public class BatchExportTool : ICortexTool
 {
     public string Name => "batch_export";

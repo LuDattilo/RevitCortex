@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Creates a new sheet with optional title block and numbering.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateSheetTool : ICortexTool
 {
     public string Name => "create_sheet";

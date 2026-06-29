@@ -25,6 +25,7 @@ namespace RevitCortex.Tools.Elements;
 /// raw parameter values, and writing them back would require unit re-parsing
 /// per parameter type. Out of scope for this MVP.
 /// </summary>
+[ToolSafety(false, true)]
 public class ImportFromPowerBiTool : ICortexTool
 {
     public string Name => "import_from_powerbi";

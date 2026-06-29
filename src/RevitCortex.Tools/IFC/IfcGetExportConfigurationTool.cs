@@ -10,6 +10,7 @@ namespace RevitCortex.Tools.IFC;
 /// <summary>
 /// Returns the full details of a specific IFC export configuration.
 /// </summary>
+[ToolSafety(true, false)]
 public class IfcGetExportConfigurationTool : ICortexTool
 {
     public string Name => "ifc_get_export_configuration";

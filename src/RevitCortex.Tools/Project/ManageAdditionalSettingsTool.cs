@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Project;
 /// fill patterns, halftone/underlay, and detail levels.
 /// Corresponds to Manage → Additional Settings dropdown.
 /// </summary>
+[ToolSafety(false, false)]
 public class ManageAdditionalSettingsTool : ICortexTool
 {
     public string Name => "manage_additional_settings";

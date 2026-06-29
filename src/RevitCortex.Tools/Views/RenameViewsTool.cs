@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Renames views using find/replace, prefix, or suffix with optional view type filtering.
 /// </summary>
+[ToolSafety(false, true)]
 public class RenameViewsTool : ICortexTool
 {
     public string Name => "rename_views";

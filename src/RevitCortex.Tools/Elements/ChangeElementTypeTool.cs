@@ -9,6 +9,7 @@ using RevitCortex.Core.Tools;
 
 namespace RevitCortex.Tools.Elements;
 
+[ToolSafety(false, true)]
 public class ChangeElementTypeTool : ICortexTool
 {
     public string Name => "change_element_type";

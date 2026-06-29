@@ -18,6 +18,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// DirectShape marker in the host document around each linked target's
 /// bounding box so the user can actually see where the linked element is.
 /// </summary>
+[ToolSafety(false, false)]
 public class ShowCrossModelElementsTool : ICortexTool
 {
     public string Name => "show_cross_model_elements";

@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Views;
 /// Creates callout, section, or elevation views from room bounding boxes.
 /// Combines create_callout_from_rooms, create_elevations_from_rooms, and create_views_from_rooms.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateViewsFromRoomsTool : ICortexTool
 {
     public string Name => "create_views_from_rooms";

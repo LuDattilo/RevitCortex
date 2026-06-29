@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Analyzes model complexity with element counts, category breakdown, and level distribution.
 /// </summary>
+[ToolSafety(true, false)]
 public class AnalyzeModelStatisticsTool : ICortexTool
 {
     public string Name => "analyze_model_statistics";

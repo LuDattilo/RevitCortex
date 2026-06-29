@@ -11,6 +11,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Deletes a Revit schedule by ID or name.
 /// </summary>
+[ToolSafety(false, true)]
 public class DeleteScheduleTool : ICortexTool
 {
     public string Name => "delete_schedule";

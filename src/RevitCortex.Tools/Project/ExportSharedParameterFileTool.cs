@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Exports the shared parameter file contents as structured data or to a file path.
 /// </summary>
+[ToolSafety(true, false)]
 public class ExportSharedParameterFileTool : ICortexTool
 {
     public string Name => "export_shared_parameter_file";

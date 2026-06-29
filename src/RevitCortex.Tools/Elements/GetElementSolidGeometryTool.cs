@@ -19,6 +19,7 @@ namespace RevitCortex.Tools.Elements;
 /// outside of its host"). This tool exposes the armable solid so callers can position
 /// rebar/elements inside the host's physical body. Read-only.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetElementSolidGeometryTool : ICortexTool
 {
     public string Name => "get_element_solid_geometry";

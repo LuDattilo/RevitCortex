@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.IFC;
 /// Places family instances (doors, windows) from IFC-imported DirectShapes.
 /// Uses bounding box center for placement and tries to find matching family symbols.
 /// </summary>
+[ToolSafety(false, false)]
 public class IfcRebuildFamilyInstancesTool : ICortexTool
 {
     public string Name => "ifc_rebuild_family_instances";

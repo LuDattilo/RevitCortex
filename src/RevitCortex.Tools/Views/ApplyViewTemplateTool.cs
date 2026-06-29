@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Lists, applies, or removes view templates from views.
 /// </summary>
+[ToolSafety(false, false)]
 public class ApplyViewTemplateTool : ICortexTool
 {
     public string Name => "apply_view_template";

@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Batch renames elements (views, sheets, levels, grids, rooms, system types) using find/replace, prefix, or suffix.
 /// </summary>
+[ToolSafety(false, true)]
 public class BatchRenameTool : ICortexTool
 {
     public string Name => "batch_rename";

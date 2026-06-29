@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Lists, duplicates, deletes, or renames view templates.
 /// </summary>
+[ToolSafety(false, true)]
 public class ManageViewTemplatesTool : ICortexTool
 {
     public string Name => "manage_view_templates";

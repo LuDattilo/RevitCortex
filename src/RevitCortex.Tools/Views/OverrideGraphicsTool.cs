@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Sets or resets graphic overrides (color, transparency, halftone, line weight) for elements in a view.
 /// </summary>
+[ToolSafety(false, false)]
 public class OverrideGraphicsTool : ICortexTool
 {
     public string Name => "override_graphics";

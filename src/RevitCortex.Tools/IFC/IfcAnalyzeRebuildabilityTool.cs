@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.IFC;
 /// Scans imported IFC elements (DirectShapes), classifies each as rebuildable or not,
 /// and returns confidence scores per element.
 /// </summary>
+[ToolSafety(true, false)]
 public class IfcAnalyzeRebuildabilityTool : ICortexTool
 {
     public string Name => "ifc_analyze_rebuildability";

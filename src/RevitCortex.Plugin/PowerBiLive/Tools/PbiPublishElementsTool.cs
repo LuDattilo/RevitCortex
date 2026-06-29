@@ -38,6 +38,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///                 If omitted, all model elements are exported.
 ///   maxElements   (int, optional): Hard limit on exported rows. Default 10000.
 /// </summary>
+[ToolSafety(false, true)]
 public class PbiPublishElementsTool : ICortexTool
 {
     public string Name => "pbi_publish_elements";

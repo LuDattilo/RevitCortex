@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Project;
 /// Lists worksets with open/close status and ownership info.
 /// Only available for workshared documents (IsDynamic = true).
 /// </summary>
+[ToolSafety(true, false)]
 public class GetWorksetsTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_worksets";

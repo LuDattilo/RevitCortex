@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Parameters;
 /// <summary>
 /// Copies parameter values from a source element to target elements.
 /// </summary>
+[ToolSafety(false, true)]
 public class TransferParametersTool : ICortexTool
 {
     public string Name => "transfer_parameters";

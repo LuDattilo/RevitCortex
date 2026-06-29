@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Lists all schedules (if no scheduleId) or retrieves headers/rows for a specific schedule.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetScheduleDataTool : ICortexTool
 {
     public string Name => "get_schedule_data";

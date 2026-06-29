@@ -23,6 +23,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///                "ElementParameters", "Selection".
 ///                Default: ["Metadata", "Elements", "Selection"].
 /// </summary>
+[ToolSafety(false, false)]
 public class PbiCreateDatasetTool : ICortexTool
 {
     private static readonly string[] DefaultTables = PowerBiDatasetSchema.AllTables;

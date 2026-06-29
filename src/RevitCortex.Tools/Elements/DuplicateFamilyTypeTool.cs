@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// Duplicates a loadable family type (FamilySymbol) with a new name,
 /// optionally setting parameter values on the new type in the same transaction.
 /// </summary>
+[ToolSafety(false, false)]
 public class DuplicateFamilyTypeTool : ICortexTool
 {
     public string Name => "duplicate_family_type";

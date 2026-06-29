@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// Supports color, transparency, shininess, smoothness, class, category,
 /// and identity parameters (description, manufacturer, model, URL, etc.).
 /// </summary>
+[ToolSafety(false, true)]
 public class SetMaterialPropertiesTool : ICortexTool
 {
     public string Name => "set_material_properties";

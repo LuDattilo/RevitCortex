@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Annotations;
 /// Colors elements by parameter value and optionally creates a drafting legend view.
 /// Supports auto, gradient, and custom color schemes.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateColorLegendTool : ICortexTool
 {
     public string Name => "create_color_legend";

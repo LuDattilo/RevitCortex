@@ -18,6 +18,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///   - After sign-out an Azure AD admin can also revoke refresh tokens
 ///     server-side via the Entra ID portal.
 /// </summary>
+[ToolSafety(false, true)]
 public class PbiSignOutTool : ICortexTool
 {
     public string Name => "pbi_sign_out";

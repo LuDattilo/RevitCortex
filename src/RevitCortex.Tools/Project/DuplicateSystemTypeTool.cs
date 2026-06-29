@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Duplicates a system family type (wall, floor, roof, ceiling) with a new name.
 /// </summary>
+[ToolSafety(false, true)]
 public class DuplicateSystemTypeTool : ICortexTool
 {
     public string Name => "duplicate_system_type";

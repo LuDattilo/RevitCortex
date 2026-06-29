@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Renames loaded families with find/replace, prefix, or suffix.
 /// </summary>
+[ToolSafety(false, true)]
 public class RenameFamiliesTool : ICortexTool
 {
     public string Name => "rename_families";

@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Project;
 /// Walls, Floors, Roofs, Ceilings.
 /// Supports adding, removing, and modifying layers.
 /// </summary>
+[ToolSafety(false, true)]
 public class SetCompoundStructureTool : ICortexTool
 {
     public string Name => "set_compound_structure";

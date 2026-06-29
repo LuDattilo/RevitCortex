@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Creates a 3D section box from selected elements' combined bounding box.
 /// </summary>
+[ToolSafety(false, false)]
 public class SectionBoxFromSelectionTool : ICortexTool
 {
     public string Name => "section_box_from_selection";

@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Lists all materials in the project with optional filtering by material class or name.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetMaterialsTool : ICortexTool, ICacheableTool
 {
     public string Name => "get_materials";

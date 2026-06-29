@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Sheets;
 /// <summary>
 /// Creates multiple sheets at once with title blocks and optional view placement.
 /// </summary>
+[ToolSafety(false, false)]
 public class BatchCreateSheetsTool : ICortexTool
 {
     public string Name => "batch_create_sheets";

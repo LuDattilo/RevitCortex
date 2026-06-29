@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Elements;
 /// Creates one or more line-based elements (walls, beams, structural framing, etc.).
 /// Mirrors the fork's CreateLineElementEventHandler logic.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateLineBasedElementTool : ICortexTool
 {
     public string Name => "create_line_based_element";

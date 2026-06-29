@@ -25,6 +25,7 @@ namespace RevitCortex.Tools.Project;
 ///   ShowOverriden  (also accepted: Overridden, Overriden)
 ///   DontShow       (also accepted: NotDisplayed, None, Hidden)
 /// </summary>
+[ToolSafety(false, false)]
 public class ManagePhaseFiltersTool : ICortexTool
 {
     public string Name => "manage_phase_filters";

@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Detects geometric intersections (clashes) between two sets of elements.
 /// </summary>
+[ToolSafety(true, false)]
 public class ClashDetectionTool : ICortexTool
 {
     public string Name => "clash_detection";

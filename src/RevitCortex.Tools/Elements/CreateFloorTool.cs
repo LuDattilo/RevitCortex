@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Creates a floor from boundary points or a room boundary.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateFloorTool : ICortexTool
 {
     public string Name => "create_floor";

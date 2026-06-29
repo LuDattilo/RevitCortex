@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// Retrieves all warnings/errors in the model with optional severity and
 /// description filtering. Useful for model health auditing.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetWarningsTool : ICortexTool
 {
     public string Name => "get_warnings";

@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Parameters;
 /// Lists, creates, reads, updates, or deletes global parameters in the project.
 /// Global parameters are project-level named values that can drive dimensions and constraints.
 /// </summary>
+[ToolSafety(false, true)]
 public class ManageGlobalParametersTool : ICortexTool
 {
     public string Name => "manage_global_parameters";

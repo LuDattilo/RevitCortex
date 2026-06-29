@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.IFC;
 /// <summary>
 /// Reloads an existing IFC link, optionally from a new IFC file path.
 /// </summary>
+[ToolSafety(false, true)]
 public class IfcReloadLinkTool : ICortexTool
 {
     public string Name => "ifc_reload_link";

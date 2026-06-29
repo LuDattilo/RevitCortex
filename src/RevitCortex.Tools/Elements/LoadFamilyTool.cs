@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Loads a .rfa family, lists loaded families, or duplicates a family type.
 /// </summary>
+[ToolSafety(false, false)]
 public class LoadFamilyTool : ICortexTool
 {
     public string Name => "load_family";

@@ -14,6 +14,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 /// Inputs:
 ///   workspaceId (string, required): Power BI group/workspace GUID.
 /// </summary>
+[ToolSafety(true, false)]
 public class PbiListDatasetsTool : ICortexTool
 {
     public string Name => "pbi_list_datasets";

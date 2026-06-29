@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Parameters;
 /// <summary>
 /// Lists, creates, deletes, or modifies project parameters.
 /// </summary>
+[ToolSafety(false, true)]
 public class ManageProjectParametersTool : ICortexTool
 {
     public string Name => "manage_project_parameters";

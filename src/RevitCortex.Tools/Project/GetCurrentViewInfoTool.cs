@@ -10,6 +10,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Returns metadata about the currently active view (name, type, scale, detail level).
 /// </summary>
+[ToolSafety(true, false)]
 public class GetCurrentViewInfoTool : ICortexTool
 {
     public string Name => "get_current_view_info";

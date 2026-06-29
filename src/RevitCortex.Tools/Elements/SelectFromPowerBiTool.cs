@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Elements;
 /// revitcortex:// protocol handler) and selects/zooms/isolates them in the
 /// active Revit view. This is the bridge that closes the loop PBI → Revit.
 /// </summary>
+[ToolSafety(false, false)]
 public class SelectFromPowerBiTool : ICortexTool
 {
     public string Name => "select_from_powerbi";

@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// Returns the currently selected elements in the Revit UI.
 /// Mirrors the fork's GetSelectedElementsEventHandler logic.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetSelectedElementsTool : ICortexTool
 {
     public string Name => "get_selected_elements";

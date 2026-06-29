@@ -20,6 +20,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///   signIn (bool, default false): if true and not already signed in, kick
 ///   off device-code flow without blocking Revit.
 /// </summary>
+[ToolSafety(false, false)]
 public class PbiCheckAuthTool : ICortexTool
 {
     internal static readonly PowerBiAuthFlowState FlowState = new PowerBiAuthFlowState();

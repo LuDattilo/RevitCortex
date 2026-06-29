@@ -57,6 +57,7 @@ namespace RevitCortex.Tools.StructuralSteel;
 // =====================================================================================
 
 /// <summary>Creates a StructuralConnectionType bound to a family symbol (typed create).</summary>
+[ToolSafety(false, false)]
 public class CreateSteelStructuralConnectionTypeTool : ICortexTool
 {
     public string Name => "create_steel_structural_connection_type";
@@ -135,6 +136,7 @@ public class CreateSteelStructuralConnectionTypeTool : ICortexTool
 }
 
 /// <summary>Creates a StructuralConnectionHandlerType (name + guid + family name).</summary>
+[ToolSafety(false, false)]
 public class CreateSteelConnectionHandlerTypeTool : ICortexTool
 {
     public string Name => "create_steel_connection_handler_type";
@@ -207,6 +209,7 @@ public class CreateSteelConnectionHandlerTypeTool : ICortexTool
 }
 
 /// <summary>Creates the document's default StructuralConnectionHandlerType.</summary>
+[ToolSafety(false, false)]
 public class CreateDefaultSteelConnectionHandlerTypeTool : ICortexTool
 {
     public string Name => "create_default_steel_connection_handler_type";
@@ -256,6 +259,7 @@ public class CreateDefaultSteelConnectionHandlerTypeTool : ICortexTool
 }
 
 /// <summary>Re-binds a StructuralConnectionType to a different family symbol (SetFamilySymbolId).</summary>
+[ToolSafety(false, false)]
 public class SetSteelConnectionTypeFamilySymbolTool : ICortexTool
 {
     public string Name => "set_steel_connection_type_family_symbol";
@@ -331,6 +335,7 @@ public class SetSteelConnectionTypeFamilySymbolTool : ICortexTool
 }
 
 /// <summary>Action-based administration of StructuralConnectionApprovalType (create | list only).</summary>
+[ToolSafety(false, false)]
 public class ManageSteelApprovalTypeTool : ICortexTool
 {
     public string Name => "manage_steel_approval_type";
@@ -435,6 +440,7 @@ public class ManageSteelApprovalTypeTool : ICortexTool
 /// mutation requires interactively-picked Reference / Subelement objects that cannot be reconstructed from
 /// JSON ids. The message documents that the legacy add/remove APIs were removed in Revit 2027.
 /// </summary>
+[ToolSafety(false, false)]
 public class ManageCustomSteelConnectionTypeTool : ICortexTool
 {
     public string Name => "manage_custom_steel_connection_type";
@@ -498,6 +504,7 @@ public class ManageCustomSteelConnectionTypeTool : ICortexTool
 }
 
 /// <summary>Reads a connection handler's input points (id GUID + position in mm).</summary>
+[ToolSafety(true, false)]
 public class GetSteelConnectionInputPointsTool : ICortexTool
 {
     public string Name => "get_steel_connection_input_points";
@@ -559,6 +566,7 @@ public class GetSteelConnectionInputPointsTool : ICortexTool
 /// predicate, so this returns the type's ApplyTo + family symbol and (optionally) the supplied elements'
 /// categories so the caller can judge fit.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetSteelConnectionApplicabilityTool : ICortexTool
 {
     public string Name => "get_steel_connection_applicability";
@@ -633,6 +641,7 @@ public class GetSteelConnectionApplicabilityTool : ICortexTool
 /// (the type is absent from Autodesk.Revit.DB.Structure in R26+R27 and the handler exposes no producer),
 /// so this returns a documented validationAvailable=false rather than fabricating warnings.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetSteelConnectionValidationTool : ICortexTool
 {
     public string Name => "get_steel_connection_validation";

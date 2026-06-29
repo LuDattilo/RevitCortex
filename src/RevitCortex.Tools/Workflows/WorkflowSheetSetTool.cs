@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Workflows;
 /// <summary>
 /// Auto-creates sheets with title blocks from a sheet definition list.
 /// </summary>
+[ToolSafety(false, false)]
 public class WorkflowSheetSetTool : ICortexTool
 {
     public string Name => "workflow_sheet_set";

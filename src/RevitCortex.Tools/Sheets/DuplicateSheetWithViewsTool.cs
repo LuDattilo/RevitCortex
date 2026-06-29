@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Sheets;
 /// Duplicates a sheet and its placed views with configurable duplication options.
 /// Also copies title block parameters from source sheet.
 /// </summary>
+[ToolSafety(false, false)]
 public class DuplicateSheetWithViewsTool : ICortexTool
 {
     public string Name => "duplicate_sheet_with_views";

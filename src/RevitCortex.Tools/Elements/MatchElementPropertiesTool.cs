@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// Matches parameters by name, respects read-only state, and handles all StorageTypes.
 /// Mirrors the fork's MatchElementPropertiesEventHandler.
 /// </summary>
+[ToolSafety(false, true)]
 public class MatchElementPropertiesTool : ICortexTool
 {
     public string Name => "match_element_properties";

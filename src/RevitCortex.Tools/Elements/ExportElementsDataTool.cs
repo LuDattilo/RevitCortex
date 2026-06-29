@@ -17,6 +17,7 @@ namespace RevitCortex.Tools.Elements;
 /// explicit or auto-discovered parameter columns, and value-based row filtering.
 /// Mirrors the fork's ExportElementsDataEventHandler.
 /// </summary>
+[ToolSafety(true, false)]
 public class ExportElementsDataTool : ICortexTool
 {
     public string Name => "export_elements_data";

@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Project;
 /// Calculates total area and volume of materials across selected or all elements.
 /// Heavy query — can take time on large models.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetMaterialQuantitiesTool : ICortexTool
 {
     public string Name => "get_material_quantities";

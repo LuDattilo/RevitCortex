@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Creates, applies, or lists view filters with optional parameter rules and graphic overrides.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateViewFilterTool : ICortexTool
 {
     public string Name => "create_view_filter";

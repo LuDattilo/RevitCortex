@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Lists available family types (loadable and system) with optional category/name filtering.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetAvailableFamilyTypesTool : ICortexTool
 {
     public string Name => "get_available_family_types";

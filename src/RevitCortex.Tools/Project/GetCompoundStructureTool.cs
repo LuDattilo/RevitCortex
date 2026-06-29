@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Project;
 /// Reads compound structure (stratigraphy/layers) from system family types:
 /// Walls, Floors, Roofs, Ceilings.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetCompoundStructureTool : ICortexTool
 {
     public string Name => "get_compound_structure";

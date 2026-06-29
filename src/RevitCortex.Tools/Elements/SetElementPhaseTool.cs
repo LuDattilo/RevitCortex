@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// IsDynamic = true — only available when the document has phases.
 /// Mirrors the fork's SetElementPhaseEventHandler logic.
 /// </summary>
+[ToolSafety(false, false)]
 public class SetElementPhaseTool : ICortexTool
 {
     public string Name => "set_element_phase";

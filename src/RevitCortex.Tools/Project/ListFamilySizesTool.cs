@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Project;
 /// Lists families with type and instance counts, sorted by instance count, type count, or name.
 /// Useful for identifying bloated/unused families.
 /// </summary>
+[ToolSafety(true, false)]
 public class ListFamilySizesTool : ICortexTool
 {
     public string Name => "list_family_sizes";

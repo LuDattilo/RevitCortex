@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Annotations;
 /// <summary>
 /// Tags all walls in the current view at their midpoint.
 /// </summary>
+[ToolSafety(false, false)]
 public class TagWallsTool : ICortexTool
 {
     public string Name => "tag_walls";

@@ -145,6 +145,7 @@ namespace RevitCortex.Tools.Interop
     /// mode=import consumes CortexElementRefs and selects/isolates them by
     /// composing show_cross_model_elements (no source changes there).
     /// </summary>
+    [ToolSafety(false, false)]
     public class CrossAppSelectionTool : ICortexTool
     {
         public string Name => "cross_app_selection";

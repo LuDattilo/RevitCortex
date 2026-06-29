@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Parameters;
 /// Adds a shared parameter to project categories from the shared parameter file.
 /// Creates the group/definition if it doesn't exist.
 /// </summary>
+[ToolSafety(false, false)]
 public class AddSharedParameterTool : ICortexTool
 {
     public string Name => "add_shared_parameter";

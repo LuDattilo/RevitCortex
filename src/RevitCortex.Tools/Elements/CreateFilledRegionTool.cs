@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Creates a filled region from boundary points in the specified view.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateFilledRegionTool : ICortexTool
 {
     public string Name => "create_filled_region";

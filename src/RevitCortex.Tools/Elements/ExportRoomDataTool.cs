@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Exports room data from the current project (name, number, level, area, volume, etc.).
 /// </summary>
+[ToolSafety(true, false)]
 public class ExportRoomDataTool : ICortexTool
 {
     public string Name => "export_room_data";

@@ -11,6 +11,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Deletes a material from the project (with confirmation).
 /// </summary>
+[ToolSafety(false, true)]
 public class DeleteMaterialTool : ICortexTool
 {
     public string Name => "delete_material";

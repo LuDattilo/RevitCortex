@@ -16,6 +16,7 @@ namespace RevitCortex.Tools.Elements
     /// Revit-derived InstanceGuid / UniqueId and the next call needs a
     /// Revit ElementId.
     /// </summary>
+    [ToolSafety(true, false)]
     public class ResolveElementsByUniqueIdTool : ICortexTool
     {
         public string Name => "get_elements_by_unique_id";

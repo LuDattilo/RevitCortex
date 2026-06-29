@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// <summary>
 /// Pins or unpins one or more link instances.
 /// </summary>
+[ToolSafety(false, false)]
 public class PinUnpinLinkInstanceTool : ICortexTool
 {
     public string Name => "pin_unpin_link_instance";

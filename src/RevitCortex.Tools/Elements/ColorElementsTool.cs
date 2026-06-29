@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Elements;
 /// Color strategies: customColors array → gradient (blue→red) → random.
 /// Mirrors the fork's ColorSplashEventHandler logic.
 /// </summary>
+[ToolSafety(false, false)]
 public class ColorElementsTool : ICortexTool
 {
     public string Name => "color_elements";

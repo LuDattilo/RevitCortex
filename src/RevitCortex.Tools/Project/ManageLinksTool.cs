@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Lists, reloads, or unloads linked Revit/CAD/IFC files.
 /// </summary>
+[ToolSafety(false, true)]
 public class ManageLinksTool : ICortexTool
 {
     public string Name => "manage_links";

@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Sheets;
 /// <summary>
 /// Aligns viewports across sheets by placement position or model coordinates.
 /// </summary>
+[ToolSafety(false, false)]
 public class AlignViewportsTool : ICortexTool
 {
     public string Name => "align_viewports";

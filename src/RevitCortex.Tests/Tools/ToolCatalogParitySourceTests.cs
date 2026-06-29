@@ -44,9 +44,13 @@ public class ToolCatalogParitySourceTests
 
         var pluginFiles = ReadCsFiles("RevitCortex.Tools")
             .Concat(ReadCsFiles("RevitCortex.Plugin"));
+        // Match the Name property in any common shape so a tool cannot silently
+        // escape the parity check: expression-bodied (=> "x") or a property with
+        // an initializer ({ get; } = "x" / { get; set; } = "x"). Over-matching
+        // non-tool Name members is harmless — it only adds to the allowed set.
         var pluginNames = ExtractNames(
             pluginFiles,
-            new Regex(@"public\s+string\s+Name\s*=>\s*""([^""]+)"""));
+            new Regex(@"public\s+string\s+Name\s*(?:=>\s*|\{[^}]*\}\s*=\s*)""([^""]+)"""));
 
         Assert.NotEmpty(mcpNames);
         Assert.NotEmpty(pluginNames);

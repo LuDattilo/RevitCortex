@@ -10,6 +10,7 @@ namespace RevitCortex.Tools.LinkedFiles;
 /// <summary>
 /// Returns the full transform of a linked file instance (origin, basis vectors, rotation angle).
 /// </summary>
+[ToolSafety(true, false)]
 public class GetLinkTransformTool : ICortexTool
 {
     public string Name => "get_link_transform";

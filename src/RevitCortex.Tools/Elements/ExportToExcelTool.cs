@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Exports elements by category to Excel (.xlsx) with color-coded columns.
 /// </summary>
+[ToolSafety(true, false)]
 public class ExportToExcelTool : ICortexTool
 {
     public string Name => "export_to_excel";

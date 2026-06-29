@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Elements;
 /// Retrieves doors/windows by room with dimensions and room association data.
 /// Phase-aware lookup via FromRoom/ToRoom with type-level caching.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetRoomOpeningsTool : ICortexTool
 {
     public string Name => "get_room_openings";

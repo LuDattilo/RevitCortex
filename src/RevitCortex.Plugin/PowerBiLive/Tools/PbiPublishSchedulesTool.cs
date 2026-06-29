@@ -30,6 +30,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///                   no cell cap. Use this to bound long-form row count when
 ///                   schedules have many fields (rows = elements * fields).
 /// </summary>
+[ToolSafety(false, true)]
 public class PbiPublishSchedulesTool : ICortexTool
 {
     public string Name => "pbi_publish_schedules";

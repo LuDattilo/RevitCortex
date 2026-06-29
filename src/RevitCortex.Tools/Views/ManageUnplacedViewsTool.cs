@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Lists or deletes views that are not placed on any sheet.
 /// </summary>
+[ToolSafety(false, true)]
 public class ManageUnplacedViewsTool : ICortexTool
 {
     public string Name => "manage_unplaced_views";

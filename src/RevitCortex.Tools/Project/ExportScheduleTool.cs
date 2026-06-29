@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Exports a schedule view to CSV/TSV format or returns data as structured JSON.
 /// </summary>
+[ToolSafety(true, false)]
 public class ExportScheduleTool : ICortexTool
 {
     public string Name => "export_schedule";

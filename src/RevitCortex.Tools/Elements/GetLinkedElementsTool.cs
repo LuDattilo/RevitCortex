@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.Elements;
 /// name, categories (OST_* codes) and parameter extraction.
 /// Mirrors the fork's GetLinkedElementsEventHandler logic.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetLinkedElementsTool : ICortexTool
 {
     public string Name => "get_linked_elements";

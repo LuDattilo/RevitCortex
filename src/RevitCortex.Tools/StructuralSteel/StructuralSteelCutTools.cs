@@ -34,6 +34,7 @@ namespace RevitCortex.Tools.StructuralSteel;
 /// Adds a solid-solid cut so cutElement cuts targetElement (SolidSolidCutUtils.AddCutBetweenSolids).
 /// Generic Revit geometry cut, not steel-specific.
 /// </summary>
+[ToolSafety(false, false)]
 public class AddSteelSolidCutTool : ICortexTool
 {
     public string Name => "add_steel_solid_cut";
@@ -104,6 +105,7 @@ public class AddSteelSolidCutTool : ICortexTool
 /// <summary>
 /// Reports whether one element may cut another via a solid cut and/or an instance void cut, without mutating.
 /// </summary>
+[ToolSafety(true, false)]
 public class CheckSteelCutEligibilityTool : ICortexTool
 {
     public string Name => "check_steel_cut_eligibility";
@@ -149,6 +151,7 @@ public class CheckSteelCutEligibilityTool : ICortexTool
 /// <summary>
 /// Removes a solid-solid cut between two elements (SolidSolidCutUtils.RemoveCutBetweenSolids).
 /// </summary>
+[ToolSafety(false, true)]
 public class RemoveSteelSolidCutTool : ICortexTool
 {
     public string Name => "remove_steel_solid_cut";
@@ -204,6 +207,7 @@ public class RemoveSteelSolidCutTool : ICortexTool
 /// Toggles whether the cutting solid's faces are split at an existing solid-solid cut
 /// (SolidSolidCutUtils.SplitFacesOfCuttingSolid).
 /// </summary>
+[ToolSafety(false, false)]
 public class SetSteelSolidCutFaceSplittingTool : ICortexTool
 {
     public string Name => "set_steel_solid_cut_face_splitting";
@@ -257,6 +261,7 @@ public class SetSteelSolidCutFaceSplittingTool : ICortexTool
 /// Adds an instance void cut so a cutting void instance cuts targetElement
 /// (InstanceVoidCutUtils.AddInstanceVoidCut). Generic Revit geometry op, not steel-specific.
 /// </summary>
+[ToolSafety(false, false)]
 public class AddSteelInstanceVoidCutTool : ICortexTool
 {
     public string Name => "add_steel_instance_void_cut";
@@ -324,6 +329,7 @@ public class AddSteelInstanceVoidCutTool : ICortexTool
 /// Removes an instance void cut between a cutting void instance and a target element
 /// (InstanceVoidCutUtils.RemoveInstanceVoidCut).
 /// </summary>
+[ToolSafety(false, true)]
 public class RemoveSteelInstanceVoidCutTool : ICortexTool
 {
     public string Name => "remove_steel_instance_void_cut";
@@ -380,6 +386,7 @@ public class RemoveSteelInstanceVoidCutTool : ICortexTool
 /// Reads the solid-solid cut relationships of an element: the solids that cut it
 /// (GetCuttingSolids) and the solids it cuts (GetSolidsBeingCut).
 /// </summary>
+[ToolSafety(true, false)]
 public class GetSolidCutRelationshipsTool : ICortexTool
 {
     public string Name => "get_solid_cut_relationships";
@@ -435,6 +442,7 @@ public class GetSolidCutRelationshipsTool : ICortexTool
 /// Reads the instance-void cut relationships of an element: the void instances that cut it
 /// (GetCuttingVoidInstances) and the elements it (as a void instance) cuts (GetElementsBeingCut).
 /// </summary>
+[ToolSafety(true, false)]
 public class GetInstanceVoidCutRelationshipsTool : ICortexTool
 {
     public string Name => "get_instance_void_cut_relationships";

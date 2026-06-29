@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Parameters;
 /// <summary>
 /// Syncs element parameters from structured data (import from CSV/JSON array).
 /// </summary>
+[ToolSafety(false, true)]
 public class SyncCsvParametersTool : ICortexTool
 {
     public string Name => "sync_csv_parameters";

@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Parameters;
 /// Adds a prefix and/or suffix to a parameter value on matching elements.
 /// Supports dry-run preview mode.
 /// </summary>
+[ToolSafety(false, true)]
 public class AddPrefixSuffixTool : ICortexTool
 {
     public string Name => "add_prefix_suffix";

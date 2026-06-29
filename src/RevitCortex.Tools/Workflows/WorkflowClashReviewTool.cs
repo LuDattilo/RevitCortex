@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Workflows;
 /// <summary>
 /// Detects clashes between two categories and optionally creates a section box view.
 /// </summary>
+[ToolSafety(false, false)]
 public class WorkflowClashReviewTool : ICortexTool
 {
     public string Name => "workflow_clash_review";

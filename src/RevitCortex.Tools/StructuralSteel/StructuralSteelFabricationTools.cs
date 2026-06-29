@@ -35,6 +35,7 @@ namespace RevitCortex.Tools.StructuralSteel;
 /// Wraps the static SteelElementProperties.AddFabricationInformationForRevitElements; returns the
 /// element ids that received fabrication info (the method returns the affected ids).
 /// </summary>
+[ToolSafety(false, false)]
 public class AddSteelFabricationInfoTool : ICortexTool
 {
     public string Name => "add_steel_fabrication_info";
@@ -93,6 +94,7 @@ public class AddSteelFabricationInfoTool : ICortexTool
 /// Reads the steel fabrication properties of an element: whether it has SteelElementProperties,
 /// and the fabrication unique id (Guid string) if present.
 /// </summary>
+[ToolSafety(true, false)]
 public class GetSteelElementFabricationPropertiesTool : ICortexTool
 {
     public string Name => "get_steel_element_fabrication_properties";
@@ -137,6 +139,7 @@ public class GetSteelElementFabricationPropertiesTool : ICortexTool
 /// Sets the steel fabrication unique id (SteelElementProperties.UniqueID) of an element.
 /// Fails if the element has no steel fabrication properties (run add_steel_fabrication_info first).
 /// </summary>
+[ToolSafety(false, false)]
 public class SetSteelFabricationUniqueIdTool : ICortexTool
 {
     public string Name => "set_steel_fabrication_unique_id";
@@ -213,6 +216,7 @@ public class SetSteelFabricationUniqueIdTool : ICortexTool
 /// (The reference-based GetFabricationUniqueID overload is not exposed because a Reference cannot be
 /// fabricated from JSON; the element-properties path is used instead.)
 /// </summary>
+[ToolSafety(true, false)]
 public class GetSteelFabricationUniqueIdTool : ICortexTool
 {
     public string Name => "get_steel_fabrication_unique_id";
@@ -255,6 +259,7 @@ public class GetSteelFabricationUniqueIdTool : ICortexTool
 /// <summary>
 /// Resolves the Revit element referenced by a steel fabrication GUID (SteelElementProperties.GetReference).
 /// </summary>
+[ToolSafety(true, false)]
 public class GetSteelReferenceByFabricationIdTool : ICortexTool
 {
     public string Name => "get_steel_reference_by_fabrication_id";

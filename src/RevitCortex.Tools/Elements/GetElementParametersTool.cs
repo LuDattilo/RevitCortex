@@ -8,6 +8,7 @@ using RevitCortex.Core.Tools;
 
 namespace RevitCortex.Tools.Elements;
 
+[ToolSafety(true, false)]
 public class GetElementParametersTool : ICortexTool
 {
     public string Name => "get_element_parameters";

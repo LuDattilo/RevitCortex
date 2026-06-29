@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Annotations;
 /// <summary>
 /// Finds and removes tags that have empty text or reference deleted/invalid elements.
 /// </summary>
+[ToolSafety(false, true)]
 public class WipeEmptyTagsTool : ICortexTool
 {
     public string Name => "wipe_empty_tags";

@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Creates a new view (floor plan, ceiling plan, section, elevation, 3D).
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateViewTool : ICortexTool
 {
     public string Name => "create_view";

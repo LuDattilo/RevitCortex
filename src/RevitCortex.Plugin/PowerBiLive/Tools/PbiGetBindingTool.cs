@@ -17,6 +17,7 @@ namespace RevitCortex.Plugin.PowerBiLive.Tools;
 ///
 /// No inputs required.
 /// </summary>
+[ToolSafety(true, false)]
 public class PbiGetBindingTool : ICortexTool
 {
     public string Name => "pbi_get_binding";

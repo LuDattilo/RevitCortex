@@ -15,6 +15,7 @@ namespace RevitCortex.Tools.IFC;
 /// Reconstructs structural columns and beams from IFC-imported DirectShape elements.
 /// Columns use point-based NewFamilyInstance; beams use curve-based NewFamilyInstance.
 /// </summary>
+[ToolSafety(false, false)]
 public class IfcRebuildStructuralMembersTool : ICortexTool
 {
     public string Name => "ifc_rebuild_structural_members";

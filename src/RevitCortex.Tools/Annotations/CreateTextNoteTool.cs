@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Annotations;
 /// <summary>
 /// Creates one or more text notes in the active or specified view.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateTextNoteTool : ICortexTool
 {
     public string Name => "create_text_note";

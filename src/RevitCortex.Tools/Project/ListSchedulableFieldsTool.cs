@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Project;
 /// Discovers all available schedulable fields for a given category by creating
 /// a temporary schedule. Requires a transaction (creates + deletes temp element).
 /// </summary>
+[ToolSafety(true, false)]
 public class ListSchedulableFieldsTool : ICortexTool
 {
     public string Name => "list_schedulable_fields";

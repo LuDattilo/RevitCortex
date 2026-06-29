@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Creates a grid system with specified counts, spacing, and labeling.
 /// </summary>
+[ToolSafety(false, true)]
 public class CreateGridTool : ICortexTool
 {
     public string Name => "create_grid";

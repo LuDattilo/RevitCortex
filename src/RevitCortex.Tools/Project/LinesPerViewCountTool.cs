@@ -14,6 +14,7 @@ namespace RevitCortex.Tools.Project;
 /// Scans all views and counts detail/model lines per view, returning views
 /// exceeding a threshold sorted by line count. Useful for performance auditing.
 /// </summary>
+[ToolSafety(true, false)]
 public class LinesPerViewCountTool : ICortexTool
 {
     public string Name => "lines_per_view_count";

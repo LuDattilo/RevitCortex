@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Creates a schedule view with specified category, fields, filters, and sort options.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateScheduleTool : ICortexTool
 {
     public string Name => "create_schedule";

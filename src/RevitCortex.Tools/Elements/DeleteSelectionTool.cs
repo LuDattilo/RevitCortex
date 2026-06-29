@@ -11,6 +11,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Deletes a named saved selection filter.
 /// </summary>
+[ToolSafety(false, true)]
 public class DeleteSelectionTool : ICortexTool
 {
     public string Name => "delete_selection";

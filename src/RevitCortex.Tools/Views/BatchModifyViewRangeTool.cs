@@ -12,6 +12,7 @@ namespace RevitCortex.Tools.Views;
 /// <summary>
 /// Modifies the view range (top, cut plane, bottom, view depth) for one or more plan views.
 /// </summary>
+[ToolSafety(false, false)]
 public class BatchModifyViewRangeTool : ICortexTool
 {
     public string Name => "batch_modify_view_range";

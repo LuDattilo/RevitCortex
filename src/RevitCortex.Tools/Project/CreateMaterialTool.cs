@@ -11,6 +11,7 @@ namespace RevitCortex.Tools.Project;
 /// <summary>
 /// Creates a new material in the project with optional color, class, and transparency.
 /// </summary>
+[ToolSafety(false, false)]
 public class CreateMaterialTool : ICortexTool
 {
     public string Name => "create_material";

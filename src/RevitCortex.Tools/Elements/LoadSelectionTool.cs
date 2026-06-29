@@ -13,6 +13,7 @@ namespace RevitCortex.Tools.Elements;
 /// <summary>
 /// Lists saved selections or loads a named selection, optionally selecting elements in view.
 /// </summary>
+[ToolSafety(true, false)]
 public class LoadSelectionTool : ICortexTool
 {
     public string Name => "load_selection";
