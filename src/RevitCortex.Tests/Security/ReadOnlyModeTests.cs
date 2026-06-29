@@ -3,6 +3,7 @@ using RevitCortex.Core.Discovery;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Security;
 using RevitCortex.Core.Session;
+using RevitCortex.Core.Tools;
 using RevitCortex.Plugin;
 using RevitCortex.Tests.Router;
 using Xunit;
@@ -19,19 +20,38 @@ public class ReadOnlyModeTests
         return new CortexRouter(session, analyzer);
     }
 
-    private void RegisterTool(CortexRouter router, FakeTool tool)
+    [ToolSafety(false)]
+    private sealed class DeclaredWriteWithReadPrefixTool : FakeTool
     {
-        var field = typeof(CortexRouter).GetField("_tools",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-        var tools = (System.Collections.Generic.Dictionary<string, RevitCortex.Core.Tools.ICortexTool>)field.GetValue(router)!;
-        tools[tool.Name] = tool;
+        public DeclaredWriteWithReadPrefixTool()
+        {
+            Name = "get_declared_write";
+        }
+    }
+
+    [ToolSafety(true)]
+    private sealed class DeclaredReadWithWritePrefixTool : FakeTool
+    {
+        public DeclaredReadWithWritePrefixTool()
+        {
+            Name = "set_declared_read";
+        }
+    }
+
+    [ToolSafety(false, true)]
+    private sealed class DeclaredDestructiveTool : FakeTool
+    {
+        public DeclaredDestructiveTool()
+        {
+            Name = "delete_declared_destructive";
+        }
     }
 
     [Fact]
     public void ReadOnlyMode_BlocksWriteTool()
     {
         var router = CreateRouter(out _);
-        RegisterTool(router, new FakeTool { Name = "delete_element" });
+        router.RegisterTool(new FakeTool { Name = "delete_element" });
         router.ReadOnlyMode = true;
 
         var result = router.Route("delete_element", new JObject());
@@ -44,7 +64,7 @@ public class ReadOnlyModeTests
     public void ReadOnlyMode_AllowsReadTool()
     {
         var router = CreateRouter(out _);
-        RegisterTool(router, new FakeTool { Name = "get_element_parameters" });
+        router.RegisterTool(new FakeTool { Name = "get_element_parameters" });
         router.ReadOnlyMode = true;
 
         var result = router.Route("get_element_parameters", new JObject());
@@ -55,11 +75,45 @@ public class ReadOnlyModeTests
     public void ReadOnlyMode_Disabled_AllowsWriteTool()
     {
         var router = CreateRouter(out _);
-        RegisterTool(router, new FakeTool { Name = "delete_element" });
+        router.RegisterTool(new FakeTool { Name = "delete_element" });
         router.ReadOnlyMode = false;
 
         var result = router.Route("delete_element", new JObject());
         Assert.True(result.Success);
+    }
+
+    [Fact]
+    public void ReadOnlyMode_BlocksDeclaredWriteToolWithReadPrefix()
+    {
+        var router = CreateRouter(out _);
+        router.RegisterTool(new DeclaredWriteWithReadPrefixTool());
+        router.ReadOnlyMode = true;
+
+        var result = router.Route("get_declared_write", new JObject());
+
+        Assert.False(result.Success);
+        Assert.Equal(CortexErrorCode.PermissionDenied, result.Error!.Code);
+    }
+
+    [Fact]
+    public void ReadOnlyMode_AllowsDeclaredReadToolWithWritePrefix()
+    {
+        var router = CreateRouter(out _);
+        router.RegisterTool(new DeclaredReadWithWritePrefixTool());
+        router.ReadOnlyMode = true;
+
+        var result = router.Route("set_declared_read", new JObject());
+
+        Assert.True(result.Success);
+    }
+
+    [Fact]
+    public void ToolSafety_ExposesDestructiveMetadata()
+    {
+        var router = CreateRouter(out _);
+        router.RegisterTool(new DeclaredDestructiveTool());
+
+        Assert.True(router.IsToolDestructive("delete_declared_destructive"));
     }
 
     [Theory]

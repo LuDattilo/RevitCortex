@@ -128,27 +128,35 @@ public class CortexSession
     /// Ask user to confirm a destructive operation. Returns true if confirmed or no callback set.
     /// If "Yes to All" was previously clicked, auto-approves for 120 s.
     /// If "Auto" mode is active, auto-approves indefinitely until the user clicks Stop Auto.
+    /// Critical confirmations ignore automatic approval modes and require a real callback.
     /// </summary>
     /// <param name="action">Action verb: "delete", "rename", "replace compound structure", etc.</param>
     /// <param name="elementCount">Number of elements affected.</param>
     /// <param name="description">Optional detailed description of what will happen.</param>
-    public bool RequestConfirmation(string action, int elementCount, string? description = null)
+    /// <param name="critical">If true, bypasses ApproveAll and fails closed when no callback is available.</param>
+    public bool RequestConfirmation(
+        string action,
+        int elementCount,
+        string? description = null,
+        bool critical = false)
     {
         if (elementCount <= 0) return true;
-        if (AutoMode)
+        if (!critical && AutoMode)
         {
             // Auto-approved by Auto mode. Signal activity so the UI keeps the
             // Auto mode window alive through this burst of operations.
             AutoModeActivity?.Invoke();
             return true;
         }
-        if (ApproveAll) return true;
+        if (!critical && ApproveAll) return true;
+        if (critical && ConfirmAction == null) return false;
 
         var result = ConfirmAction?.Invoke(action, elementCount, description);
         if (result == null)
         {
-            // null = "Yes to All" was clicked
-            ApproveAll = true;
+            // null = "Yes to All" was clicked. Critical confirmations may
+            // proceed for this explicit click, but must not arm future approval.
+            if (!critical) ApproveAll = true;
             return true;
         }
         if (result == false) return false;
@@ -156,7 +164,7 @@ public class CortexSession
         // Check for Auto sentinel: ConfirmAction returns false with a special
         // convention would be complex — instead ConfirmationHelper sets AutoMode
         // directly on the session. Check again after the dialog.
-        if (AutoMode) return true;
+        if (!critical && AutoMode) return true;
 
         return result.Value;
     }

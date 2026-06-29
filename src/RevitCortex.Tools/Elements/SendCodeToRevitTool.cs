@@ -19,6 +19,7 @@ namespace RevitCortex.Tools.Elements;
 /// Scripts are persisted to ~/.revitcortex/scripts/ and cleaned up at Revit shutdown
 /// unless marked as reusable.
 /// </summary>
+[ToolSafety(false, true)]
 public class SendCodeToRevitTool : ICortexTool
 {
     public static readonly string ScriptsFolder = Path.Combine(
@@ -63,7 +64,7 @@ public class SendCodeToRevitTool : ICortexTool
         }
 
         // Gate 3: explicit user confirmation before any script execution
-        if (!session.RequestConfirmation("execute C# script", 1))
+        if (!session.RequestConfirmation("execute C# script", 1, critical: true))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Script execution cancelled by user");
 
         // Persist script to ~/.revitcortex/scripts/

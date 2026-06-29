@@ -20,6 +20,8 @@ namespace RevitCortex.Plugin;
 public class CortexRouter
 {
     private readonly Dictionary<string, ICortexTool> _tools = new();
+    private readonly Dictionary<string, ToolSafetyRegistration> _toolSafety =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly CortexSession _session;
     private readonly IDocumentAnalyzer _analyzer;
     private readonly AuditLogger _auditLogger;
@@ -69,6 +71,20 @@ public class CortexRouter
         "push_to_powerbi",
     };
 
+    private sealed class ToolSafetyRegistration
+    {
+        public ToolSafetyRegistration(bool readOnly, bool destructive, bool declared)
+        {
+            ReadOnly = readOnly;
+            Destructive = destructive;
+            Declared = declared;
+        }
+
+        public bool ReadOnly { get; }
+        public bool Destructive { get; }
+        public bool Declared { get; }
+    }
+
     public CortexRouter(CortexSession session, IDocumentAnalyzer analyzer, AuditLogger? auditLogger = null)
     {
         _session = session;
@@ -89,7 +105,7 @@ public class CortexRouter
             try
             {
                 var tool = (ICortexTool)Activator.CreateInstance(type)!;
-                _tools[tool.Name] = tool;
+                RegisterTool(tool, type);
             }
             catch (Exception ex)
             {
@@ -97,6 +113,53 @@ public class CortexRouter
                     $"[RevitCortex] Failed to register tool {type.Name}: {ex.Message}");
             }
         }
+    }
+
+    public void RegisterTool(ICortexTool tool)
+    {
+        RegisterTool(tool, tool.GetType());
+    }
+
+    private void RegisterTool(ICortexTool tool, Type toolType)
+    {
+        _tools[tool.Name] = tool;
+
+        var safety = ResolveToolSafety(tool, toolType);
+        _toolSafety[tool.Name] = safety;
+
+        var prefixReadOnly = IsReadOnlyTool(tool.Name);
+        if (safety.Declared && safety.ReadOnly != prefixReadOnly)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[RevitCortex] Tool safety mismatch for {tool.Name}: " +
+                $"declared ReadOnly={safety.ReadOnly}, prefix ReadOnly={prefixReadOnly}.");
+        }
+        else if (!safety.Declared)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[RevitCortex] Tool {tool.Name} has no [ToolSafety]; using prefix fallback.");
+        }
+    }
+
+    private static ToolSafetyRegistration ResolveToolSafety(ICortexTool tool, Type toolType)
+    {
+        var aware = tool as IToolSafetyAware;
+        if (aware != null)
+        {
+            var info = aware.GetToolSafety();
+            return new ToolSafetyRegistration(info.ReadOnly, info.Destructive, declared: true);
+        }
+
+        var attribute = (ToolSafetyAttribute?)Attribute.GetCustomAttribute(
+            toolType, typeof(ToolSafetyAttribute), inherit: true);
+        if (attribute != null)
+        {
+            return new ToolSafetyRegistration(
+                attribute.ReadOnly, attribute.Destructive, declared: true);
+        }
+
+        return new ToolSafetyRegistration(
+            IsReadOnlyTool(tool.Name), destructive: false, declared: false);
     }
 
     public CortexResult<object> Route(string toolName, JObject input)
@@ -122,7 +185,7 @@ public class CortexRouter
                 suggestion: "This tool requires specific document features (e.g., worksets, phases)");
 
         // Read-only mode: block write tools
-        if (_readOnlyMode && !IsReadOnlyTool(toolName))
+        if (_readOnlyMode && !IsToolReadOnly(toolName))
             return CortexResult<object>.Fail(CortexErrorCode.PermissionDenied,
                 $"Tool '{toolName}' is blocked in read-only mode",
                 suggestion: "Disable read-only mode in Settings to allow write operations");
@@ -170,7 +233,7 @@ public class CortexRouter
                 var timeoutSeconds = (tool as ICommandTimeoutTool)?.CommandTimeoutSeconds ?? 120;
                 result = _dispatcher.Execute(tool, input, _session, timeoutSeconds * 1000);
             }
-            else if (onUiThread && !IsReadOnlyTool(toolName)
+            else if (onUiThread && !IsToolReadOnly(toolName)
                      && !InlineUiThreadAllowedTools.Contains(toolName))
             {
                 // The inline path runs on the UI thread but outside a Revit API
@@ -312,6 +375,18 @@ public class CortexRouter
                 return true;
         }
         return false;
+    }
+
+    public bool IsToolReadOnly(string toolName)
+    {
+        return _toolSafety.TryGetValue(toolName, out var safety)
+            ? safety.ReadOnly
+            : IsReadOnlyTool(toolName);
+    }
+
+    public bool IsToolDestructive(string toolName)
+    {
+        return _toolSafety.TryGetValue(toolName, out var safety) && safety.Destructive;
     }
 
     public bool ReadOnlyMode

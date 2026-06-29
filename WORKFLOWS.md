@@ -227,6 +227,19 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 ---
 
+## Convenzione Sviluppo: Tool Safety
+
+**Sequenza:** nuovo/modificato `ICortexTool` -> dichiarare `[ToolSafety(readOnly, destructive)]` quando il comportamento e noto -> verificare read-only mode con test -> build R25 + R24
+**Parametri chiave:**
+- `readOnly`: valore autorevole usato dal router; il prefisso del nome resta solo fallback per tool non annotati
+- `destructive`: metadata per audit/UI/gating; usare `true` per delete, purge, rename, parameter write, code execution e operazioni equivalenti
+- `send_code_to_revit`: deve usare conferma critica, non auto-approvabile da "Yes to All"
+**NON fare:** Non affidare la sicurezza solo a prefissi `get_`/`export_`. Non usare `RequestConfirmation` normale per capacita arbitrarie come esecuzione C#.
+
+**Fonte:** 2026-06-29 Tool Safety & Hardening Design
+
+---
+
 ## IFC: Verifica Capacita
 
 **Sequenza:** `ifc_get_capabilities`

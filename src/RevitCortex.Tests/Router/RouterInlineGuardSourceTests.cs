@@ -26,7 +26,7 @@ public class RouterInlineGuardSourceTests
     {
         var src = ReadRouter();
         Assert.Contains("InlineUiThreadAllowedTools", src);
-        Assert.Contains("onUiThread && !IsReadOnlyTool(toolName)", src);
+        Assert.Contains("onUiThread && !IsToolReadOnly(toolName)", src);
         Assert.Contains("cannot run inline on the UI thread", src);
     }
 
