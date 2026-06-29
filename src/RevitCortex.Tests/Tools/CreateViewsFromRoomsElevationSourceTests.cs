@@ -34,10 +34,23 @@ public class CreateViewsFromRoomsElevationSourceTests
 
         Assert.Contains("ViewFamily.Elevation", src);
         Assert.Contains("ElevationMarker.CreateElevationMarker", src);
-        Assert.Contains(".CreateElevation(doc, ownerPlan.Id, index)", src);
+        Assert.Contains(".CreateElevation(doc, ownerPlan.Id, 0)", src);
         Assert.Contains("FindOwnerFloorPlan(doc, room)", elevationBranch);
         Assert.Contains("CreateElevationsFromRoom(", elevationBranch);
         Assert.DoesNotContain("CreateSectionFromBB(doc, bb, offset, dir)", elevationBranch);
+    }
+
+    [Fact]
+    public void ElevationCreation_UsesOneRotatedMarkerPerDirection()
+    {
+        var src = ReadTool();
+
+        // A single marker only hosts one elevation reliably (index 1-3 throw
+        // "index is occupied or out of range"), so we rotate a fresh marker per side.
+        Assert.Contains("RotateElevationMarker(doc, marker.Id, markerOrigin, RotationAngleForDirection(dir))", src);
+        Assert.Contains("ElementTransformUtils.RotateElement", src);
+        Assert.DoesNotContain("ElevationIndexForDirection", src);
+        Assert.DoesNotContain(".CreateElevation(doc, ownerPlan.Id, index)", src);
     }
 
     [Fact]

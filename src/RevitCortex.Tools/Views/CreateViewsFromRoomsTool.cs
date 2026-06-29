@@ -152,15 +152,19 @@ public class CreateViewsFromRoomsTool : ICortexTool
         var center = (roomBB.Min + roomBB.Max) / 2.0;
         var z = room.Level != null ? room.Level.Elevation : roomBB.Min.Z;
         var markerOrigin = new XYZ(center.X, center.Y, z);
-        var marker = ElevationMarker.CreateElevationMarker(doc, vft.Id, markerOrigin, scale);
-
         var directions = new[] { "north", "south", "east", "west" };
         foreach (var dir in directions)
         {
+            ElevationMarker? marker = null;
             try
             {
-                var index = ElevationIndexForDirection(dir);
-                var elevView = marker.CreateElevation(doc, ownerPlan.Id, index);
+                // One marker per direction, each rotated to face the room and read at index 0.
+                // A single marker only reliably hosts one elevation via this API ("index is
+                // occupied or out of range" on indices 1-3), so we create a fresh marker per side.
+                marker = ElevationMarker.CreateElevationMarker(doc, vft.Id, markerOrigin, scale);
+                RotateElevationMarker(doc, marker.Id, markerOrigin, RotationAngleForDirection(dir));
+
+                var elevView = marker.CreateElevation(doc, ownerPlan.Id, 0);
                 TrySetName(elevView, $"{Capitalize(dir)} - {viewNameBase}");
                 elevView.Scale = scale;
                 ApplyRoomCrop(elevView, roomBB, offset);
@@ -169,25 +173,31 @@ public class CreateViewsFromRoomsTool : ICortexTool
             catch (Exception ex)
             {
                 warnings.Add($"Failed to create {dir} elevation for room {room.Number}: {FormatException(ex)}");
+                if (marker != null)
+                {
+                    try { doc.Delete(marker.Id); } catch { }
+                }
             }
-        }
-
-        if (createdViews.Count == 0)
-        {
-            try { doc.Delete(marker.Id); } catch { }
         }
 
         return createdViews;
     }
 
-    private static int ElevationIndexForDirection(string direction)
+    private static void RotateElevationMarker(Document doc, ElementId markerId, XYZ origin, double angle)
+    {
+        if (Math.Abs(angle) < 0.000001) return;
+        var axis = Line.CreateBound(origin, origin + XYZ.BasisZ);
+        ElementTransformUtils.RotateElement(doc, markerId, axis, angle);
+    }
+
+    private static double RotationAngleForDirection(string direction)
     {
         switch (direction)
         {
-            case "east": return 1;
-            case "south": return 2;
-            case "west": return 3;
-            default: return 0;
+            case "east": return -Math.PI / 2.0;
+            case "south": return Math.PI;
+            case "west": return Math.PI / 2.0;
+            default: return 0.0;
         }
     }
 
