@@ -67,6 +67,7 @@ public class CreateGridTool : ICortexTool
                 StringComparer.OrdinalIgnoreCase);
 
             using var tx = new Transaction(doc, "RevitCortex: Create Grid");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             // X grids (vertical lines, labeled alphabetically by default)
@@ -101,7 +102,10 @@ public class CreateGridTool : ICortexTool
                 createdGrids.Add(new { id = ToolHelpers.GetElementIdValue(grid.Id), axis = "Y", name = grid.Name, requestedLabel = label, position = i * ySpacingMm });
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
 
             return CortexResult<object>.Ok(new
             {
@@ -159,9 +163,13 @@ public class CreateGridTool : ICortexTool
 
         var oldName = grid.Name;
         using var tx = new Transaction(doc, "RevitCortex: Rename Grid");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         grid.Name = newName;
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new { action = "rename", gridId = ToolHelpers.GetElementIdValue(grid.Id), oldName, newName });
     }
@@ -176,9 +184,13 @@ public class CreateGridTool : ICortexTool
 
         var name = grid!.Name;
         using var tx = new Transaction(doc, "RevitCortex: Delete Grid");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         doc.Delete(grid.Id);
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new { action = "delete", deletedGrid = name });
     }

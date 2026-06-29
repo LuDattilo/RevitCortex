@@ -86,6 +86,7 @@ public class DuplicateFamilyTypeTool : ICortexTool
 
             using (var tx = new Transaction(doc!, "RevitCortex: Duplicate Family Type"))
             {
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
 
                 var newType = source.Duplicate(newName) as FamilySymbol;
@@ -126,7 +127,10 @@ public class DuplicateFamilyTypeTool : ICortexTool
                     }
                 }
 
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
 
                 var result = new Dictionary<string, object?>
                 {

@@ -70,6 +70,7 @@ public class CreateArrayTool : ICortexTool
                         "Associative arrays need an active view. Activate a view, or pass associative=false for loose copies.");
 
                 using var atx = new Transaction(doc, "RevitCortex: Create Array (associative)");
+                var atxFailures = TransactionFailureHandling.SuppressWarnings(atx);
                 atx.Start();
                 ElementId arrayId;
                 if (arrayType == "radial")
@@ -92,7 +93,10 @@ public class CreateArrayTool : ICortexTool
                     var la = LinearArray.Create(doc, view, sourceIds, count, totalVec, ArrayAnchorMember.Last);
                     arrayId = la.Id;
                 }
-                atx.Commit();
+                if (atx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(atxFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
 
                 return CortexResult<object>.Ok(new
                 {
@@ -105,6 +109,7 @@ public class CreateArrayTool : ICortexTool
             }
 
             using var tx = new Transaction(doc, "RevitCortex: Create Array");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             if (arrayType == "radial")
@@ -169,7 +174,10 @@ public class CreateArrayTool : ICortexTool
                 }
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
 
             return CortexResult<object>.Ok(new
             {

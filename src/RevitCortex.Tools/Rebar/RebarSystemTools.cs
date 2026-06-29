@@ -69,10 +69,23 @@ public class CreateAreaReinforcementTool : ICortexTool
             if (cerr != null) return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, cerr);
         }
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would create an area reinforcement system on host {ToolHelpers.GetElementIdValue(host!)}",
+                hostId = ToolHelpers.GetElementIdValue(host!),
+                barTypeId = ToolHelpers.GetElementIdValue(barType),
+                barTypeName = barType.Name,
+                explicitBoundary = curves != null,
+                boundaryCurveCount = curves?.Count ?? 0
+            });
+
         if (!session.RequestConfirmation("create area reinforcement", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Create Area Reinforcement");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -101,7 +114,10 @@ public class CreateAreaReinforcementTool : ICortexTool
             doc.Regenerate();
             var memberIds = area.GetRebarInSystemIds().Select(i => ToolHelpers.GetElementIdValue(i)).ToList();
             var id = ToolHelpers.GetElementIdValue(area);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             string? memberCountNote = memberIds.Count == 0
                 ? "Bar system members are still 0 after regeneration; they may finish materializing after commit. Re-read with get_area_reinforcement_data to get the final member count."
                 : null;
@@ -163,10 +179,23 @@ public class CreatePathReinforcementTool : ICortexTool
         var endHook = RebarToolHelpers.ResolveRebarHookType(doc, input["endHookId"]?.Value<long?>(), input["endHookName"]?.Value<string>());
         if (endHook != null) endHookId = endHook.Id;
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would create a path reinforcement system on host {ToolHelpers.GetElementIdValue(host!)} from {curves.Count} curve(s)",
+                hostId = ToolHelpers.GetElementIdValue(host!),
+                barTypeId = ToolHelpers.GetElementIdValue(barType),
+                barTypeName = barType.Name,
+                curveCount = curves.Count,
+                flip
+            });
+
         if (!session.RequestConfirmation("create path reinforcement", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Create Path Reinforcement");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -192,7 +221,10 @@ public class CreatePathReinforcementTool : ICortexTool
             doc.Regenerate();
             var memberIds = path.GetRebarInSystemIds().Select(i => ToolHelpers.GetElementIdValue(i)).ToList();
             var id = ToolHelpers.GetElementIdValue(path);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             string? memberCountNote = memberIds.Count == 0
                 ? "Bar system members are still 0 after regeneration; they may finish materializing after commit. Re-read with get_path_reinforcement_data to get the final member count."
                 : null;
@@ -252,17 +284,31 @@ public class SetAreaReinforcementLayersTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "active (bool) is required");
         var active = input["active"]!.Value<bool>();
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would set layer '{layerStr}' active={active} on area reinforcement {ToolHelpers.GetElementIdValue(area)}",
+                areaReinforcementId = ToolHelpers.GetElementIdValue(area),
+                layer = layerStr,
+                active
+            });
+
         if (!session.RequestConfirmation("set area reinforcement layer", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Area Reinforcement Layer");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             // Verified arg order (R23-R27): SetLayerActive(bool active, AreaReinforcementLayerType layer).
             area.SetLayerActive(active, layerType);
             var isActive = area.IsLayerActive(layerType);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 areaReinforcementId = ToolHelpers.GetElementIdValue(area),
@@ -327,10 +373,23 @@ public class SetPathReinforcementOptionsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "Provide at least one of: additionalOffsetMm, primaryBarOrientation, alternatingBarOrientation");
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would set options on path reinforcement {ToolHelpers.GetElementIdValue(path)}",
+                pathReinforcementId = ToolHelpers.GetElementIdValue(path),
+                additionalOffsetMm = hasOffset ? input["additionalOffsetMm"]!.Value<double>() : (double?)null,
+                primaryBarOrientation = primary?.ToString(),
+                alternatingBarOrientation = alternating?.ToString(),
+                warnings
+            });
+
         if (!session.RequestConfirmation("set path reinforcement options", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Path Reinforcement Options");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -347,7 +406,10 @@ public class SetPathReinforcementOptionsTool : ICortexTool
                     path.AlternatingBarOrientation = alternating.Value;
                 else warnings.Add($"alternatingBarOrientation '{alternating}' is not valid (alternating layer may be disabled); ignored");
             }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 pathReinforcementId = ToolHelpers.GetElementIdValue(path),
@@ -397,10 +459,21 @@ public class ConvertRebarSystemToRebarsTool : ICortexTool
             ? area.GetRebarInSystemIds().Count
             : path!.GetRebarInSystemIds().Count;
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would convert {(area != null ? "area" : "path")} reinforcement {systemId.Value} ({memberCount} member(s)) into standalone rebars",
+                systemId = systemId.Value,
+                systemKind = area != null ? "area" : "path",
+                memberCount
+            });
+
         if (!session.RequestConfirmation("convert reinforcement to rebars", memberCount))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Convert Reinforcement To Rebars");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -411,7 +484,10 @@ public class ConvertRebarSystemToRebarsTool : ICortexTool
                 ? AreaReinforcement.ConvertRebarInSystemToRebars(doc, area)
                 : PathReinforcement.ConvertRebarInSystemToRebars(doc, path!);
             var rebarIds = resultIds.Select(i => ToolHelpers.GetElementIdValue(i)).ToList();
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = $"Converted reinforcement {systemId} into {rebarIds.Count} standalone rebar(s)",
@@ -455,10 +531,20 @@ public class RemoveRebarSystemTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 $"Element {systemId} ({elem.Category?.Name}) is not an area or path reinforcement system");
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would remove {(area != null ? "area" : "path")} reinforcement system {systemId.Value}",
+                systemId = systemId.Value,
+                systemKind = area != null ? "area" : "path"
+            });
+
         if (!session.RequestConfirmation("remove reinforcement system", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Remove Reinforcement System");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -468,7 +554,10 @@ public class RemoveRebarSystemTool : ICortexTool
             IList<ElementId> remaining = area != null
                 ? AreaReinforcement.RemoveAreaReinforcementSystem(doc, area)
                 : PathReinforcement.RemovePathReinforcementSystem(doc, path!);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = $"Removed reinforcement system {systemId}",

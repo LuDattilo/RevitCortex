@@ -60,6 +60,7 @@ public class RenameFamiliesTool : ICortexTool
                     return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
                 using var tx = new Transaction(doc, "RevitCortex: Rename Families");
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
 
                 foreach (var fam in familyList)
@@ -92,7 +93,10 @@ public class RenameFamiliesTool : ICortexTool
                     }
                 }
 
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
             }
             else
             {

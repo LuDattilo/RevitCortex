@@ -75,10 +75,23 @@ public class CreateFabricAreaTool : ICortexTool
             majorOrigin = curves[0].GetEndPoint(0);
         }
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would create a fabric area system on host {ToolHelpers.GetElementIdValue(host!)}",
+                hostId = ToolHelpers.GetElementIdValue(host!),
+                fabricSheetTypeId = ToolHelpers.GetElementIdValue(sheetType),
+                fabricSheetTypeName = sheetType.Name,
+                fabricAreaTypeId = ToolHelpers.GetElementIdValue(areaTypeId),
+                explicitBoundary = loops != null
+            });
+
         if (!session.RequestConfirmation("create fabric area", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Create Fabric Area");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -93,7 +106,10 @@ public class CreateFabricAreaTool : ICortexTool
             doc.Regenerate();
             var sheetIds = area.GetFabricSheetElementIds().Select(i => ToolHelpers.GetElementIdValue(i)).ToList();
             var id = ToolHelpers.GetElementIdValue(area);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = $"Created fabric area {id} with {sheetIds.Count} sheet(s)",
@@ -154,10 +170,22 @@ public class CreateFabricSheetTool : ICortexTool
             }
         }
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would create a {(bendLoop != null ? "bent" : "flat")} fabric sheet in host {ToolHelpers.GetElementIdValue(host!)}",
+                hostId = ToolHelpers.GetElementIdValue(host!),
+                fabricSheetTypeId = ToolHelpers.GetElementIdValue(sheetType),
+                fabricSheetTypeName = sheetType.Name,
+                bent = bendLoop != null
+            });
+
         if (!session.RequestConfirmation("create fabric sheet", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Create Fabric Sheet");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -170,7 +198,10 @@ public class CreateFabricSheetTool : ICortexTool
             if (sheet == null) { tx.RollBack(); return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed, "Revit returned no fabric sheet"); }
             var id = ToolHelpers.GetElementIdValue(sheet);
             var isBent = sheet.IsBent;
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = $"Created fabric sheet {id}",
@@ -214,16 +245,30 @@ public class PlaceFabricSheetTool : ICortexTool
         if (translationToken != null)
             transform = Transform.CreateTranslation(RebarToolHelpers.ParseXyzMm(translationToken));
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would place fabric sheet {sheetId.Value} in host {ToolHelpers.GetElementIdValue(host!)}",
+                fabricSheetId = sheetId.Value,
+                hostId = ToolHelpers.GetElementIdValue(host!),
+                hasTranslation = translationToken != null
+            });
+
         if (!session.RequestConfirmation("place fabric sheet", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Place Fabric Sheet");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             // Verified across R23-R27: FabricSheet.PlaceInHost(Element hostElement, Transform transform).
             sheet.PlaceInHost(host!, transform);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = $"Placed fabric sheet {sheetId} in host {ToolHelpers.GetElementIdValue(host!)}",
@@ -277,16 +322,29 @@ public class SetFabricSheetBendProfileTool : ICortexTool
                 $"Fabric sheet {sheetId} is not bent; a bend profile can only be set on a bent sheet",
                 suggestion: "Create the sheet with a bendProfile via create_fabric_sheet to make it bent.");
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would set bend profile on fabric sheet {sheetId.Value}",
+                fabricSheetId = sheetId.Value,
+                curveCount = curves.Count
+            });
+
         if (!session.RequestConfirmation("set fabric sheet bend profile", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Fabric Sheet Bend Profile");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             // Verified across R23-R27: FabricSheet.SetBendProfile(CurveLoop bendProfile).
             sheet.SetBendProfile(loop);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = $"Set bend profile on fabric sheet {sheetId}",
@@ -322,17 +380,29 @@ public class RemoveFabricReinforcementSystemTool : ICortexTool
         var area = doc!.GetElement(ToolHelpers.ToElementId(areaId.Value)) as FabricArea;
         if (area == null) return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, $"No FabricArea with id {areaId}");
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would remove fabric reinforcement system {areaId.Value}",
+                fabricAreaId = areaId.Value
+            });
+
         if (!session.RequestConfirmation("remove fabric area system", 1))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Remove Fabric Reinforcement System");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
             // Verified across R23-R27: STATIC FabricArea.RemoveFabricReinforcementSystem(Document, FabricArea)
             // returns IList<ElementId> of affected/remaining elements.
             IList<ElementId> remaining = FabricArea.RemoveFabricReinforcementSystem(doc, area);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 message = $"Removed fabric reinforcement system {areaId}",

@@ -70,6 +70,7 @@ public class CreateRoomTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No levels found in document");
 
             using var tx = new Transaction(doc, "RevitCortex: Create Room");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             var uv = new UV(xFt, yFt);
@@ -115,7 +116,10 @@ public class CreateRoomTool : ICortexTool
                 if (baseParam != null) baseParam.Set(baseOffsetMm / MmPerFoot);
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
 
             return CortexResult<object>.Ok(new
             {

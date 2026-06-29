@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Project;
 
@@ -68,9 +69,13 @@ public class ManageWorksetsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Create Workset");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var workset = Workset.Create(doc, name);
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {
@@ -98,9 +103,13 @@ public class ManageWorksetsTool : ICortexTool
 
         var oldName = workset.Name;
         using var tx = new Transaction(doc, "RevitCortex: Rename Workset");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         WorksetTable.RenameWorkset(doc, workset.Id, newName);
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new { action = "rename", worksetId = workset.Id.IntegerValue, oldName, newName });
     }
@@ -126,10 +135,14 @@ public class ManageWorksetsTool : ICortexTool
 
         var name = workset.Name;
         using var tx = new Transaction(doc, "RevitCortex: Delete Workset");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var settings = new DeleteWorksetSettings(DeleteWorksetOption.MoveElementsToWorkset, fallback.Id);
         WorksetTable.DeleteWorkset(doc, workset.Id, settings);
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {

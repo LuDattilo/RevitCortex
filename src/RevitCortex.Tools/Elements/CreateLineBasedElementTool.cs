@@ -182,13 +182,15 @@ public class CreateLineBasedElementTool : ICortexTool
 
                 using (var tx = new Transaction(doc, "RevitCortex: Create Wall"))
                 {
+                    var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                     tx.Start();
                     try
                     {
                         var wall = Wall.Create(doc, locationLine, wallType.Id, baseLevel.Id, heightFt, baseOffset, false, false);
                         if (wall != null)
                             createdIds.Add(ToolHelpers.GetElementIdValue(wall.Id));
-                        tx.Commit();
+                        if (tx.Commit() != TransactionStatus.Committed)
+                            warnings.Add($"Revit rolled back the wall transaction: {TransactionFailureHandling.Describe(txFailures)}");
                     }
                     catch
                     {
@@ -224,6 +226,7 @@ public class CreateLineBasedElementTool : ICortexTool
 
                 using (var tx2 = new Transaction(doc, "RevitCortex: Create Line-Based Element"))
                 {
+                    var tx2Failures = TransactionFailureHandling.SuppressWarnings(tx2);
                     tx2.Start();
                     try
                     {
@@ -260,7 +263,8 @@ public class CreateLineBasedElementTool : ICortexTool
                             }
                             createdIds.Add(ToolHelpers.GetElementIdValue(instance.Id));
                         }
-                        tx2.Commit();
+                        if (tx2.Commit() != TransactionStatus.Committed)
+                            warnings.Add($"Revit rolled back the line-based element transaction: {TransactionFailureHandling.Describe(tx2Failures)}");
                     }
                     catch
                     {

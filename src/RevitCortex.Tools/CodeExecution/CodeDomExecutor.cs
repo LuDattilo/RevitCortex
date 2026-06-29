@@ -91,8 +91,14 @@ public static class CodeDomExecutor
                 try
                 {
                     result = method!.Invoke(null, new object[] { globals.document, globals.uiDocument, globals.app });
-                    if (txGroup.GetStatus() == TransactionStatus.Started)
-                        txGroup.Assimilate();
+                    if (txGroup.GetStatus() == TransactionStatus.Started
+                        && txGroup.Assimilate() != TransactionStatus.Committed)
+                    {
+                        return CortexResult<object>.Fail(
+                            CortexErrorCode.TransactionFailed,
+                            "Revit rolled back the script transaction group on commit.",
+                            suggestion: "The script triggered a Revit error during commit. Fix the reported model errors and retry.");
+                    }
                 }
                 catch
                 {
@@ -104,12 +110,19 @@ public static class CodeDomExecutor
             else
             {
                 using var tx = new Transaction(globals.document, "RevitCortex: Script");
+                var txFailures = Utilities.TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
                 try
                 {
                     result = method!.Invoke(null, new object[] { globals.document, globals.uiDocument, globals.app });
-                    if (tx.GetStatus() == TransactionStatus.Started)
-                        tx.Commit();
+                    if (tx.GetStatus() == TransactionStatus.Started
+                        && tx.Commit() != TransactionStatus.Committed)
+                    {
+                        return CortexResult<object>.Fail(
+                            CortexErrorCode.TransactionFailed,
+                            $"Revit rolled back the script transaction: {Utilities.TransactionFailureHandling.Describe(txFailures)}",
+                            suggestion: "The script triggered a Revit error during commit. Fix the reported model errors and retry.");
+                    }
                 }
                 catch
                 {

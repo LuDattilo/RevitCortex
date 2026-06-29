@@ -60,6 +60,7 @@ public class PlaceViewportTool : ICortexTool
             var position = new XYZ(posXMm / MmPerFoot, posYMm / MmPerFoot, 0);
 
             using var tx = new Transaction(doc, "RevitCortex: Place Viewport");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
             var viewport = Viewport.Create(doc, sheetEid, viewEid, position);
 
@@ -82,7 +83,10 @@ public class PlaceViewportTool : ICortexTool
                     viewport.ChangeTypeId(vpType.Id);
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
 
             return CortexResult<object>.Ok(new
             {

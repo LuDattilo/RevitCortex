@@ -35,6 +35,7 @@ public class CreatePresetScheduleTool : ICortexTool
         try
         {
             using var tx = new Transaction(doc, "RevitCortex: Create Preset Schedule");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             ViewSchedule schedule;
@@ -81,7 +82,10 @@ public class CreatePresetScheduleTool : ICortexTool
                         suggestion: "Use: door_by_room, window_by_room, room_finish, material_takeoff, sheet_list, view_list");
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 scheduleId = ToolHelpers.GetElementIdValue(schedule.Id),

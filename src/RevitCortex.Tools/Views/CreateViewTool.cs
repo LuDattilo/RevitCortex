@@ -39,6 +39,7 @@ public class CreateViewTool : ICortexTool
         try
         {
             using var tx = new Transaction(doc, "RevitCortex: Create View");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             View? createdView = null;
@@ -103,7 +104,10 @@ public class CreateViewTool : ICortexTool
             // Optional view template by id or name
             ApplyViewTemplate(doc, createdView, input);
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
 
             return CortexResult<object>.Ok(new
             {

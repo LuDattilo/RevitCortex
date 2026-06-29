@@ -84,6 +84,7 @@ public class WorkflowClashReviewTool : ICortexTool
             if (createSectionBox && clashes.Count > 0 && minPt != null && maxPt != null)
             {
                 using var tx = new Transaction(doc, "RevitCortex: Clash Review Section Box");
+                var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
                 tx.Start();
                 var vft = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
                     .FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional);
@@ -99,7 +100,10 @@ public class WorkflowClashReviewTool : ICortexTool
                     });
                     sectionBoxViewId = ToolHelpers.GetElementIdValue(view3D.Id);
                 }
-                tx.Commit();
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
             }
 
             // Build suggestion if a set is empty

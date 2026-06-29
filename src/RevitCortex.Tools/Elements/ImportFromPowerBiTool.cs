@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
 using RevitCortex.Core.Session;
 using RevitCortex.Core.Tools;
+using RevitCortex.Tools.Utilities;
 
 namespace RevitCortex.Tools.Elements;
 
@@ -125,6 +126,7 @@ public class ImportFromPowerBiTool : ICortexTool
 
         // Open one transaction for the whole batch (Revit allows up to 1M ops).
         using var tx = new Transaction(doc, "RevitCortex: Import from Power BI CSV");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         if (!dryRun)
         {
             try { tx.Start(); }
@@ -198,7 +200,13 @@ public class ImportFromPowerBiTool : ICortexTool
 
         if (!dryRun)
         {
-            try { tx.Commit(); }
+            try
+            {
+                if (tx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
+            }
             catch (Exception ex)
             {
                 try { tx.RollBack(); } catch { }

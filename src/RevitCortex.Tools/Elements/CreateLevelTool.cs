@@ -74,6 +74,7 @@ public class CreateLevelTool : ICortexTool
             var warnings = new List<string>();
 
             using var tx = new Transaction(doc, "RevitCortex: Create Level");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();
 
             var level = Level.Create(doc, elevationMm / MmPerFoot);
@@ -110,7 +111,10 @@ public class CreateLevelTool : ICortexTool
                 else warnings.Add("Ceiling plan ViewFamilyType not found");
             }
 
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
 
             return CortexResult<object>.Ok(new
             {
@@ -135,6 +139,7 @@ public class CreateLevelTool : ICortexTool
 
         var changed = new List<string>();
         using var tx = new Transaction(doc, "RevitCortex: Set Level");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         var elevationMm = input["elevation"]?.Value<double?>();
@@ -155,7 +160,10 @@ public class CreateLevelTool : ICortexTool
             }
         }
 
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {
@@ -186,9 +194,13 @@ public class CreateLevelTool : ICortexTool
 
         var oldName = level.Name;
         using var tx = new Transaction(doc, "RevitCortex: Rename Level");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         level.Name = newName;
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new { action = "rename", levelId = ToolHelpers.GetElementIdValue(level.Id), oldName, newName });
     }
@@ -203,9 +215,13 @@ public class CreateLevelTool : ICortexTool
 
         var name = level!.Name;
         using var tx = new Transaction(doc, "RevitCortex: Delete Level");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         doc.Delete(level.Id);
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new { action = "delete", deletedLevel = name });
     }

@@ -76,6 +76,7 @@ public class CreateRevisionTool : ICortexTool
         var issuedTo = input["issuedTo"]?.Value<string>();
 
         using var tx = new Transaction(doc, "RevitCortex: Create Revision");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         var revision = Revision.Create(doc);
@@ -85,7 +86,10 @@ public class CreateRevisionTool : ICortexTool
         if (!string.IsNullOrEmpty(issuedTo)) revision.IssuedTo = issuedTo;
         ApplyIssuedAndVisibility(revision, input);
 
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {
@@ -109,6 +113,7 @@ public class CreateRevisionTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, $"Revision {revisionIdLong} not found");
 
         using var tx = new Transaction(doc, "RevitCortex: Update Revision");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         var date = input["date"]?.Value<string>();
@@ -121,7 +126,10 @@ public class CreateRevisionTool : ICortexTool
         if (issuedTo != null) revision.IssuedTo = issuedTo;
         ApplyIssuedAndVisibility(revision, input);
 
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {
@@ -179,6 +187,7 @@ public class CreateRevisionTool : ICortexTool
         }
 
         using var tx = new Transaction(doc, "RevitCortex: Add Revision to Sheets");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         int updatedCount = 0;
@@ -200,7 +209,10 @@ public class CreateRevisionTool : ICortexTool
             }
         }
 
-        tx.Commit();
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
 
         return CortexResult<object>.Ok(new
         {

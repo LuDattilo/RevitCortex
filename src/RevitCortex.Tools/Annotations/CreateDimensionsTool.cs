@@ -40,6 +40,7 @@ public class CreateDimensionsTool : ICortexTool
         var warnings = new List<string>();
 
         using var tx = new Transaction(doc, "RevitCortex: Create Dimensions");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
 
         try
@@ -55,7 +56,10 @@ public class CreateDimensionsTool : ICortexTool
                     warnings.Add($"Failed to create dimension: {ex.Message}");
                 }
             }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
         }
         catch
         {
@@ -217,46 +221,61 @@ public class CreateDimensionsTool : ICortexTool
             return;
         }
 
-        // For point-to-point dimensions we need detail lines as references
+        // For point-to-point dimensions we need detail lines as references.
         var detailLine1 = doc.Create.NewDetailCurve(view, Line.CreateBound(p0, p0 + XYZ.BasisZ * 0.01));
         var detailLine2 = doc.Create.NewDetailCurve(view, Line.CreateBound(p1, p1 + XYZ.BasisZ * 0.01));
 
-        var refs = new ReferenceArray();
-        refs.Append(detailLine1.GeometryCurve.Reference);
-        refs.Append(detailLine2.GeometryCurve.Reference);
-
-        var linePointToken = spec["linePoint"];
-        XYZ linePoint = linePointToken != null
-            ? ParseXYZ(linePointToken)
-            : (p0 + p1) / 2.0 + view.UpDirection * (2.0 / MmPerFoot * 1000);
-
-        var dimLine = Line.CreateBound(p0, p1);
-        var dim = doc.Create.NewDimension(view, dimLine, refs);
-        if (dim != null)
+        // The two anchor detail lines are only useful while the dimension that
+        // references them exists. Without cleanup they accumulate as invisible
+        // orphans whenever NewDimension returns null OR throws (e.g. invalid refs,
+        // or a failure while applying the dimension style afterwards). Track them
+        // and remove any that the created dimension did not consume in a finally.
+        bool dimensionCreated = false;
+        try
         {
-            createdIds.Add(ToolHelpers.GetElementIdValue(dim.Id));
+            var refs = new ReferenceArray();
+            refs.Append(detailLine1.GeometryCurve.Reference);
+            refs.Append(detailLine2.GeometryCurve.Reference);
 
-            // Apply dimension type if specified (parity with element-mode branch)
-            var dimensionStyleId = spec["dimensionStyleId"]?.Value<long>() ?? -1;
-            if (dimensionStyleId > 0)
+            var linePointToken = spec["linePoint"];
+            XYZ linePoint = linePointToken != null
+                ? ParseXYZ(linePointToken)
+                : (p0 + p1) / 2.0 + view.UpDirection * (2.0 / MmPerFoot * 1000);
+
+            var dimLine = Line.CreateBound(p0, p1);
+            var dim = doc.Create.NewDimension(view, dimLine, refs);
+            if (dim != null)
             {
+                dimensionCreated = true;
+                createdIds.Add(ToolHelpers.GetElementIdValue(dim.Id));
+
+                // Apply dimension type if specified (parity with element-mode branch)
+                var dimensionStyleId = spec["dimensionStyleId"]?.Value<long>() ?? -1;
+                if (dimensionStyleId > 0)
+                {
 #if REVIT2024_OR_GREATER
-                var styleElem = doc.GetElement(new ElementId(dimensionStyleId));
+                    var styleElem = doc.GetElement(new ElementId(dimensionStyleId));
 #else
-                var styleElem = doc.GetElement(new ElementId((int)dimensionStyleId));
+                    var styleElem = doc.GetElement(new ElementId((int)dimensionStyleId));
 #endif
-                if (styleElem is DimensionType dt)
-                    dim.DimensionType = dt;
+                    if (styleElem is DimensionType dt)
+                        dim.DimensionType = dt;
+                }
+            }
+            else
+            {
+                warnings.Add("NewDimension returned null; anchor detail lines were removed");
             }
         }
-        else
+        finally
         {
-            // The two anchor detail lines are only useful while the dimension that
-            // references them exists — without cleanup they accumulate as invisible
-            // orphans on every failed call.
-            doc.Delete(detailLine1.Id);
-            doc.Delete(detailLine2.Id);
-            warnings.Add("NewDimension returned null; anchor detail lines were removed");
+            // If no dimension references the anchor lines, delete them so a failed
+            // (null-return or thrown) attempt does not leave orphan detail lines.
+            if (!dimensionCreated)
+            {
+                doc.Delete(detailLine1.Id);
+                doc.Delete(detailLine2.Id);
+            }
         }
     }
 

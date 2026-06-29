@@ -67,6 +67,7 @@ public class SetReinforcementSettingsTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc!, "RevitCortex: Set Reinforcement Settings");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var warnings = new List<string>();
         try
@@ -83,7 +84,10 @@ public class SetReinforcementSettingsTool : ICortexTool
                 try { s.RebarShapeDefinesEndTreatments = setDefinesEndTreatments.Value; }
                 catch (Exception ex) { warnings.Add($"rebarShapeDefinesEndTreatments not changed: {ex.Message}"); }
             }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new { changed = true, warnings });
         }
         catch (Exception ex)
@@ -285,13 +289,17 @@ public class ManageRebarRoundingTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc!, "RevitCortex: Manage Rebar Rounding");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var warnings = new List<string>();
         try
         {
             var bad = RoundingManagerHelper.Apply(mgr, input, warnings);
             if (bad != null) { if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack(); return bad; }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             JObject dto = RoundingManagerHelper.ToDto(mgr, scope);
             dto["warnings"] = JArray.FromObject(warnings);
             return CortexResult<object>.Ok(dto);
@@ -327,6 +335,7 @@ public class ManageFabricRoundingTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc!, "RevitCortex: Manage Fabric Rounding");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var warnings = new List<string>();
         try
@@ -334,7 +343,10 @@ public class ManageFabricRoundingTool : ICortexTool
             dynamic mgr = ReinforcementSettings.GetReinforcementSettings(doc!).GetFabricRoundingManager();
             var bad = RoundingManagerHelper.Apply(mgr, input, warnings);
             if (bad != null) { if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack(); return bad; }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             JObject dto = RoundingManagerHelper.ToDto(mgr, "document");
             dto["warnings"] = JArray.FromObject(warnings);
             return CortexResult<object>.Ok(dto);
@@ -483,6 +495,7 @@ public class ManageRebarNumberingTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Set Rebar Number");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var warnings = new List<string>();
         try
@@ -498,7 +511,10 @@ public class ManageRebarNumberingTool : ICortexTool
                 // On some targets the schedule mark / REBAR_NUMBER is read-only — surface, don't fail.
                 warnings.Add($"Could not set the rebar number on this Revit version (may be read-only): {ex.Message}");
             }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 rebarId = ToolHelpers.GetElementIdValue(rebar!),
@@ -577,6 +593,7 @@ public class CreateRebarBendingDetailTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Create Rebar Bending Detail");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         var warnings = new List<string>();
         try
@@ -590,7 +607,10 @@ public class CreateRebarBendingDetailTool : ICortexTool
                 return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
                     "Revit returned no bending detail; the rebar may not support a bending detail in this view.");
             }
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 bendingDetailId = ToolHelpers.GetElementIdValue(detail),
@@ -645,6 +665,7 @@ public class ModifyRebarBendingDetailTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
         using var tx = new Transaction(doc, "RevitCortex: Modify Rebar Bending Detail");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
         tx.Start();
         try
         {
@@ -652,7 +673,10 @@ public class ModifyRebarBendingDetailTool : ICortexTool
                 RebarBendingDetail.SetPosition(detail, RebarToolHelpers.ParseXyzMm(input["position"]!));
             if (rotationDeg != null)
                 RebarBendingDetail.SetRotation(detail, rotationDeg.Value * Math.PI / 180.0);
-            tx.Commit();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
             return CortexResult<object>.Ok(new
             {
                 bendingDetailId = ToolHelpers.GetElementIdValue(detail),
