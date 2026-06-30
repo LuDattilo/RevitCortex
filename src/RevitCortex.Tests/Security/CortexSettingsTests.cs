@@ -56,4 +56,40 @@ public class CortexSettingsTests
         }
         finally { if (File.Exists(tempPath)) File.Delete(tempPath); }
     }
+
+    [Fact]
+    public void SetEnableCodeExecution_PreservesUnmodeledKeys()
+    {
+        var tempPath = Path.Combine(Path.GetTempPath(), $"rc-test-{System.Guid.NewGuid():N}.json");
+        File.WriteAllText(tempPath,
+            "{\"EnableCodeExecution\": false, \"Port\": 9090, \"DisabledTools\": [\"foo\",\"bar\"]}");
+        try
+        {
+            CortexSettings.SetEnableCodeExecution(true, tempPath);
+
+            var json = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(tempPath));
+            Assert.True(json.Value<bool>("EnableCodeExecution"));
+            // keys not modeled by CortexSettings must survive the write
+            Assert.Equal(9090, json.Value<int>("Port"));
+            Assert.Equal(new[] { "foo", "bar" }, json["DisabledTools"]!.ToObject<string[]>());
+            // and the strongly-typed loader still parses the flag
+            Assert.True(CortexSettings.Load(tempPath).EnableCodeExecution);
+        }
+        finally { if (File.Exists(tempPath)) File.Delete(tempPath); }
+    }
+
+    [Fact]
+    public void SetEnableCodeExecution_MissingFile_CreatesFileWithFlag()
+    {
+        var tempPath = Path.Combine(Path.GetTempPath(), $"rc-test-{System.Guid.NewGuid():N}.json");
+        try
+        {
+            CortexSettings.SetEnableCodeExecution(true, tempPath);
+            Assert.True(CortexSettings.Load(tempPath).EnableCodeExecution);
+
+            CortexSettings.SetEnableCodeExecution(false, tempPath);
+            Assert.False(CortexSettings.Load(tempPath).EnableCodeExecution);
+        }
+        finally { if (File.Exists(tempPath)) File.Delete(tempPath); }
+    }
 }
