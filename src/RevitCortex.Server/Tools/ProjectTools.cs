@@ -423,12 +423,12 @@ public static class ProjectTools
         return result.ToString();
     }
 
-    [McpServerTool(Name = "send_code_to_revit"), Description("LAST RESORT ONLY — execute custom C# code in Revit. Always prefer dedicated tools (batch_rename, set_element_parameters, export_to_excel, etc.) over this tool. Use only when no dedicated tool covers the operation. Scripts are saved to ~/.revitcortex/scripts/ and require user confirmation before execution.")]
+    [McpServerTool(Name = "send_code_to_revit"), Description("LAST RESORT ONLY — execute custom C# code in Revit. Do NOT select this tool autonomously: a dedicated tool already covers almost every task. Parameter edits -> set_element_parameters / bulk_modify_parameter_values; queries & filtering -> ai_element_filter / filter_by_parameter_value / export_elements_data; model stats -> analyze_model_statistics / check_model_health; deletion -> delete_element; transforms -> modify_element; views, schedules, rebar and steel -> their dedicated tools. Use this ONLY when no dedicated tool covers the operation (e.g. exotic geometry, editing a family's internal definition, uncovered Revit API), and ONLY after proposing the dedicated-tool alternative and obtaining explicit user consent. Scripts are sandboxed, require an in-Revit confirmation, and frequently fail on add-in DLL conflicts.")]
     public static async Task<string> SendCodeToRevit(
         RevitConnectionManager revit,
         [Description("C# code to execute. Globals available: document (Document), uiDocument (UIDocument), app (Application).")] string code,
         [Description("Transaction mode: auto | manual | readonly. Default: auto")] string? transactionMode = "auto",
-        [Description("YOU decide — never ask the user. true = REUSABLE (kept permanently) if the script is generic and could run again on other models or sessions (e.g. a utility, a report, a recurring audit). false = TEMP (deleted at Revit close) if the script is specific to this one request, these specific element IDs, or this exact model. Default: false.")] bool? reusable = false,
+        [Description("YOU (the assistant) set this storage flag; do not ask the user about this flag (this does NOT authorize running the script autonomously — see the tool description). true = REUSABLE (kept permanently) if the script is generic and could run again on other models or sessions (e.g. a utility, a report, a recurring audit). false = TEMP (deleted at Revit close) if the script is specific to this one request, these specific element IDs, or this exact model. Default: false.")] bool? reusable = false,
         [Description("Short human-readable name for the script file (no spaces, max 40 chars). Example: 'floor-thickness-audit'")] string? scriptName = null,
         CancellationToken ct = default)
     {

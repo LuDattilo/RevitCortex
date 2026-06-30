@@ -33,6 +33,20 @@ Ogni flusso e stato ricavato dalla documentazione operativa del progetto e testa
 
 ---
 
+## Audit Uso Improprio send_code_to_revit
+
+**Sequenza:** verificare `~/.revitcortex/settings.json` (`EnableCodeExecution`) -> analizzare `~/.revitcortex/audit.jsonl` raggruppando per `tool` -> leggere le ultime entry `send_code_to_revit` con `code_snippet`/`error_message` -> confrontare ogni pattern con `tool-schemas.txt` e i tool dedicati -> controllare le descrizioni MCP esposte da `src/RevitCortex.Server` e dal wrapper legacy `server/src/tools`.
+**Parametri chiave:**
+- `EnableCodeExecution: true` rende lo script tool realmente disponibile; con `false` ogni chiamata deve fermarsi e usare tool nativi.
+- Le entry audit v2 includono `code_snippet`, `code_hash`, `duration_ms`, `error_message`: bastano per classificare query, write, test sandbox e casi coperti da tool nativi.
+- Per query semplici usare `ai_element_filter`, `export_elements_data`, `analyze_model_statistics`, `list_*`/`get_*`; per modifiche usare i mutatori dedicati con `dryRun` quando disponibile.
+- `send_code_to_revit` deve usare una conferma critica singola: niente `Auto`, niente `Yes to All`.
+**NON fare:** Non giudicare dal solo prompt del modello. Verificare prima audit reale + schema MCP effettivamente installato. Non lasciare descrizioni legacy tipo "Execute custom C# code..." senza "LAST RESORT ONLY".
+
+**Fonte:** audit locale RevitCortex del 2026-06-30 su uso eccessivo di `send_code_to_revit`
+
+---
+
 ## Controllo Qualita Mattutino
 
 **Sequenza:** `check_model_health` -> `get_warnings` -> (opzionale) `clash_detection`
