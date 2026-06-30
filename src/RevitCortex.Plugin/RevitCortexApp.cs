@@ -81,6 +81,7 @@ public class RevitCortexApp : IExternalApplication
             _session = new CortexSession(store);
             _session.ConfirmAction = (action, count, desc) =>
                 ConfirmationHelper.ConfirmWithSession(action, count, desc, _session);
+            _session.CriticalConfirmAction = ConfirmationHelper.ConfirmCritical;
             _session.AutoModeActivity += OnAutoModeActivity;
             ConfirmationHelper.AutoModeChanged += OnAutoModeChanged;
             var analyzer = new DocumentAnalyzer();
