@@ -34,7 +34,7 @@ class GuidePDF(FPDF):
         self.set_y(-12)
         self.set_font("Helvetica", "I", 7)
         self.set_text_color(*C_LIGHT_GRAY)
-        self.cell(0, 8, "RevitCortex v1.0 - AI Assistant for Autodesk Revit", align="C")
+        self.cell(0, 8, "RevitCortex v1.0.47 - AI Assistant for Autodesk Revit", align="C")
 
     def section_title(self, num, title):
         self.add_page()
@@ -188,7 +188,7 @@ def build_pdf():
     pdf.cell(0, 7, "Multilingual support: EN, IT, FR, DE", align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(30)
     pdf.set_font("Helvetica", "I", 10)
-    pdf.cell(0, 6, "April 2026 - v1.0", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, "June 2026 - v1.0.47", align="C", new_x="LMARGIN", new_y="NEXT")
 
     # =======================================================
     # TABLE OF CONTENTS
@@ -648,11 +648,11 @@ def build_pdf():
           "Overrides removed for element 123")])
 
     pdf.tool_card("send_code_to_revit",
-        "Execute custom C# code inside Revit. Code is validated by a security sandbox.",
-        "For advanced operations not covered by the other tools.",
-        [("Run this code to rename all sheets",
-          "Code executed successfully. 12 sheets renamed.")],
-        warns="Code cannot access the filesystem, network, registry or processes. Forbidden namespaces: System.IO, System.Net, System.Diagnostics.Process.")
+        "LAST RESORT: execute custom C# code inside Revit. Disabled by default - enable it in Settings > Tools (requires explicit confirmation on every run). Code is validated by a security sandbox.",
+        "ONLY when no dedicated tool covers the operation. For parameters, filters, renaming, statistics and views always use the dedicated tools.",
+        [("Create a DirectShape geometry not covered by the standard tools",
+          "Code executed after confirmation. Geometry created.")],
+        warns="Disabled by default (EnableCodeExecution in settings.json). Code cannot access the filesystem, network, registry or processes. Forbidden namespaces: System.IO, System.Net, System.Diagnostics.Process.")
 
     # =======================================================
     # 06 - TYPES AND FAMILIES
@@ -1717,9 +1717,9 @@ def build_pdf():
             ("Worksets", "Move all doors to workset 'Architecture - Doors'."),
         ]),
         ("CUSTOM C# SCRIPT (Revit 2025+)", [
-            ("Batch operation", "Use send_code_to_revit to rename all 'Generic' families adding the 'STD-' prefix."),
+            ("Batch operation", "Add the 'STD-' prefix to all 'Generic' families."),
             ("Complex type", "Write C# code to create floor type 'FL_001' with 3 layers: ceramic 10mm, screed 60mm, concrete 150mm."),
-            ("Advanced read", "Use send_code_to_revit to calculate total wall area by level and return a table."),
+            ("Advanced read", "Calculate total wall area by level and return a table."),
         ]),
     ]
 

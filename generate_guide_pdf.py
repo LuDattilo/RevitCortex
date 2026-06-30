@@ -34,7 +34,7 @@ class GuidePDF(FPDF):
         self.set_y(-12)
         self.set_font("Helvetica", "I", 7)
         self.set_text_color(*C_LIGHT_GRAY)
-        self.cell(0, 8, "RevitCortex v1.0.18 - AI Assistant for Autodesk Revit", align="C")
+        self.cell(0, 8, "RevitCortex v1.0.47 - AI Assistant for Autodesk Revit", align="C")
 
     def section_title(self, num, title):
         self.add_page()
@@ -209,7 +209,7 @@ def build_pdf():
     pdf.cell(0, 7, "Supporto multilingua: EN, IT, FR, DE", align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(30)
     pdf.set_font("Helvetica", "I", 10)
-    pdf.cell(0, 6, "Aprile 2026 - v1.0", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, "Giugno 2026 - v1.0.47", align="C", new_x="LMARGIN", new_y="NEXT")
 
     # =======================================================
     # TABLE OF CONTENTS
@@ -669,11 +669,11 @@ def build_pdf():
           "Override rimossi per l'elemento 123")])
 
     pdf.tool_card("send_code_to_revit",
-        "Esegue codice C# personalizzato dentro Revit. Il codice viene validato da un sandbox di sicurezza.",
-        "Per operazioni avanzate non coperte dagli altri strumenti.",
-        [("Esegui questo codice per rinominare tutte le tavole",
-          "Codice eseguito con successo. 12 tavole rinominate.")],
-        warns="Il codice non puo' accedere al filesystem, rete, registro o processi. Namespace vietati: System.IO, System.Net, System.Diagnostics.Process.")
+        "ULTIMA RISORSA: esegue codice C# personalizzato dentro Revit. Disabilitato di default - abilitalo da Settings > Tools (richiede conferma esplicita a ogni esecuzione). Il codice e' validato da un sandbox di sicurezza.",
+        "SOLO quando nessuno strumento dedicato copre l'operazione. Per parametri, filtri, rinomine, statistiche e viste usa sempre gli strumenti dedicati.",
+        [("Crea una geometria DirectShape non coperta dagli strumenti standard",
+          "Codice eseguito dopo conferma. Geometria creata.")],
+        warns="Disabilitato di default (EnableCodeExecution in settings.json). Il codice non puo' accedere al filesystem, rete, registro o processi. Namespace vietati: System.IO, System.Net, System.Diagnostics.Process.")
 
     # =======================================================
     # 06 - TIPI E FAMIGLIE
@@ -1773,9 +1773,9 @@ def build_pdf():
             ("Workset", "Sposta tutte le porte nel workset 'Architettura - Porte'."),
         ]),
         ("SCRIPT C# PERSONALIZZATO (Revit 2025+)", [
-            ("Operazione batch", "Usa send_code_to_revit per rinominare tutte le famiglie di tipo 'Generic' aggiungendo il prefisso 'STD-'."),
+            ("Operazione batch", "Aggiungi il prefisso 'STD-' a tutte le famiglie di tipo 'Generic'."),
             ("Tipo complesso", "Scrivi un codice C# per creare un tipo pavimento 'PV_001' con 3 strati: gres 10mm, massetto 60mm, CLS 150mm."),
-            ("Lettura avanzata", "Usa send_code_to_revit per calcolare l'area totale di tutti i muri per livello e restituire una tabella."),
+            ("Lettura avanzata", "Calcola l'area totale di tutti i muri per livello e restituisci una tabella."),
         ]),
     ]
 
