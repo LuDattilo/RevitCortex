@@ -4,10 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
+using System.Runtime.Loader;
 using Autodesk.Revit.DB;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RevitCortex.Core.Results;
@@ -16,13 +14,24 @@ using RevitCortex.Tools.Utilities;
 namespace RevitCortex.Tools.CodeExecution;
 
 /// <summary>
-/// Compiles and executes C# code snippets inside the Revit process using the Roslyn
-/// CSharpCompilation API (no Scripting layer — avoids CreateFromAssemblyInternal conflicts).
-/// Requires Revit 2025+ (net8).
+/// Compiles and executes C# code snippets inside the Revit process. Requires Revit 2025+ (net8).
+///
+/// Roslyn isolation: Revit hosts every add-in in ONE shared AssemblyLoadContext, and sibling
+/// add-ins ship older System.Collections.Immutable / System.Reflection.Metadata copies. Simple-name
+/// binding in the default ALC then hands Microsoft.CodeAnalysis 4.12 the wrong (older) dependency,
+/// failing with "Could not load Microsoft.CodeAnalysis 4.12.0.0". To avoid this, the COMPILATION
+/// step (the only Roslyn-touching code) is delegated to <see cref="RoslynCompilerWorker"/> loaded
+/// into a dedicated <see cref="RoslynLoadContext"/> that resolves Roslyn + its 8.0 deps from OUR
+/// plugin folder. This type itself references NO Microsoft.CodeAnalysis types, so the default ALC
+/// never loads Roslyn (which would re-introduce the race). The emitted assembly bytes are then
+/// loaded and run here in the default ALC, where the script's Revit API types match the live globals.
 /// </summary>
 public static class RoslynExecutor
 {
     private static readonly int PrefixLines = 12; // lines added by WrapCode before user code
+
+    private static MethodInfo? _compileMethod;
+    private static readonly object _compileLock = new object();
 
     public static CortexResult<object> Execute(
         string code,
@@ -32,43 +41,37 @@ public static class RoslynExecutor
         try
         {
             var wrappedCode = WrapCode(code);
+            var referencePaths = GatherReferencePaths();
 
-            var refs = BuildReferences();
-
-            var parseOptions = CSharpParseOptions.Default
-                .WithLanguageVersion(LanguageVersion.Latest);
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(wrappedCode, parseOptions);
-
-            var compilation = CSharpCompilation.Create(
-                assemblyName: $"RevitCortexScript_{Guid.NewGuid():N}",
-                syntaxTrees: new[] { syntaxTree },
-                references: refs,
-                options: new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary,
-                    optimizationLevel: OptimizationLevel.Release,
-                    allowUnsafe: false));
-
-            using var ms = new MemoryStream();
-            var emitResult = compilation.Emit(ms);
-
-            if (!emitResult.Success)
+            // Compile inside the isolated ALC (Roslyn + 8.0 deps resolved from our folder).
+            byte[]? assemblyBytes;
+            string[] compileErrors;
+            try
             {
-                var errors = emitResult.Diagnostics
-                    .Where(d => d.Severity == DiagnosticSeverity.Error)
-                    .Select(d =>
-                    {
-                        var line = d.Location.GetLineSpan().StartLinePosition.Line + 1 - PrefixLines;
-                        return $"Line {line}: {d.GetMessage()}";
-                    });
+                var compile = GetCompileMethod();
+                var args = new object?[] { wrappedCode, referencePaths.ToArray(), PrefixLines, null };
+                assemblyBytes = (byte[]?)compile.Invoke(null, args);
+                compileErrors = (string[])args[3]! ?? Array.Empty<string>();
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException != null)
+            {
+                return CortexResult<object>.Fail(
+                    CortexErrorCode.Unknown,
+                    $"Roslyn compilation failed: {ex.InnerException.Message}",
+                    suggestion: "This is an internal compiler/assembly-loading error, not a problem with your code.");
+            }
+
+            if (assemblyBytes == null)
+            {
                 return CortexResult<object>.Fail(
                     CortexErrorCode.InvalidInput,
-                    $"Compilation error:\n{string.Join("\n", errors)}",
+                    $"Compilation error:\n{string.Join("\n", compileErrors)}",
                     suggestion: "Globals: document (Document), uiDocument (UIDocument), app (Application). Use explicit 'return'.");
             }
 
-            ms.Seek(0, SeekOrigin.Begin);
-            var assembly = Assembly.Load(ms.ToArray());
+            // Load + run the emitted assembly in the DEFAULT ALC so the script's Revit API
+            // types are identical to the live document/globals passed in below.
+            var assembly = Assembly.Load(assemblyBytes);
             var type = assembly.GetType("RevitCortex.DynamicScript.ScriptRunner")!;
             var method = type.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
 
@@ -143,9 +146,75 @@ public static class RoslynExecutor
         }
     }
 
+    /// <summary>
+    /// Lazily creates the isolated Roslyn ALC, loads RevitCortex.Tools into it, and caches the
+    /// <see cref="RoslynCompilerWorker.Compile"/> MethodInfo. Invoking it runs the Roslyn
+    /// compilation inside that context, where Microsoft.CodeAnalysis + Immutable/Metadata 8.0
+    /// bind to our plugin-folder copies instead of a sibling add-in's older versions.
+    /// </summary>
+    private static MethodInfo GetCompileMethod()
+    {
+        if (_compileMethod != null)
+            return _compileMethod;
+
+        lock (_compileLock)
+        {
+            if (_compileMethod != null)
+                return _compileMethod;
+
+            var dir = Path.GetDirectoryName(typeof(RoslynExecutor).Assembly.Location);
+            if (string.IsNullOrEmpty(dir))
+                dir = AppContext.BaseDirectory;
+
+            var alc = new RoslynLoadContext(dir!);
+            var toolsAsm = alc.LoadFromAssemblyPath(Path.Combine(dir!, "RevitCortex.Tools.dll"));
+            var workerType = toolsAsm.GetType("RevitCortex.Tools.CodeExecution.RoslynCompilerWorker", throwOnError: true)!;
+            _compileMethod = workerType.GetMethod("Compile", BindingFlags.Public | BindingFlags.Static)
+                ?? throw new InvalidOperationException("RoslynCompilerWorker.Compile not found");
+            return _compileMethod;
+        }
+    }
+
+    /// <summary>
+    /// AssemblyLoadContext that serves Roslyn (Microsoft.CodeAnalysis*) and its 8.0 dependencies
+    /// (System.Collections.Immutable / System.Reflection.Metadata) plus RevitCortex.Tools from the
+    /// plugin folder, and defers everything else (Revit API, RevitCortex.Core, the .NET runtime) to
+    /// the default ALC so those types stay shared.
+    /// </summary>
+    private sealed class RoslynLoadContext : AssemblyLoadContext
+    {
+        private readonly string _dir;
+
+        public RoslynLoadContext(string dir) : base(name: "RevitCortexRoslyn", isCollectible: false)
+        {
+            _dir = dir;
+        }
+
+        protected override Assembly? Load(AssemblyName assemblyName)
+        {
+            var name = assemblyName.Name;
+            if (string.IsNullOrEmpty(name))
+                return null;
+
+            bool isolate = name!.StartsWith("Microsoft.CodeAnalysis", StringComparison.Ordinal)
+                || name == "System.Collections.Immutable"
+                || name == "System.Reflection.Metadata"
+                || name == "RevitCortex.Tools";
+
+            if (isolate)
+            {
+                var path = Path.Combine(_dir, name + ".dll");
+                if (File.Exists(path))
+                    return LoadFromAssemblyPath(path);
+            }
+
+            return null; // defer to the default ALC
+        }
+    }
+
     private static string WrapCode(string userCode)
     {
-        var sb = new StringBuilder();
+        var sb = new System.Text.StringBuilder();
         sb.AppendLine("using System;");
         sb.AppendLine("using System.Linq;");
         sb.AppendLine("using System.Collections.Generic;");
@@ -166,39 +235,41 @@ public static class RoslynExecutor
         return sb.ToString();
     }
 
-    private static List<MetadataReference> BuildReferences()
+    /// <summary>
+    /// Collects the file paths of the assemblies the script may reference. Pure string work —
+    /// deliberately does NOT touch Microsoft.CodeAnalysis (MetadataReference creation happens in
+    /// the isolated worker), so JITing this type never loads Roslyn into the default ALC.
+    /// </summary>
+    private static List<string> GatherReferencePaths()
     {
-        var refs = new List<MetadataReference>();
+        var paths = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Revit hosts many add-ins in one process. Some ship private copies of
-        // framework assemblies, so loaded-assembly enumeration can leak duplicate
-        // identities into Roslyn before user code is compiled.
-        AddTrustedPlatformAssemblies(refs, seen);
+        AddTrustedPlatformAssemblies(paths, seen);
 
-        AddAssembly(refs, seen, typeof(object).Assembly);
-        AddAssembly(refs, seen, typeof(Enumerable).Assembly);
-        AddAssembly(refs, seen, typeof(List<>).Assembly);
-        AddAssembly(refs, seen, typeof(Document).Assembly);
-        AddAssembly(refs, seen, typeof(Autodesk.Revit.UI.UIDocument).Assembly);
-        AddAssembly(refs, seen, typeof(JObject).Assembly);
+        AddAssemblyPath(paths, seen, typeof(object).Assembly);
+        AddAssemblyPath(paths, seen, typeof(Enumerable).Assembly);
+        AddAssemblyPath(paths, seen, typeof(List<>).Assembly);
+        AddAssemblyPath(paths, seen, typeof(Document).Assembly);
+        AddAssemblyPath(paths, seen, typeof(Autodesk.Revit.UI.UIDocument).Assembly);
+        AddAssemblyPath(paths, seen, typeof(JObject).Assembly);
 
         foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
         {
             if (ShouldReferenceLoadedAssembly(asm))
-                AddAssembly(refs, seen, asm);
+                AddAssemblyPath(paths, seen, asm);
         }
 
-        return refs;
+        return paths;
     }
 
-    private static void AddTrustedPlatformAssemblies(List<MetadataReference> refs, HashSet<string> seen)
+    private static void AddTrustedPlatformAssemblies(List<string> paths, HashSet<string> seen)
     {
         var tpa = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
         if (string.IsNullOrEmpty(tpa))
             return;
 
-        foreach (var path in tpa.Split(Path.PathSeparator))
+        foreach (var path in tpa!.Split(Path.PathSeparator))
         {
             if (string.IsNullOrWhiteSpace(path))
                 continue;
@@ -207,7 +278,7 @@ public static class RoslynExecutor
             if (!IsFrameworkReference(name))
                 continue;
 
-            AddReferencePath(refs, seen, path);
+            AddPath(paths, seen, path);
         }
     }
 
@@ -241,19 +312,19 @@ public static class RoslynExecutor
         }
     }
 
-    private static void AddAssembly(List<MetadataReference> refs, HashSet<string> seen, Assembly asm)
+    private static void AddAssemblyPath(List<string> paths, HashSet<string> seen, Assembly asm)
     {
         try
         {
             if (asm.IsDynamic || string.IsNullOrEmpty(asm.Location))
                 return;
 
-            AddReferencePath(refs, seen, asm.Location);
+            AddPath(paths, seen, asm.Location);
         }
         catch { }
     }
 
-    private static void AddReferencePath(List<MetadataReference> refs, HashSet<string> seen, string path)
+    private static void AddPath(List<string> paths, HashSet<string> seen, string path)
     {
         try
         {
@@ -264,7 +335,7 @@ public static class RoslynExecutor
             if (string.IsNullOrEmpty(name) || !seen.Add(name))
                 return;
 
-            refs.Add(MetadataReference.CreateFromFile(path));
+            paths.Add(path);
         }
         catch { }
     }
