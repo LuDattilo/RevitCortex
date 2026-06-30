@@ -6,8 +6,8 @@
         WindowStartupLocation="Manual"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
+        ShowActivated="False"
         WindowStyle="ToolWindow"
-        Topmost="True"
         Background="White"
         Loaded="Window_Loaded">
 
