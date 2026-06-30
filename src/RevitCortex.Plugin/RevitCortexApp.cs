@@ -291,7 +291,8 @@ public class RevitCortexApp : IExternalApplication
             if (_autoModeWindow != null) return; // already showing
             try
             {
-                _autoModeWindow = new UI.AutoModeWindow();
+                var revitHandle = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
+                _autoModeWindow = new UI.AutoModeWindow(revitHandle);
                 _autoModeWindow.StopRequested += OnAutoModeWindowStopRequested;
                 _autoModeWindow.Closed += (_, _) => _autoModeWindow = null;
                 _autoModeWindow.Show();

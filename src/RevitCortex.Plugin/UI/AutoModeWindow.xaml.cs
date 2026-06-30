@@ -30,10 +30,19 @@ public partial class AutoModeWindow : Window
     // elsewhere (Stop command, document close). Suppresses StopRequested so we
     // don't loop back into deactivation.
     private bool _closingFromHost;
+    private readonly IntPtr _ownerHandle;
+    private bool _ownerAttached;
 
     public AutoModeWindow()
+        : this(Process.GetCurrentProcess().MainWindowHandle)
     {
+    }
+
+    public AutoModeWindow(IntPtr ownerHandle)
+    {
+        _ownerHandle = ownerHandle;
         InitializeComponent();
+        AttachOwner();
     }
 
     /// <summary>
@@ -48,19 +57,26 @@ public partial class AutoModeWindow : Window
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        // Parent to the Revit main window so it tracks Revit's lifetime.
-        try
-        {
-            var handle = Process.GetCurrentProcess().MainWindowHandle;
-            if (handle != IntPtr.Zero)
-                new WindowInteropHelper(this).Owner = handle;
-        }
-        catch { /* non-critical */ }
+        // Parent to Revit so the window stays above Revit, but not above other
+        // foreground applications. This is intentionally not a global Topmost window.
+        AttachOwner();
 
         // Top-center of the primary work area with a small top margin.
         var area = SystemParameters.WorkArea;
         Left = area.Left + (area.Width - Width) / 2;
         Top = area.Top + 24;
+    }
+
+    private void AttachOwner()
+    {
+        if (_ownerAttached || _ownerHandle == IntPtr.Zero) return;
+
+        try
+        {
+            new WindowInteropHelper(this).Owner = _ownerHandle;
+            _ownerAttached = true;
+        }
+        catch { /* non-critical */ }
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e)
