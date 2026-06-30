@@ -195,7 +195,11 @@ public static class CodeDomExecutor
                 MaxDepth = 5,
                 Error = (sender, args) => args.ErrorContext.Handled = true
             });
-            return JToken.Parse(json);
+            var token = JToken.Parse(json);
+            // The result envelope expects a JObject. A script that returns a collection
+            // (List/array) parses to a JArray — wrap it so it doesn't fail downstream with
+            // "Object serialized to Array. JObject instance expected."
+            return token is JObject ? token : new JObject { ["result"] = token };
         }
         catch
         {
