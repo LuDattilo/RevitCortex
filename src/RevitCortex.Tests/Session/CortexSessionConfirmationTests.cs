@@ -197,6 +197,10 @@ public class CortexSessionConfirmationTests
         session.ApproveAll = true;
         session.ConfirmAction = (_, _, _) =>
         {
+            throw new InvalidOperationException("Normal callback must not handle critical confirmations.");
+        };
+        session.CriticalConfirmAction = (_, _, _) =>
+        {
             callbackInvoked = true;
             return false;
         };
@@ -215,6 +219,10 @@ public class CortexSessionConfirmationTests
         session.AutoMode = true;
         session.ConfirmAction = (_, _, _) =>
         {
+            throw new InvalidOperationException("Normal callback must not handle critical confirmations.");
+        };
+        session.CriticalConfirmAction = (_, _, _) =>
+        {
             callbackInvoked = true;
             return false;
         };
@@ -226,14 +234,36 @@ public class CortexSessionConfirmationTests
     }
 
     [Fact]
-    public void RequestConfirmation_CriticalYesToAll_DoesNotArmApproveAll()
+    public void RequestConfirmation_CriticalNullCallbackResult_CancelsAndDoesNotArmApproveAll()
     {
         var session = NewSession();
-        session.ConfirmAction = (_, _, _) => null;
+        session.CriticalConfirmAction = (_, _, _) => null;
+
+        var result = session.RequestConfirmation("execute C# script", 1, critical: true);
+
+        Assert.False(result);
+        Assert.False(session.ApproveAll);
+    }
+
+    [Fact]
+    public void RequestConfirmation_CriticalIgnoresNormalCallback()
+    {
+        var session = NewSession();
+        session.ConfirmAction = (_, _, _) => true;
+
+        var result = session.RequestConfirmation("execute C# script", 1, critical: true);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void RequestConfirmation_CriticalAllowsExplicitCriticalYes()
+    {
+        var session = NewSession();
+        session.CriticalConfirmAction = (_, _, _) => true;
 
         var result = session.RequestConfirmation("execute C# script", 1, critical: true);
 
         Assert.True(result);
-        Assert.False(session.ApproveAll);
     }
 }

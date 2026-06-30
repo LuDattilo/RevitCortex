@@ -93,6 +93,34 @@ public static class ConfirmationHelper
     }
 
     /// <summary>
+    /// Shows a confirmation dialog for critical operations. Batch approvals are
+    /// intentionally unavailable here because these actions require an explicit
+    /// per-operation decision.
+    /// </summary>
+    public static bool? ConfirmCritical(string action, int elementCount, string? description)
+    {
+        if (elementCount <= 0) return true;
+
+        var dialog = new TaskDialog("RevitCortex Critical Confirmation")
+        {
+            MainInstruction = $"About to {action} ({elementCount} element(s))",
+            CommonButtons = TaskDialogCommonButtons.None
+        };
+
+        if (!string.IsNullOrEmpty(description))
+            dialog.MainContent = description;
+
+        dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Yes",
+            "Approve this operation only");
+        dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "No",
+            "Cancel this operation");
+
+        var result = dialog.Show();
+        if (result == TaskDialogResult.CommandLink1) return true;
+        return false;
+    }
+
+    /// <summary>
     /// Fired when Auto mode is activated or deactivated via the confirmation dialog.
     /// The ribbon subscribes to this to show/hide the "Stop Auto" button immediately.
     /// </summary>

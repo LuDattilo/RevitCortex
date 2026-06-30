@@ -30,7 +30,7 @@ public class SendCodeToRevitTool : ICortexTool
     public string Category => "Code";
     public bool RequiresDocument => true;
     public bool IsDynamic => false;
-    public string Description => "Execute custom C# code in the Revit context. Use ONLY when no dedicated tool covers the task — prefer specific tools always. Globals: document (Document), uiDocument (UIDocument), app (Application). REQUIRES EnableCodeExecution=true in ~/.revitcortex/settings.json.";
+    public string Description => "LAST RESORT ONLY — execute custom C# code in the Revit context. Prefer dedicated tools always; use ONLY when no dedicated tool covers the operation and after proposing the dedicated-tool alternative and obtaining explicit user consent. Globals: document (Document), uiDocument (UIDocument), app (Application). REQUIRES EnableCodeExecution=true in ~/.revitcortex/settings.json.";
 
     public CortexResult<object> Execute(JObject input, CortexSession session)
     {

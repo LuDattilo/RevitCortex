@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace RevitCortex.Core.Security;
 
@@ -48,5 +49,32 @@ public class CortexSettings
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
         File.WriteAllText(file, JsonConvert.SerializeObject(this, Formatting.Indented));
+    }
+
+    /// <summary>
+    /// Merge-writes ONLY the EnableCodeExecution flag into the settings file,
+    /// preserving every other key (e.g. DisabledTools, Port) that this strongly-typed
+    /// class does not model. Use this instead of <see cref="Save"/> from the settings UI,
+    /// where a full re-serialize would silently drop keys owned by other pages.
+    /// </summary>
+    public static void SetEnableCodeExecution(bool enabled, string? path = null)
+    {
+        var file = path ?? DefaultPath;
+        JObject root;
+        try
+        {
+            root = File.Exists(file) ? JObject.Parse(File.ReadAllText(file)) : new JObject();
+        }
+        catch
+        {
+            root = new JObject();
+        }
+
+        root["EnableCodeExecution"] = enabled;
+
+        var dir = Path.GetDirectoryName(file);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+        File.WriteAllText(file, root.ToString(Formatting.Indented));
     }
 }

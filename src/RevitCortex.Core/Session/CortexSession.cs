@@ -46,6 +46,13 @@ public class CortexSession
     public Func<string, int, string?, bool?>? ConfirmAction { get; set; }
 
     /// <summary>
+    /// Confirmation callback for critical operations. Critical operations must
+    /// not expose batch approval modes such as "Yes to All" or "Auto"; null/false
+    /// both cancel.
+    /// </summary>
+    public Func<string, int, string?, bool?>? CriticalConfirmAction { get; set; }
+
+    /// <summary>
     /// When true, all subsequent confirmations are auto-approved until timeout.
     /// Set by "Yes to All" in the confirmation dialog. Expires after 120 seconds.
     /// The flag+timestamp pair must be read/written as a unit, otherwise a
@@ -149,7 +156,12 @@ public class CortexSession
             return true;
         }
         if (!critical && ApproveAll) return true;
-        if (critical && ConfirmAction == null) return false;
+        if (critical)
+        {
+            if (CriticalConfirmAction == null) return false;
+            var criticalResult = CriticalConfirmAction.Invoke(action, elementCount, description);
+            return criticalResult == true;
+        }
 
         var result = ConfirmAction?.Invoke(action, elementCount, description);
         if (result == null)

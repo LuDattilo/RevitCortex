@@ -4,7 +4,7 @@ import { withRevitConnection } from "../connection/ConnectionManager.js";
 import { toolResponse, toolError } from "../logging/compactTool.js";
 
 export function registerSendCodeToRevitTool(server: McpServer): void {
-  server.tool("send_code_to_revit", "Execute custom C# code in the Revit context", SendCodeToRevitInput.shape, async (args) => {
+  server.tool("send_code_to_revit", "LAST RESORT ONLY — execute custom C# code in Revit. Always prefer dedicated tools; use only when no native RevitCortex tool covers the operation and after explicit user consent.", SendCodeToRevitInput.shape, async (args) => {
     const start = Date.now();
     try {
       const result = await withRevitConnection(async (client) => {
