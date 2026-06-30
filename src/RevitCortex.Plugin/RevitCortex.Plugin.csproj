@@ -63,6 +63,23 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.12.0" />
   </ItemGroup>
 
+  <!-- Roslyn pulls System.Collections.Immutable / System.Reflection.Metadata 8.0, which
+       are framework-provided. The build/publish pipeline strips runtime-pack assemblies
+       from the output, and Revit's shared AssemblyLoadContext won't probe our folder for
+       them, so send_code_to_revit's Roslyn compiler fails to bind. We vendor the exact 8.0
+       copies (runtime-deps\) and copy them into the output AFTER Build and AFTER Publish
+       (so the publish trimming can't remove them); RevitCortexApp's AssemblyResolve handler
+       then serves them past the shared ALC. net8 only (R25/R26). -->
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net8'))">
+    <VendoredRoslynDep Include="$(MSBuildProjectDirectory)\runtime-deps\*.dll" />
+  </ItemGroup>
+  <Target Name="CopyVendoredRoslynDepsAfterBuild" AfterTargets="Build" Condition="$(TargetFramework.StartsWith('net8'))">
+    <Copy SourceFiles="@(VendoredRoslynDep)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" OverwriteReadOnlyFiles="true" />
+  </Target>
+  <Target Name="CopyVendoredRoslynDepsAfterPublish" AfterTargets="Publish" Condition="$(TargetFramework.StartsWith('net8'))">
+    <Copy SourceFiles="@(VendoredRoslynDep)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" OverwriteReadOnlyFiles="true" />
+  </Target>
+
   <!-- ZipArchive + HttpClient live in separate assemblies on net48 -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
     <Reference Include="System.IO.Compression" />

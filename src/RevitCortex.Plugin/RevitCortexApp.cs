@@ -71,6 +71,14 @@ public class RevitCortexApp : IExternalApplication
     {
         Instance = this;
 
+        // Roslyn (send_code_to_revit, net8+) needs Microsoft.CodeAnalysis 4.12 plus its
+        // System.Collections.Immutable / System.Reflection.Metadata 8.0 dependencies.
+        // Revit loads every add-in into ONE shared AssemblyLoadContext and does not probe
+        // our plugin folder for these, so a sibling add-in's older copy (or the missing
+        // 8.0 deps) breaks the bind with "Could not load Microsoft.CodeAnalysis 4.12.0.0".
+        // Serve our own bundled copies from the plugin folder so they always win.
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveBundledDependency;
+
         try
         {
             // Create ribbon panel
@@ -626,6 +634,40 @@ public class RevitCortexApp : IExternalApplication
         {
             System.Diagnostics.Trace.WriteLine(
                 $"[RevitCortex] Could not load Tools assembly: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Resolves Roslyn (Microsoft.CodeAnalysis*) and its System.Collections.Immutable /
+    /// System.Reflection.Metadata 8.0 dependencies from the plugin's own folder. Revit's
+    /// shared AssemblyLoadContext does not probe our folder for these, so without this a
+    /// sibling add-in's older copy can win the bind (or the 8.0 deps go unfound), which
+    /// breaks send_code_to_revit's Roslyn compiler on Revit 2025+.
+    /// Scoped to the Roslyn dependency graph so it never hijacks Revit or other add-ins.
+    /// </summary>
+    private static Assembly? ResolveBundledDependency(object? sender, ResolveEventArgs args)
+    {
+        var requested = new AssemblyName(args.Name).Name;
+        if (string.IsNullOrEmpty(requested))
+            return null;
+
+        bool wanted = requested.StartsWith("Microsoft.CodeAnalysis", StringComparison.Ordinal)
+            || requested == "System.Collections.Immutable"
+            || requested == "System.Reflection.Metadata";
+        if (!wanted)
+            return null;
+
+        try
+        {
+            var dir = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (dir == null)
+                return null;
+            var candidate = System.IO.Path.Combine(dir, requested + ".dll");
+            return System.IO.File.Exists(candidate) ? Assembly.LoadFrom(candidate) : null;
+        }
+        catch
+        {
             return null;
         }
     }
