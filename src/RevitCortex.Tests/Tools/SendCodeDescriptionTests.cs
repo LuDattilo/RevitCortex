@@ -60,6 +60,14 @@ public class SendCodeDescriptionTests
     }
 
     [Fact]
+    public void ServerDescription_DoesNotSteerToModalFamilyEditing()
+    {
+        // Document.EditFamily deadlocks from the tool's external-event context, so the
+        // description must not advertise family-internal editing as a valid escalation.
+        Assert.DoesNotContain("editing a family's internal definition", ServerToolDescription());
+    }
+
+    [Fact]
     public void ServerDescription_DropsPermissiveLegacyWording()
     {
         Assert.DoesNotContain("Execute custom C# code in the Revit context", ServerToolDescription());

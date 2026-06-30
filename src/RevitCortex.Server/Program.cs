@@ -23,8 +23,9 @@ builder.Services
             "(parameters, filtering/queries, model statistics, views, schedules, tags, dimensions, rebar, steel, IFC, Power BI). " +
             "Destructive tools accept a dryRun option — preview before committing. " +
             "send_code_to_revit is a LAST RESORT: never select it autonomously. Escalate to it only when no dedicated tool covers " +
-            "the operation (exotic geometry, editing a family's internal definition, or an uncovered Revit API), and only after " +
-            "proposing the dedicated-tool alternative to the user and obtaining their explicit consent.";
+            "the operation (exotic geometry creation, read-only inspection of an uncovered Revit API, or a one-off operation no " +
+            "dedicated tool covers) — never for modal family editing (Document.EditFamily deadlocks from the external-event context) " +
+            "— and only after proposing the dedicated-tool alternative to the user and obtaining their explicit consent.";
     })
     .WithStdioServerTransport()
     .WithToolsFromAssembly();
