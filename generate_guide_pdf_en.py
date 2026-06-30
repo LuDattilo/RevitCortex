@@ -34,7 +34,7 @@ class GuidePDF(FPDF):
         self.set_y(-12)
         self.set_font("Helvetica", "I", 7)
         self.set_text_color(*C_LIGHT_GRAY)
-        self.cell(0, 8, "RevitCortex v1.0.47 - AI Assistant for Autodesk Revit", align="C")
+        self.cell(0, 8, "RevitCortex v1.0.48 - AI Assistant for Autodesk Revit", align="C")
 
     def section_title(self, num, title):
         self.add_page()
@@ -188,7 +188,7 @@ def build_pdf():
     pdf.cell(0, 7, "Multilingual support: EN, IT, FR, DE", align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(30)
     pdf.set_font("Helvetica", "I", 10)
-    pdf.cell(0, 6, "June 2026 - v1.0.47", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, "June 2026 - v1.0.48", align="C", new_x="LMARGIN", new_y="NEXT")
 
     # =======================================================
     # TABLE OF CONTENTS
