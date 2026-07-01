@@ -259,7 +259,7 @@ Serve a: capire un `.dyn` altrui prima di lanciarlo, popolare correttamente `inp
   "pythonCode": "…corpo Python (accede a Revit API via clr)…",
   "inputs":  [ {"name":"folderPath","type":"String"}, {"name":"limit","type":"Integer"} ],
   "outputs": [ {"name":"result"} ],
-  "savePath": "C:/…/graph.dyn",   // opzionale; default cartella dedicata
+  "savePath": "C:/…/graph.dyn",   // opzionale; default: ~/.revitcortex/dynamo-graphs/<name>.dyn
   "execute": false                 // genera+salva; se true, dopo il salvataggio invoca run
 }
 ```
@@ -272,6 +272,11 @@ Pipeline:
 4. `RequestConfirmation("generate Dynamo graph", 1)`.
 5. Salva il file. Ritorna path + riepilogo (n. input/output, engine, byte).
 6. Se `execute:true` → delega a `dynamo_run_graph`.
+
+**Cartella dedicata di default:** `~/.revitcortex/dynamo-graphs/` (creata al primo uso, accanto a
+`settings.json` e `audit.jsonl` — nessuna nuova convenzione di percorso). Il nome file deriva dal
+campo `name` sanitizzato (caratteri illegali sostituiti); collisioni risolte con suffisso numerico.
+`savePath` esplicito ha la precedenza sul default.
 
 Statico perché non tocca Dynamo → generi qui anche dove Dynamo non è installato, esegui altrove.
 
