@@ -75,5 +75,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RevitCortex.Core\RevitCortex.Core.csproj" />
+    <ProjectReference Include="..\RevitCortex.Tools.Dynamo\RevitCortex.Tools.Dynamo.csproj" />
   </ItemGroup>
 </Project>

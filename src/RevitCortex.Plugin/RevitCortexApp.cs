@@ -93,6 +93,12 @@ public class RevitCortexApp : IExternalApplication
                 _router.RegisterToolsFromAssembly(toolsAssembly);
             }
 
+            var dynamoToolsAssembly = LoadNamedToolsAssembly("RevitCortex.Tools.Dynamo.dll");
+            if (dynamoToolsAssembly != null)
+            {
+                _router.RegisterToolsFromAssembly(dynamoToolsAssembly);
+            }
+
             // Also scan the Plugin assembly itself: a few tools (Power BI Live
             // auth/REST) live here because they depend on MSAL.NET which is
             // referenced by the Plugin, not the Tools project.
@@ -624,6 +630,23 @@ public class RevitCortexApp : IExternalApplication
         {
             System.Diagnostics.Trace.WriteLine(
                 $"[RevitCortex] Could not load Tools assembly: {ex.Message}");
+            return null;
+        }
+    }
+
+    private Assembly? LoadNamedToolsAssembly(string dllName)
+    {
+        try
+        {
+            var pluginDir = System.IO.Path.GetDirectoryName(
+                Assembly.GetExecutingAssembly().Location)!;
+            var path = System.IO.Path.Combine(pluginDir, dllName);
+            return System.IO.File.Exists(path) ? Assembly.LoadFrom(path) : null;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[RevitCortex] Could not load {dllName}: {ex.Message}");
             return null;
         }
     }
