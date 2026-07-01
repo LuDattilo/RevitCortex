@@ -21,6 +21,11 @@ public class DocumentCapabilities
         "show_cross_model_elements",
         "get_selected_linked_elements",
         "get_room_openings",
+        // NOTE: dynamo_get_status / dynamo_run_graph are dynamic tools too, but they live
+        // in the separate RevitCortex.Tools.Dynamo assembly. They are intentionally NOT
+        // listed here because ToolRegistrationTests validates this list against tools loaded
+        // from RevitCortex.Tools.dll only. The router gate reads IsToolEnabled (set by
+        // DocumentAnalyzer when Dynamo is present), not this convenience list.
     };
 
     public bool HasWorksets { get; set; }
