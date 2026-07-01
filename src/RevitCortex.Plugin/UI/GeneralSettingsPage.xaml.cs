@@ -305,6 +305,8 @@ public partial class GeneralSettingsPage : Page
                     PortTextBox.Text = settings.Port.ToString();
                     SetComboSelection(LogLevelComboBox, settings.LogLevel ?? DefaultLogLevel);
                     ReadOnlyCheckBox.IsChecked = settings.ReadOnlyMode;
+                    EnableDynamoCheckBox.IsChecked = settings.EnableDynamo;
+                    EnableCodeExecutionCheckBox.IsChecked = settings.EnableCodeExecution;
                     KeepCountTextBox.Text = ClampKeepCount(settings.SupportReportKeepCount).ToString();
                     return;
                 }
@@ -391,6 +393,8 @@ public partial class GeneralSettingsPage : Page
             settings["Port"] = port;
             settings["LogLevel"] = logLevel;
             settings["ReadOnlyMode"] = ReadOnlyCheckBox.IsChecked == true;
+            settings["EnableDynamo"] = EnableDynamoCheckBox.IsChecked == true;
+            settings["EnableCodeExecution"] = EnableCodeExecutionCheckBox.IsChecked == true;
             settings["SupportReportKeepCount"] = keep;
 
             string dir = Path.GetDirectoryName(SettingsFilePath)!;
@@ -499,5 +503,7 @@ internal class CortexSettings
     public int Port { get; set; } = 8080;
     public string? LogLevel { get; set; } = "Info";
     public bool ReadOnlyMode { get; set; }
+    public bool EnableDynamo { get; set; }
+    public bool EnableCodeExecution { get; set; }
     public int SupportReportKeepCount { get; set; } = 10;
 }

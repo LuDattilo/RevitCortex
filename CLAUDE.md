@@ -434,6 +434,19 @@ Specific guidance:
 - For UIDocument: `new UIDocument(document)`
 - ElementId uses `.Value` on R2024+ and `.IntegerValue` on R2023
 
+### Dynamo tools (dynamo_generate_graph / dynamo_run_graph)
+
+Escape-hatch to the full Revit API via a CPython3 Python node in a generated .dyn.
+**RevitCortex native tools ALWAYS have priority.** Use dynamo_* ONLY when:
+1. No native RevitCortex tool covers the task, AND
+2. The user explicitly approved a Dynamo/Python approach.
+
+Both write tools REQUIRE `EnableDynamo=true` in `~/.revitcortex/settings.json` (or Settings > General)
+and show a confirmation dialog. `dynamo_generate_graph` and `dynamo_list_graph_io` never load Dynamo;
+`dynamo_run_graph` requires Dynamo for Revit installed. Default output folder:
+`~/.revitcortex/dynamo-graphs/`. Python is sandboxed (no System.IO/Net/Process, no dynamic dispatch
+like getattr/eval/exec) on the automated channel — a user can still open the .dyn by hand.
+
 ## Handling User Input Situations
 
 When a tool requires user selection or interaction that cannot be automated:

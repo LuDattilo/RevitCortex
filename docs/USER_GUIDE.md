@@ -13,7 +13,7 @@
 3. [Efficienza dei token](#efficienza-dei-token)
 4. [Discipline di progetto e categorie Revit](#discipline-di-progetto-e-categorie-revit)
 5. [Riferimento comandi per disciplina](#riferimento-comandi-per-disciplina) — tutti i 288 comandi con esempi di prompt
-   - [Elementi](#elementi--lettura-ricerca-creazione-modifica) · [Progetto](#progetto--modello-materiali-abachi-impostazioni) · [IFC](#ifc--import-export-link-ricostruzione) · [Viste e Tavole](#viste-e-tavole) · [File collegati](#file-collegati-e-coordinamento) · [Power BI](#power-bi-live) · [Parametri/Annotazioni/Workflow](#parametri-annotazioni-e-workflow) · [Armatura](#armatura-rebar--reinforcement) · [Acciaio Strutturale](#acciaio-strutturale-structural-steel)
+   - [Elementi](#elementi--lettura-ricerca-creazione-modifica) · [Progetto](#progetto--modello-materiali-abachi-impostazioni) · [IFC](#ifc--import-export-link-ricostruzione) · [Viste e Tavole](#viste-e-tavole) · [File collegati](#file-collegati-e-coordinamento) · [Power BI](#power-bi-live) · [Parametri/Annotazioni/Workflow](#parametri-annotazioni-e-workflow) · [Armatura](#armatura-rebar--reinforcement) · [Acciaio Strutturale](#acciaio-strutturale-structural-steel) · [Dynamo](#dynamo)
 6. [Workflow consigliati](#workflow-consigliati)
 7. [Impostazioni di progetto avanzate](#impostazioni-di-progetto-avanzate)
 8. [Esecuzione di codice personalizzato](#esecuzione-di-codice-personalizzato)
@@ -929,6 +929,17 @@ Le categorie acciaio rientrano tipicamente in `OST_StructuralFraming` (travi, co
 **3. Tracciabilità di fabbricazione e approvazione**
 
 > "Per tutti gli elementi selezionati di categoria `OST_StructuralFraming` aggiungi le informazioni di fabbricazione (prima in anteprima), poi mostrami il fabrication ID e i materiali collegati di un elemento campione. Infine elenca i tipi di approvazione disponibili e approva la connessione 482910 con lo stato Verificato."
+
+### Dynamo
+
+Via di fuga verso l'intera API di Revit tramite un nodo Python CPython3 in un grafo `.dyn` generato. **I tool nativi di RevitCortex hanno sempre la priorità**: usare i comandi `dynamo_*` solo quando nessun tool nativo copre l'attività e l'utente ha approvato esplicitamente un approccio Dynamo/Python. I due comandi di scrittura richiedono `EnableDynamo=true` (in Impostazioni > General oppure `"EnableDynamo": true` in `~/.revitcortex/settings.json`) e mostrano una conferma nativa di Revit.
+
+| Comando | Cosa fa | Esempio di prompt naturale |
+|---------|---------|----------------------------|
+| `dynamo_get_status` | Verifica se Dynamo è disponibile e l'integrazione è abilitata. | "Dynamo è disponibile e abilitato?" |
+| `dynamo_list_graph_io` | Elenca gli input attesi da un grafo `.dyn` (non carica Dynamo). | "Che input si aspetta C:/graphs/export.dyn?" |
+| `dynamo_generate_graph` | Genera un grafo Dynamo con un nodo Python (non carica Dynamo). | "Genera un grafo Dynamo che rinomina tutte le tavole con un prefisso (Python)." |
+| `dynamo_run_graph` | Esegue un grafo `.dyn` in modalità headless (richiede Dynamo for Revit installato). | "Esegui C:/graphs/export.dyn in modalità headless." |
 
 
 ## Workflow consigliati
