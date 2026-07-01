@@ -11,8 +11,13 @@ namespace RevitCortex.Tools.Dynamo.Runtime
     /// </summary>
     public sealed class DynamoRuntimeLoader
     {
+        // The AssemblyResolve handler is process-wide, so it must be hooked exactly once
+        // for the whole AppDomain. Subscribing per instance leaks handlers across runs.
+        private static readonly object _resolverLock = new object();
+        private static bool _staticResolverHooked;
+        private static string _resolveDir = "";
+
         private readonly string _dynamoForRevitDir;
-        private bool _resolverHooked;
 
         public DynamoRuntimeLoader(string dynamoForRevitDir)
         {
@@ -46,17 +51,26 @@ namespace RevitCortex.Tools.Dynamo.Runtime
 
         private void HookResolver()
         {
-            if (_resolverHooked) return;
-            AppDomain.CurrentDomain.AssemblyResolve += ResolveFromDynamoDir;
-            _resolverHooked = true;
+            lock (_resolverLock)
+            {
+                // Always point the resolver at this loader's dir (latest wins).
+                _resolveDir = _dynamoForRevitDir;
+
+                if (_staticResolverHooked) return;
+                AppDomain.CurrentDomain.AssemblyResolve += ResolveFromDynamoDir;
+                _staticResolverHooked = true;
+            }
         }
 
-        private Assembly? ResolveFromDynamoDir(object? sender, ResolveEventArgs args)
+        private static Assembly? ResolveFromDynamoDir(object? sender, ResolveEventArgs args)
         {
             try
             {
+                var dir = _resolveDir;
+                if (string.IsNullOrEmpty(dir)) return null;
+
                 var simpleName = new AssemblyName(args.Name).Name + ".dll";
-                foreach (var root in new[] { _dynamoForRevitDir, Path.Combine(_dynamoForRevitDir, "Revit") })
+                foreach (var root in new[] { dir, Path.Combine(dir, "Revit") })
                 {
                     var candidate = Path.Combine(root, simpleName);
                     if (File.Exists(candidate)) return Assembly.LoadFrom(candidate);

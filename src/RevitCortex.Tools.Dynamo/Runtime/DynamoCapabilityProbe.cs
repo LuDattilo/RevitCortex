@@ -32,9 +32,11 @@ namespace RevitCortex.Tools.Dynamo.Runtime
             var dir = DynamoPaths.DynamoForRevitDir(_autodeskBase, revitYear);
             caps.DynamoForRevitDir = dir;
 
-            var revitDs = Path.Combine(dir, "DynamoRevitDS.dll");
-            var core = Path.Combine(dir, "DynamoCore.dll");
-            if (!File.Exists(revitDs) || !File.Exists(core))
+            // Real installs place the DLLs under {dir}\Revit\; older/other layouts keep
+            // them at the root. Mirror DynamoRuntimeLoader: probe the Revit subfolder first,
+            // then the root. IsPresent requires BOTH dlls to be found.
+            if (!TryResolveDll(dir, "DynamoRevitDS.dll", out _) ||
+                !TryResolveDll(dir, "DynamoCore.dll", out var core))
                 return caps; // IsPresent stays false
 
             caps.IsPresent = true;
@@ -44,6 +46,22 @@ namespace RevitCortex.Tools.Dynamo.Runtime
             // Revit 2024+ ships Dynamo where CPython3 is available/standard.
             caps.CPython3Expected = revitYear >= 2024;
             return caps;
+        }
+
+        /// <summary>
+        /// Looks for <paramref name="fileName"/> in {dir}\Revit\ first, then {dir}\ (root).
+        /// Returns the full path of whichever exists via <paramref name="path"/>.
+        /// </summary>
+        private static bool TryResolveDll(string dir, string fileName, out string path)
+        {
+            var revitSub = Path.Combine(dir, "Revit", fileName);
+            if (File.Exists(revitSub)) { path = revitSub; return true; }
+
+            var root = Path.Combine(dir, fileName);
+            if (File.Exists(root)) { path = root; return true; }
+
+            path = "";
+            return false;
         }
     }
 }
