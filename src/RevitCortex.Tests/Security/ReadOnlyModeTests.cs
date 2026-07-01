@@ -91,6 +91,10 @@ public class ReadOnlyModeTests
     [InlineData("create_generic_steel_connection", false)]
     [InlineData("add_steel_solid_cut", false)]
     [InlineData("delete_steel_connection", false)]
+    [InlineData("dynamo_get_status", true)]
+    [InlineData("dynamo_list_graph_io", true)]
+    [InlineData("dynamo_generate_graph", false)]
+    [InlineData("dynamo_run_graph", false)]
     public void IsReadOnlyTool_ClassifiesCorrectly(string toolName, bool expectedReadOnly)
     {
         Assert.Equal(expectedReadOnly, CortexRouter.IsReadOnlyTool(toolName));
