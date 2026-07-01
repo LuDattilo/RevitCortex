@@ -100,5 +100,56 @@ namespace RevitCortex.Tests.Dynamo
             }
             finally { if (File.Exists(outPath)) File.Delete(outPath); }
         }
+
+        [Fact]
+        public void Generate_BlockedUnsafePython_WritesNoFile()
+        {
+            var outPath = Path.Combine(Path.GetTempPath(), "rc_gen_blocked_" + System.Guid.NewGuid().ToString("N") + ".dyn");
+            var t = new DynamoGenerateGraphTool
+            {
+                SettingsPathForTests = TempSettings(true),
+                SkipConfirmationForTests = true
+            };
+            try
+            {
+                var res = t.Execute(new JObject
+                {
+                    ["name"] = "G",
+                    ["pythonCode"] = "import System.IO\nSystem.IO.File.Delete('x')",
+                    ["savePath"] = outPath
+                }, NewSession());
+                Assert.False(res.Success);
+                Assert.Equal(CortexErrorCode.PermissionDenied, res.Error!.Code);
+                Assert.False(File.Exists(outPath)); // fail-safety: no file written when a gate blocks
+            }
+            finally { if (File.Exists(outPath)) File.Delete(outPath); }
+        }
+
+        [Fact]
+        public void Generate_CancelledConfirmation_FailsAndWritesNoFile()
+        {
+            var outPath = Path.Combine(Path.GetTempPath(), "rc_gen_cancel_" + System.Guid.NewGuid().ToString("N") + ".dyn");
+            var t = new DynamoGenerateGraphTool
+            {
+                SettingsPathForTests = TempSettings(true)
+                // NOTE: do NOT set SkipConfirmationForTests — we want the confirmation gate to run
+            };
+            var session = NewSession();
+            session.ConfirmAction = (action, count, description) => false; // simulate user clicking "No"
+            try
+            {
+                var res = t.Execute(new JObject
+                {
+                    ["name"] = "G",
+                    ["pythonCode"] = "OUT = 1",
+                    ["outputs"] = new JArray { new JObject { ["name"] = "result" } },
+                    ["savePath"] = outPath
+                }, session);
+                Assert.False(res.Success);
+                Assert.Equal(CortexErrorCode.Cancelled, res.Error!.Code);
+                Assert.False(File.Exists(outPath)); // fail-safety: cancelled → no file
+            }
+            finally { if (File.Exists(outPath)) File.Delete(outPath); }
+        }
     }
 }
