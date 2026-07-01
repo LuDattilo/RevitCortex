@@ -32,5 +32,36 @@ namespace RevitCortex.Tests.Dynamo
             var err = PythonSandbox.Validate("System.Diagnostics.Process.Start('cmd')");
             Assert.NotNull(err);
         }
+
+        [Fact]
+        public void Validate_BlocksNamespaceInsideAddReferenceString()
+        {
+            // Idiomatic Dynamo Python assembly load with the forbidden namespace
+            // ONLY inside the string argument — CodeSandboxV2 alone misses this.
+            var err = PythonSandbox.Validate("clr.AddReference('System.IO')\nfrom System.IO import File");
+            Assert.NotNull(err);
+        }
+
+        [Fact]
+        public void Validate_BlocksNamespaceInsideDoubleQuotedAddReference()
+        {
+            var err = PythonSandbox.Validate("clr.AddReference(\"System.Net\")");
+            Assert.NotNull(err);
+        }
+
+        [Fact]
+        public void Validate_BlocksImportSystemDiagnostics()
+        {
+            var err = PythonSandbox.Validate("import System.Diagnostics");
+            Assert.NotNull(err);
+        }
+
+        [Fact]
+        public void Validate_AllowsCleanPythonWithStrings()
+        {
+            // A harmless string that merely contains a word must not false-positive.
+            var err = PythonSandbox.Validate("name = 'hello world'\nOUT = name.upper()");
+            Assert.Null(err);
+        }
     }
 }
