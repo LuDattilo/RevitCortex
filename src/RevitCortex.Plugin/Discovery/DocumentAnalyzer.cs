@@ -70,5 +70,16 @@ public class DocumentAnalyzer : IDocumentAnalyzer
         {
             caps.EnableTool("get_room_openings");
         }
+
+        // Dynamo tools: enable the dynamic ones (status + run) only when Dynamo for Revit
+        // is installed for this Revit version. The static generate/list tools register
+        // unconditionally (IsDynamic=false) and are unaffected.
+        var dynamoCaps = new RevitCortex.Tools.Dynamo.Runtime.DynamoCapabilityProbe()
+            .Probe(RevitCortex.Tools.Dynamo.Runtime.RevitYear.Current);
+        if (dynamoCaps.IsPresent)
+        {
+            caps.EnableTool("dynamo_get_status");
+            caps.EnableTool("dynamo_run_graph");
+        }
     }
 }

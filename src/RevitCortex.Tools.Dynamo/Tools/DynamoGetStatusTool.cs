@@ -18,7 +18,7 @@ namespace RevitCortex.Tools.Dynamo.Tools
 
         public CortexResult<object> Execute(JObject input, CortexSession session)
         {
-            int year = input["revitYear"]?.Value<int>() ?? 2025;
+            int year = input["revitYear"]?.Value<int>() ?? RevitYear.Current;
             var caps = new DynamoCapabilityProbe().Probe(year);
             var settings = CortexSettings.Load();
             return CortexResult<object>.Ok(new

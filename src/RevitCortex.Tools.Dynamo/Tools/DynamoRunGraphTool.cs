@@ -41,7 +41,7 @@ namespace RevitCortex.Tools.Dynamo.Tools
             if (!SkipConfirmationForTests && !session.RequestConfirmation("run Dynamo graph", 1))
                 return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
-            int year = input["revitYear"]?.Value<int>() ?? 2025;
+            int year = input["revitYear"]?.Value<int>() ?? RevitYear.Current;
             var caps = new DynamoCapabilityProbe().Probe(year);
             if (!caps.IsPresent)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
