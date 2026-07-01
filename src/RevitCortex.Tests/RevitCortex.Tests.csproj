@@ -16,5 +16,6 @@
     <ProjectReference Include="..\RevitCortex.Plugin\RevitCortex.Plugin.csproj" />
     <ProjectReference Include="..\RevitCortex.Server\RevitCortex.Server.csproj" />
     <ProjectReference Include="..\RevitCortex.Tools\RevitCortex.Tools.csproj" />
+    <ProjectReference Include="..\RevitCortex.Tools.Dynamo\RevitCortex.Tools.Dynamo.csproj" />
   </ItemGroup>
 </Project>
