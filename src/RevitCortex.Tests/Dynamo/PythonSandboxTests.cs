@@ -63,5 +63,61 @@ namespace RevitCortex.Tests.Dynamo
             var err = PythonSandbox.Validate("name = 'hello world'\nOUT = name.upper()");
             Assert.Null(err);
         }
+
+        // --- Adversarial: dynamic-dispatch bypass (must be blocked) ---
+
+        [Fact]
+        public void Validate_BlocksGetattr()
+        {
+            var err = PythonSandbox.Validate("io = getattr(System, 'IO')");
+            Assert.NotNull(err);
+        }
+
+        [Fact]
+        public void Validate_BlocksDunderImport()
+        {
+            var err = PythonSandbox.Validate("m = __import__('System.IO')");
+            Assert.NotNull(err); // caught by namespace scan OR dynamic-dispatch block
+        }
+
+        [Fact]
+        public void Validate_BlocksEval()
+        {
+            var err = PythonSandbox.Validate("eval('do_something()')");
+            Assert.NotNull(err);
+        }
+
+        [Fact]
+        public void Validate_BlocksExec()
+        {
+            var err = PythonSandbox.Validate("exec('import os')");
+            Assert.NotNull(err);
+        }
+
+        [Fact]
+        public void Validate_BlocksSplitStringAddReference()
+        {
+            var err = PythonSandbox.Validate("clr.AddReference('System.' + 'IO')");
+            Assert.NotNull(err); // non-literal AddReference argument is suspicious → block
+        }
+
+        [Fact]
+        public void Validate_BlocksFullSplitTokenGetattrExploit()
+        {
+            var code = "import clr\nclr.AddReference(\"System.\" + \"IO\")\nimport System\nio = getattr(System, \"I\" + \"O\")\nf = getattr(io, \"Fi\" + \"le\")\ngetattr(f, \"Del\" + \"ete\")(\"C:/victim.txt\")";
+            var err = PythonSandbox.Validate(code);
+            Assert.NotNull(err);
+        }
+
+        // --- Must NOT false-positive on clean generated Python ---
+
+        [Fact]
+        public void Validate_AllowsCleanRevitApiPython()
+        {
+            // Typical safe generated body: uses the Revit API via clr, no dynamic dispatch, no forbidden ns.
+            var code = "import clr\nclr.AddReference('RevitAPI')\nfrom Autodesk.Revit.DB import FilteredElementCollector\nOUT = len(list(IN))";
+            var err = PythonSandbox.Validate(code);
+            Assert.Null(err);
+        }
     }
 }
