@@ -18,6 +18,14 @@ public class CortexSettings
     [JsonProperty("EnableCodeExecution")]
     public bool EnableCodeExecution { get; set; } = false;
 
+    /// <summary>
+    /// When false (default), the Dynamo write tools (dynamo_generate_graph, dynamo_run_graph)
+    /// are refused at the tool-invocation boundary. The user must explicitly enable Dynamo
+    /// integration via settings.json or the Revit plugin Settings UI. Hard gate, not a soft warning.
+    /// </summary>
+    [JsonProperty("EnableDynamo")]
+    public bool EnableDynamo { get; set; } = false;
+
     /// <summary>TCP port for plugin-to-server communication.</summary>
     [JsonProperty("Port")]
     public int Port { get; set; } = 8080;
