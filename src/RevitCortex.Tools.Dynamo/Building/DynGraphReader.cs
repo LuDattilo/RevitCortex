@@ -33,40 +33,50 @@ namespace RevitCortex.Tools.Dynamo.Building
             var j = JObject.Parse(dynJson); // throws on invalid json (tested)
             var info = new DynGraphInfo
             {
-                Name = (string)j["Name"] ?? "",
-                DynamoVersion = (string)(j["View"]?["Dynamo"]?["Version"]) ?? ""
+                Name = Str(j["Name"]),
+                DynamoVersion = Str(j["View"]?["Dynamo"]?["Version"])
             };
 
             var nodes = j["Nodes"] as JArray ?? new JArray();
             info.TotalNodes = nodes.Count;
             foreach (var n in nodes)
             {
-                var ct = (string)n["ConcreteType"] ?? "";
+                if (!(n is JObject nodeObj)) continue;
+                var ct = Str(nodeObj["ConcreteType"]);
                 if (ct.StartsWith("PythonNodeModels.PythonNode"))
                 {
                     info.PythonNodeCount++;
-                    var engine = (string)n["Engine"];
-                    if (string.IsNullOrEmpty(engine))
+                    var engineStr = Str(nodeObj["Engine"]);
+                    if (string.IsNullOrEmpty(engineStr))
                     {
-                        engine = "IronPython2";
+                        engineStr = "IronPython2";
                         info.Warnings.Add("A Python node has no Engine field; Dynamo interprets it as deprecated IronPython2.");
                     }
                     if (string.IsNullOrEmpty(info.PythonEngine))
-                        info.PythonEngine = engine;
+                        info.PythonEngine = engineStr;
                 }
             }
 
             foreach (var inp in (j["Inputs"] as JArray ?? new JArray()))
+            {
+                if (!(inp is JObject inObj)) continue;
                 info.Inputs.Add(new GraphIoEntry(
-                    (string)inp["Id"] ?? "", (string)inp["Name"] ?? "",
-                    (string)inp["Type"] ?? "", (string)(inp["Value"]) ?? ""));
+                    Str(inObj["Id"]), Str(inObj["Name"]),
+                    Str(inObj["Type"]), Str(inObj["Value"])));
+            }
 
             foreach (var outp in (j["Outputs"] as JArray ?? new JArray()))
+            {
+                if (!(outp is JObject outObj)) continue;
                 info.Outputs.Add(new GraphIoEntry(
-                    (string)outp["Id"] ?? "", (string)outp["Name"] ?? "",
-                    (string)outp["Type"] ?? "", ""));
+                    Str(outObj["Id"]), Str(outObj["Name"]),
+                    Str(outObj["Type"]), ""));
+            }
 
             return info;
         }
+
+        private static string Str(JToken? t)
+            => t != null && t.Type == JTokenType.String ? (string)t! : "";
     }
 }

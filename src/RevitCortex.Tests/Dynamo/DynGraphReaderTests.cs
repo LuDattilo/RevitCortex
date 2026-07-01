@@ -46,5 +46,55 @@ namespace RevitCortex.Tests.Dynamo
         {
             Assert.ThrowsAny<System.Exception>(() => DynGraphReader.Read("{ not json"));
         }
+
+        [Fact]
+        public void Read_DoesNotThrow_OnNodesArrayWithPrimitiveElement()
+        {
+            var info = DynGraphReader.Read("{\"Nodes\":[123, null],\"Inputs\":[],\"Outputs\":[],\"View\":{}}");
+            Assert.Equal(2, info.TotalNodes); // raw element count preserved
+            Assert.Equal(0, info.PythonNodeCount);
+        }
+
+        [Fact]
+        public void Read_DoesNotThrow_OnEngineAsObject()
+        {
+            var dyn = "{\"Nodes\":[{\"ConcreteType\":\"PythonNodeModels.PythonNode, PythonNodeModels\",\"Engine\":{}}],\"Inputs\":[],\"Outputs\":[],\"View\":{}}";
+            var info = DynGraphReader.Read(dyn);
+            Assert.Equal("IronPython2", info.PythonEngine); // non-string Engine treated as missing
+            Assert.Contains(info.Warnings, w => w.Contains("IronPython2"));
+        }
+
+        [Fact]
+        public void Read_DoesNotThrow_OnInputsWithPrimitiveElement()
+        {
+            var info = DynGraphReader.Read("{\"Nodes\":[],\"Inputs\":[42],\"Outputs\":[],\"View\":{}}");
+            Assert.Empty(info.Inputs); // primitive element skipped
+        }
+
+        [Fact]
+        public void Read_ExtractsDynamoVersion()
+        {
+            var info = DynGraphReader.Read(BuildSampleDyn());
+            Assert.Equal("3.0.0.0", info.DynamoVersion);
+        }
+
+        [Fact]
+        public void Read_CountsMultiplePythonNodes_FirstEngineWins()
+        {
+            var dyn = "{\"Nodes\":[{\"ConcreteType\":\"PythonNodeModels.PythonNode, PythonNodeModels\",\"Engine\":\"CPython3\"},{\"ConcreteType\":\"PythonNodeModels.PythonNode, PythonNodeModels\"}],\"Inputs\":[],\"Outputs\":[],\"View\":{}}";
+            var info = DynGraphReader.Read(dyn);
+            Assert.Equal(2, info.PythonNodeCount);
+            Assert.Equal("CPython3", info.PythonEngine);
+        }
+
+        [Fact]
+        public void Read_MapsInputFieldsCorrectly()
+        {
+            var info = DynGraphReader.Read(BuildSampleDyn());
+            Assert.Single(info.Inputs);
+            Assert.Equal("folder", info.Inputs[0].Name);
+            Assert.Equal("string", info.Inputs[0].Type); // builder lowercases top-level input Type
+            Assert.False(string.IsNullOrEmpty(info.Inputs[0].NodeId)); // guards against positional ctor arg swap
+        }
     }
 }
