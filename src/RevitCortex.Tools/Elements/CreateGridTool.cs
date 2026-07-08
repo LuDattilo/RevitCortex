@@ -175,6 +175,17 @@ public class CreateGridTool : ICortexTool
         if (clash != null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, $"A grid named '{newName}' already exists");
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                action = "rename",
+                message = $"Preview: would rename grid '{grid!.Name}' to '{newName}'",
+                gridId = ToolHelpers.GetElementIdValue(grid.Id),
+                oldName = grid.Name,
+                newName
+            });
+
         if (!session.RequestConfirmation("rename grid", 1, grid!.Name))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
@@ -195,6 +206,16 @@ public class CreateGridTool : ICortexTool
     {
         var (grid, error) = ResolveGrid(doc, input);
         if (error != null) return error;
+
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                action = "delete",
+                message = $"Preview: would delete grid '{grid!.Name}'",
+                gridId = ToolHelpers.GetElementIdValue(grid.Id),
+                name = grid.Name
+            });
 
         if (!session.RequestConfirmation("delete grid", 1, grid!.Name))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");

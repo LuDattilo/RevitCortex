@@ -181,4 +181,51 @@ public class CreateToolsDryRunSourceTests
         Assert.True(section.Contains("[\"titleBlockId\"]", StringComparison.Ordinal),
             "create_sheet wrapper is expected to send titleBlockId; the plugin must accept that key");
     }
+
+    // ---- ALL actions of multi-action create tools honor dryRun -------------
+    // Codex review (PR #10): the create_level / create_grid wrappers advertise
+    // dryRun:true by default, but only the `create` branch honored it. Under
+    // AutoMode / ApproveAll, a set/rename/delete call with the default
+    // dryRun:true auto-approved confirmation and MUTATED instead of previewing.
+    // Every destructive branch must read GetDryRun BEFORE RequestConfirmation.
+
+    /// <summary>
+    /// Within a private-method slice, assert the dryRun preview precedes the
+    /// confirmation prompt (so dryRun short-circuits before any write intent).
+    /// </summary>
+    private static void AssertDryRunPrecedesConfirmation(string src, string methodSignature, string label)
+    {
+        var mStart = src.IndexOf(methodSignature, StringComparison.Ordinal);
+        Assert.True(mStart >= 0, $"{label}: method '{methodSignature}' not found");
+
+        // Slice from this method's signature to the next `private static` sibling.
+        var next = src.IndexOf("private static", mStart + methodSignature.Length, StringComparison.Ordinal);
+        var slice = next > mStart ? src.Substring(mStart, next - mStart) : src.Substring(mStart);
+
+        var dryRunIdx = slice.IndexOf("ToolHelpers.GetDryRun(input)", StringComparison.Ordinal);
+        Assert.True(dryRunIdx >= 0, $"{label}: does not read ToolHelpers.GetDryRun(input)");
+
+        var confirmIdx = slice.IndexOf("session.RequestConfirmation", StringComparison.Ordinal);
+        Assert.True(confirmIdx >= 0, $"{label}: does not call session.RequestConfirmation");
+
+        Assert.True(dryRunIdx < confirmIdx,
+            $"{label}: dryRun preview must be returned BEFORE RequestConfirmation (else AutoMode/ApproveAll executes it)");
+    }
+
+    [Fact]
+    public void CreateLevelTool_AllDestructiveActionsHonorDryRun()
+    {
+        var src = ReadSource("RevitCortex.Tools", "Elements", "CreateLevelTool.cs");
+        AssertDryRunPrecedesConfirmation(src, "SetLevel(Document doc", "CreateLevelTool.set");
+        AssertDryRunPrecedesConfirmation(src, "RenameLevel(Document doc", "CreateLevelTool.rename");
+        AssertDryRunPrecedesConfirmation(src, "DeleteLevel(Document doc", "CreateLevelTool.delete");
+    }
+
+    [Fact]
+    public void CreateGridTool_AllDestructiveActionsHonorDryRun()
+    {
+        var src = ReadSource("RevitCortex.Tools", "Elements", "CreateGridTool.cs");
+        AssertDryRunPrecedesConfirmation(src, "RenameGrid(Document doc", "CreateGridTool.rename");
+        AssertDryRunPrecedesConfirmation(src, "DeleteGrid(Document doc", "CreateGridTool.delete");
+    }
 }
