@@ -30,7 +30,11 @@ public class CreateSheetTool : ICortexTool
         var sheetName = input["sheetName"]?.Value<string>();
         var titleBlockFamilyName = input["titleBlockFamilyName"]?.Value<string>();
         var titleBlockTypeName = input["titleBlockTypeName"]?.Value<string>();
-        var titleBlockTypeId = input["titleBlockTypeId"]?.Value<long>() ?? -1;
+        // Accept both keys: the server wrapper sends "titleBlockId", while
+        // existing/bridge callers may use "titleBlockTypeId". Reading only one
+        // silently dropped an explicit title block (param-name mismatch).
+        var titleBlockTypeId = input["titleBlockTypeId"]?.Value<long>()
+            ?? input["titleBlockId"]?.Value<long>() ?? -1;
 
         try
         {
@@ -74,6 +78,24 @@ public class CreateSheetTool : ICortexTool
                     .FirstOrDefault();
                 if (first != null) tbId = first.Id;
             }
+
+            if (ToolHelpers.GetDryRun(input))
+            {
+                var tbName = tbId != ElementId.InvalidElementId
+                    ? (doc.GetElement(tbId) as FamilySymbol)?.Name ?? "(resolved)"
+                    : "(none — sheet without title block)";
+                return CortexResult<object>.Ok(new
+                {
+                    dryRun = true,
+                    message = $"Preview: would create sheet '{sheetNumber}' - '{sheetName}'",
+                    sheetNumber,
+                    sheetName,
+                    titleBlock = tbName
+                });
+            }
+
+            if (!session.RequestConfirmation("create sheet", 1, sheetNumber ?? sheetName))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
             using var tx = new Transaction(doc, "RevitCortex: Create Sheet");
             var txFailures = TransactionFailureHandling.SuppressWarnings(tx);

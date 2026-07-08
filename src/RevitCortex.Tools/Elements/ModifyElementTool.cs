@@ -56,6 +56,18 @@ public class ModifyElementTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "No valid elements found for the provided elementIds");
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would {action} {revitIds.Count} element(s)",
+                action,
+                elementCount = revitIds.Count
+            });
+
+        if (!session.RequestConfirmation($"{action} element(s)", revitIds.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
         try
         {
             ICollection<ElementId>? newElementIds = null;

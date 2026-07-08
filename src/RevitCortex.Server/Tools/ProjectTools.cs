@@ -218,9 +218,10 @@ public static class ProjectTools
         [Description("Level element id (identifies the target for set/rename/delete)")] long? levelId = null,
         [Description("Mark as a building story (create/set)")] bool? isBuildingStory = null,
         [Description("New name (for rename)")] string? newName = null,
+        [Description("Preview changes without applying. Default: true")] bool dryRun = true,
         CancellationToken ct = default)
     {
-        var p = new JObject();
+        var p = new JObject { ["dryRun"] = dryRun };
         if (action != null) p["action"] = action;
         if (name != null) p["name"] = name;
         if (elevation != null) p["elevation"] = elevation;
@@ -238,12 +239,14 @@ public static class ProjectTools
         [Description("X coordinate for room placement, in mm")] double x,
         [Description("Y coordinate for room placement, in mm")] double y,
         [Description("Room name")] string? name = null,
+        [Description("Preview changes without applying. Default: true")] bool dryRun = true,
         CancellationToken ct = default)
     {
         var p = new JObject
         {
             ["levelId"] = levelId,
             ["location"] = new JObject { ["x"] = x, ["y"] = y, ["z"] = 0 },
+            ["dryRun"] = dryRun,
         };
         if (name != null) p["name"] = name;
         var result = await revit.ExecuteAsync("create_room", p, ct);

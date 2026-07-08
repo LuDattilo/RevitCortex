@@ -35,7 +35,7 @@ public class CreateLevelTool : ICortexTool
         {
             return action switch
             {
-                "create" => CreateLevel(doc, input),
+                "create" => CreateLevel(doc, input, session),
                 "set"    => SetLevel(doc, input, session),
                 "rename" => RenameLevel(doc, input, session),
                 "delete" => DeleteLevel(doc, input, session),
@@ -49,7 +49,7 @@ public class CreateLevelTool : ICortexTool
         }
     }
 
-    private static CortexResult<object> CreateLevel(Document doc, JObject input)
+    private static CortexResult<object> CreateLevel(Document doc, JObject input, CortexSession session)
     {
         var name = input["name"]?.Value<string>();
         if (string.IsNullOrEmpty(name))
@@ -70,6 +70,21 @@ public class CreateLevelTool : ICortexTool
             if (existing != null)
                 return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                     $"Level '{name}' already exists at elevation {existing.Elevation * MmPerFoot:F0} mm");
+
+            if (ToolHelpers.GetDryRun(input))
+                return CortexResult<object>.Ok(new
+                {
+                    dryRun = true,
+                    message = $"Preview: would create level '{name}' at {elevationMm:F0} mm",
+                    name,
+                    elevationMm,
+                    isBuildingStory,
+                    createFloorPlan,
+                    createCeilingPlan
+                });
+
+            if (!session.RequestConfirmation("create level", 1, name))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
             var warnings = new List<string>();
 
@@ -134,6 +149,21 @@ public class CreateLevelTool : ICortexTool
         var (level, error) = ResolveLevel(doc, input);
         if (error != null) return error;
 
+        var willChange = new List<string>();
+        if (input["elevation"]?.Value<double?>() != null) willChange.Add("elevation");
+        if (input["isBuildingStory"]?.Value<bool?>() != null) willChange.Add("isBuildingStory");
+
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                action = "set",
+                message = $"Preview: would modify level '{level!.Name}' ({(willChange.Count > 0 ? string.Join(", ", willChange) : "no fields specified")})",
+                levelId = ToolHelpers.GetElementIdValue(level.Id),
+                name = level.Name,
+                fieldsToChange = willChange
+            });
+
         if (!session.RequestConfirmation("modify level", 1, level!.Name))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
@@ -189,6 +219,17 @@ public class CreateLevelTool : ICortexTool
         if (clash != null)
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, $"A level named '{newName}' already exists");
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                action = "rename",
+                message = $"Preview: would rename level '{level!.Name}' to '{newName}'",
+                levelId = ToolHelpers.GetElementIdValue(level.Id),
+                oldName = level.Name,
+                newName
+            });
+
         if (!session.RequestConfirmation("rename level", 1, level!.Name))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
 
@@ -209,6 +250,16 @@ public class CreateLevelTool : ICortexTool
     {
         var (level, error) = ResolveLevel(doc, input);
         if (error != null) return error;
+
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                action = "delete",
+                message = $"Preview: would delete level '{level!.Name}'",
+                levelId = ToolHelpers.GetElementIdValue(level.Id),
+                name = level.Name
+            });
 
         if (!session.RequestConfirmation("delete level", 1, level!.Name))
             return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");

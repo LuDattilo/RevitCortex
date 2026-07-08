@@ -93,9 +93,10 @@ public static class CreationTools
         [Description("Grid element id (for rename/delete)")] long? gridId = null,
         [Description("Grid name (identifies the target for rename/delete when gridId is omitted)")] string? name = null,
         [Description("New name (for rename)")] string? newName = null,
+        [Description("Preview changes without applying. Default: true")] bool dryRun = true,
         CancellationToken ct = default)
     {
-        var p = new JObject();
+        var p = new JObject { ["dryRun"] = dryRun };
         if (action != null) p["action"] = action;
         if (xCount != null) p["xCount"] = xCount;
         if (yCount != null) p["yCount"] = yCount;

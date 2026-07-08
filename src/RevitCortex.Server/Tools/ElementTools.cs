@@ -181,12 +181,14 @@ public static class ElementTools
         [Description("Target element IDs")] long[] targetElementIds,
         [Description("Parameter names to copy; if omitted, copies all writable parameters")] string[]? parameterNames = null,
         [Description("Also copy type-level parameters. Default: false")] bool? includeTypeParameters = null,
+        [Description("Preview changes without applying. Default: true")] bool dryRun = true,
         CancellationToken ct = default)
     {
         var p = new JObject
         {
             ["sourceElementId"] = sourceElementId,
             ["targetElementIds"] = new JArray(targetElementIds.Cast<object>().ToArray()),
+            ["dryRun"] = dryRun,
         };
         if (parameterNames != null) p["parameterNames"] = new JArray(parameterNames);
         if (includeTypeParameters != null) p["includeTypeParameters"] = includeTypeParameters;
@@ -391,12 +393,14 @@ public static class ElementTools
         [Description("Mirror plane origin {x,y,z} in mm (JSON object)")] string? mirrorPlaneOrigin = null,
         [Description("Mirror plane normal {x,y,z} unit vector (JSON object)")] string? mirrorPlaneNormal = null,
         [Description("Copy offset {x,y,z} in mm for copy (JSON object)")] string? copyOffset = null,
+        [Description("Preview changes without applying. Default: true")] bool dryRun = true,
         CancellationToken ct = default)
     {
         var p = new JObject
         {
             ["elementIds"] = new JArray(elementIds.Cast<object>().ToArray()),
             ["action"] = action,
+            ["dryRun"] = dryRun,
         };
         if (translation != null) p["translation"] = JToken.Parse(translation);
         if (rotationCenter != null) p["rotationCenter"] = JToken.Parse(rotationCenter);
