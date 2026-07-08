@@ -160,12 +160,14 @@ public static class ViewTools
         [Description("Sheet number (e.g. A101)")] string sheetNumber,
         [Description("Sheet name")] string sheetName,
         [Description("Title block type element ID")] long? titleBlockId = null,
+        [Description("Preview changes without applying. Default: true")] bool dryRun = true,
         CancellationToken ct = default)
     {
         var p = new JObject
         {
             ["sheetNumber"] = sheetNumber,
             ["sheetName"] = sheetName,
+            ["dryRun"] = dryRun,
         };
         if (titleBlockId != null) p["titleBlockId"] = titleBlockId;
         var result = await revit.ExecuteAsync("create_sheet", p, ct);

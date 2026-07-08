@@ -69,6 +69,19 @@ public class CreateRoomTool : ICortexTool
             if (level == null)
                 return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No levels found in document");
 
+            if (ToolHelpers.GetDryRun(input))
+                return CortexResult<object>.Ok(new
+                {
+                    dryRun = true,
+                    message = $"Preview: would create a room on level '{level.Name}' at ({location["x"]!.Value<double>():F0}, {location["y"]!.Value<double>():F0}) mm",
+                    levelName = level.Name,
+                    name,
+                    number
+                });
+
+            if (!session.RequestConfirmation("create room", 1, string.IsNullOrEmpty(name) ? level.Name : name))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
             using var tx = new Transaction(doc, "RevitCortex: Create Room");
             var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();

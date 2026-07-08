@@ -352,7 +352,9 @@ When the user cancels, tools return a `CortexResult.Fail` with `CortexErrorCode.
 {"success": false, "error": {"code": "Cancelled", "message": "Operation cancelled by user"}}
 ```
 
-**Tools with confirmation:** delete_element, delete_selection, delete_material, purge_unused, wipe_empty_tags, set_element_parameters, set_compound_structure, batch_rename, override_graphics, set_element_phase, set_element_workset, change_element_type, load_family.
+**Tools with confirmation:** delete_element, delete_selection, delete_material, purge_unused, wipe_empty_tags, set_element_parameters, set_compound_structure, batch_rename, override_graphics, set_element_phase, set_element_workset, change_element_type, load_family, create_level, create_grid, create_room, create_sheet, match_element_properties, modify_element.
+
+The create family (`create_level`, `create_grid`, `create_room`, `create_sheet`) plus `match_element_properties` and `modify_element` are **preview-first**: the write path reads `dryRun` via `ToolHelpers.GetDryRun(input)` (default `true`) and returns a `dryRun = true` preview **before** opening the Transaction; only `dryRun: false` calls `RequestConfirmation` and executes. Their server wrappers each expose a `bool dryRun = true` param and forward `["dryRun"] = dryRun`. When adding a new write tool, follow the same pattern — a write tool that ignores `dryRun` silently bypasses both the preview contract and the confirmation dialog (regression fixed 2026-07-08). Known-still-broken as of that date: the entire `RebarTools.cs` server wrapper forwards no `dryRun` (24 rebar tools stuck in preview via MCP), and several unguarded writes remain (`color_elements`, `copy_elements`, `tag_rooms`, `tag_walls`, `import_table`, and ~30 single-object creators). See memory `project_dryrun_contract_audit_2026-07-08`.
 
 When adding new destructive tools, always call `session.RequestConfirmation("action_verb", elementCount)` before the Transaction.
 

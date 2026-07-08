@@ -226,11 +226,11 @@ Questa sezione raccoglie i comandi per leggere, cercare, creare e modificare gli
 
 | Comando | Cosa fa | Esempio di prompt naturale |
 |---------|---------|----------------------------|
-| `create_room` | Crea un vano su un livello in una posizione (x, y) in mm. | "Crea un vano chiamato Ufficio sul Piano 1 in posizione 5000, 3000" |
+| `create_room` | Crea un vano su un livello in una posizione (x, y) in mm (anteprima con dryRun=true di default; impostare dryRun=false per creare, richiede conferma). | "Crea un vano chiamato Ufficio sul Piano 1 in posizione 5000, 3000, prima in anteprima" |
 | `create_floor` | Crea un pavimento da un contorno di punti o dal perimetro di un vano. | "Crea un pavimento seguendo il contorno di questo vano" |
 | `create_filled_region` | Crea una regione riempita in una vista da un contorno (con eventuali fori). | "Disegna una regione riempita su questa area della pianta" |
-| `create_grid` | Crea o gestisce griglie (singole o matrice con passo X/Y). | "Crea una griglia 5x4 con passo 6000 mm" |
-| `create_level` | Crea o gestisce livelli con quota e flag di piano edificio. | "Aggiungi un livello a quota 3500 mm chiamato Piano 2" |
+| `create_grid` | Crea o gestisce griglie (singole o matrice con passo X/Y). La creazione è preview-first (anteprima con dryRun=true di default; dryRun=false per creare, richiede conferma). | "Crea una griglia 5x4 con passo 6000 mm, prima in anteprima" |
+| `create_level` | Crea o gestisce livelli con quota e flag di piano edificio. La creazione è preview-first (anteprima con dryRun=true di default; dryRun=false per creare, richiede conferma). | "Aggiungi un livello a quota 3500 mm chiamato Piano 2, prima in anteprima" |
 | `create_structural_framing_system` | Genera un sistema di travi su un livello entro un rettangolo con passo dato. | "Genera un sistema di travi sul Piano 1 con passo 1500 mm" |
 | `create_array` | Crea una serie (array) lineare o radiale di elementi esistenti. | "Crea una serie di 6 colonne con passo 4000 mm in X" |
 | `create_point_based_element` | Crea elementi posizionati su punto (es. famiglie puntuali, arredi, colonne). | "Posiziona questa famiglia di pilastri nei punti indicati" |
@@ -244,9 +244,9 @@ Questa sezione raccoglie i comandi per leggere, cercare, creare e modificare gli
 | Comando | Cosa fa | Esempio di prompt naturale |
 |---------|---------|----------------------------|
 | `set_element_parameters` | Imposta i parametri di uno o più elementi specifici (richiede conferma). | "Imposta il Commento di questo elemento a 'Verificato'" |
-| `match_element_properties` | Copia parametri da un elemento sorgente verso più elementi destinazione. | "Copia i parametri di questo muro su tutti gli altri selezionati" |
+| `match_element_properties` | Copia parametri da un elemento sorgente verso più elementi destinazione (anteprima con dryRun=true di default; impostare dryRun=false per applicare, richiede conferma). | "Copia i parametri di questo muro su tutti gli altri selezionati, prima in anteprima" |
 | `change_element_type` | Cambia il tipo di uno o più elementi indicando l'ID o il nome del tipo. | "Cambia il tipo di queste finestre in Finestra 120x150" |
-| `modify_element` | Sposta, ruota, specchia o copia con offset gli elementi (richiede conferma). | "Sposta queste colonne di 2000 mm in X" |
+| `modify_element` | Sposta, ruota, specchia o copia con offset gli elementi (anteprima con dryRun=true di default; impostare dryRun=false per applicare, richiede conferma). | "Sposta queste colonne di 2000 mm in X, prima in anteprima" |
 | `copy_elements` | Copia gli elementi tra viste o documenti con offset opzionale. | "Copia questi elementi nella vista del Piano 2 con offset 0,0,3500" |
 | `operate_element` | Esegue azioni rapide sugli elementi (es. seleziona, isola, nascondi). | "Seleziona questi elementi nella vista" |
 | `batch_rename` | Rinomina in blocco gli elementi con find/replace, prefisso o suffisso (anteprima con dryRun). | "Rinomina in anteprima i tipi sostituendo 'STD' con 'STANDARD'" |
@@ -361,7 +361,7 @@ Creazione fogli, gestione revisioni ed export massivo di fogli/viste.
 
 | Comando | Cosa fa | Esempio di prompt naturale |
 |---------|---------|----------------------------|
-| `create_sheet` | Crea un nuovo foglio con numero, nome e cartiglio opzionale. | "Crea il foglio A-101 chiamato Pianta Piano Terra" |
+| `create_sheet` | Crea un nuovo foglio con numero, nome e cartiglio opzionale (anteprima con dryRun=true di default; impostare dryRun=false per creare, richiede conferma). | "Crea il foglio A-101 chiamato Pianta Piano Terra, prima in anteprima" |
 | `create_revision` | Crea o gestisce una revisione e la assegna ai fogli. | "Crea una revisione del 02/06/2026 e assegnala ai fogli selezionati" |
 | `batch_export` | Esporta in blocco fogli e/o viste in una cartella di output. | "Esporta tutti i fogli in PDF nella cartella Consegna" |
 

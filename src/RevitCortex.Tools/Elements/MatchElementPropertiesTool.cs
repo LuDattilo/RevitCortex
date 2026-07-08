@@ -56,6 +56,19 @@ public class MatchElementPropertiesTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "No matching parameters found on source element");
 
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would copy up to {sourceValues.Count} parameter value(s) from element {sourceElementId.Value} to {targetElementIds.Length} target(s)",
+                sourceElementId = sourceElementId.Value,
+                targetCount = targetElementIds.Length,
+                parametersToCopy = sourceValues.Keys.ToArray()
+            });
+
+        if (!session.RequestConfirmation("copy parameters to", targetElementIds.Length))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
         try
         {
             int totalCopied = 0;

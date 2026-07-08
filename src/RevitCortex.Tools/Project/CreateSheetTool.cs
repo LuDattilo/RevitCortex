@@ -75,6 +75,24 @@ public class CreateSheetTool : ICortexTool
                 if (first != null) tbId = first.Id;
             }
 
+            if (ToolHelpers.GetDryRun(input))
+            {
+                var tbName = tbId != ElementId.InvalidElementId
+                    ? (doc.GetElement(tbId) as FamilySymbol)?.Name ?? "(resolved)"
+                    : "(none — sheet without title block)";
+                return CortexResult<object>.Ok(new
+                {
+                    dryRun = true,
+                    message = $"Preview: would create sheet '{sheetNumber}' - '{sheetName}'",
+                    sheetNumber,
+                    sheetName,
+                    titleBlock = tbName
+                });
+            }
+
+            if (!session.RequestConfirmation("create sheet", 1, sheetNumber ?? sheetName))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
             using var tx = new Transaction(doc, "RevitCortex: Create Sheet");
             var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
             tx.Start();

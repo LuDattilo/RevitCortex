@@ -54,6 +54,23 @@ public class CreateGridTool : ICortexTool
             return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
                 "At least one of xCount or yCount must be > 0");
 
+        var plannedCount = Math.Max(xCount, 0) + Math.Max(yCount, 0);
+
+        if (ToolHelpers.GetDryRun(input))
+            return CortexResult<object>.Ok(new
+            {
+                dryRun = true,
+                message = $"Preview: would create {plannedCount} grid(s) ({Math.Max(xCount, 0)} X + {Math.Max(yCount, 0)} Y)",
+                plannedCount,
+                xCount = Math.Max(xCount, 0),
+                yCount = Math.Max(yCount, 0),
+                xSpacingMm,
+                ySpacingMm
+            });
+
+        if (!session.RequestConfirmation("create grid", plannedCount))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
         try
         {
             var createdGrids = new List<object>();
