@@ -154,4 +154,31 @@ public class CreateToolsDryRunSourceTests
     [Fact]
     public void ModifyElementWrapper_ForwardsDryRun()
         => AssertWrapperForwardsDryRun("ElementTools.cs", "modify_element");
+
+    // ---- create_sheet title-block param-name mismatch ----------------------
+    // The wrapper (ViewTools.cs) sends p["titleBlockId"], but the plugin read
+    // only input["titleBlockTypeId"] — so an explicit title block was silently
+    // dropped and the tool fell back to the first available one. The plugin
+    // must accept BOTH keys (titleBlockId is the wrapper's name; the bridge may
+    // send either). Same class as feedback_server_wrapper_plugin_param_mismatch.
+
+    [Fact]
+    public void CreateSheetTool_AcceptsTitleBlockIdAlias()
+    {
+        var src = ReadSource("RevitCortex.Tools", "Project", "CreateSheetTool.cs");
+        Assert.True(src.Contains("input[\"titleBlockId\"]", StringComparison.Ordinal),
+            "CreateSheetTool must read input[\"titleBlockId\"] (the key the server wrapper sends)");
+    }
+
+    [Fact]
+    public void CreateSheetWrapper_SendsTitleBlockId()
+    {
+        var src = ReadSource("RevitCortex.Server", "Tools", "ViewTools.cs");
+        var start = src.IndexOf("Name = \"create_sheet\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "create_sheet wrapper not found");
+        var end = src.IndexOf("[McpServerTool", start + 1, StringComparison.Ordinal);
+        var section = end > start ? src.Substring(start, end - start) : src.Substring(start);
+        Assert.True(section.Contains("[\"titleBlockId\"]", StringComparison.Ordinal),
+            "create_sheet wrapper is expected to send titleBlockId; the plugin must accept that key");
+    }
 }
