@@ -1,0 +1,185 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Newtonsoft.Json.Linq;
+using RiveTT.Core.Results;
+using RiveTT.Core.Session;
+using RiveTT.Core.Tools;
+using RiveTT.Tools.Utilities;
+
+namespace RiveTT.Tools.Sheets;
+
+/// <summary>
+/// Creates, lists, converts, or deletes placeholder sheets.
+/// </summary>
+[ToolSafety(false, true)]
+public class CreatePlaceholderSheetsTool : ICortexTool
+{
+    public string Name => "create_placeholder_sheets";
+    public string Category => "Sheets";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+    public string Description => "Creates, lists, converts, or deletes placeholder sheets.";
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+        var doc = session.Store.Get<object>("activeDocument") as Document;
+        if (doc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
+
+        var action = input["action"]?.Value<string>() ?? "create";
+
+        try
+        {
+            return action.ToLowerInvariant() switch
+            {
+                "create" => CreatePlaceholders(doc, input),
+                "list" => ListPlaceholders(doc),
+                "convert" => ConvertPlaceholders(doc, input, session),
+                "delete" => DeletePlaceholders(doc, input, session),
+                _ => CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    $"Unknown action: {action}", suggestion: "Use: create, list, convert, delete")
+            };
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
+        }
+    }
+
+    private static CortexResult<object> CreatePlaceholders(Document doc, JObject input)
+    {
+        var sheetsArray = input["sheets"]?.ToObject<List<JObject>>() ?? new List<JObject>();
+        if (sheetsArray.Count == 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "sheets array is required for create");
+
+        var results = new List<object>();
+        using var tx = new Transaction(doc, "RiveTT: Create Placeholder Sheets");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
+        tx.Start();
+
+        foreach (var sd in sheetsArray)
+        {
+            var number = sd["number"]?.Value<string>();
+            var name = sd["name"]?.Value<string>();
+
+            var sheet = ViewSheet.CreatePlaceholder(doc);
+            if (!string.IsNullOrEmpty(number)) sheet.SheetNumber = number;
+            if (!string.IsNullOrEmpty(name)) sheet.Name = name;
+
+            results.Add(new { sheetId = ToolHelpers.GetElementIdValue(sheet.Id), number = sheet.SheetNumber, name = sheet.Name });
+        }
+
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
+        return CortexResult<object>.Ok(new { createdCount = results.Count, sheets = results });
+    }
+
+    private static CortexResult<object> ListPlaceholders(Document doc)
+    {
+        var sheets = new FilteredElementCollector(doc)
+            .OfClass(typeof(ViewSheet))
+            .Cast<ViewSheet>()
+            .Where(s => s.IsPlaceholder)
+            .Select(s => new { id = ToolHelpers.GetElementIdValue(s.Id), number = s.SheetNumber, name = s.Name })
+            .ToList();
+
+        return CortexResult<object>.Ok(new { placeholderCount = sheets.Count, sheets });
+    }
+
+    private static CortexResult<object> ConvertPlaceholders(Document doc, JObject input, CortexSession session)
+    {
+        var sheetIds = input["sheetIds"]?.ToObject<List<long>>() ?? new List<long>();
+        var titleBlockId = input["titleBlockId"]?.Value<long>() ?? 0;
+
+        if (sheetIds.Count == 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "sheetIds required for convert");
+
+        // H23: converting deletes the placeholder sheet and recreates a real one — confirm first.
+        if (!session.RequestConfirmation("convert (delete + recreate) placeholder sheets", sheetIds.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        // Resolve title block
+        ElementId tbId;
+        if (titleBlockId > 0)
+        {
+            tbId = new ElementId(titleBlockId);
+        }
+        else
+        {
+            var firstTb = new FilteredElementCollector(doc)
+                .OfCategory(BuiltInCategory.OST_TitleBlocks)
+                .OfClass(typeof(FamilySymbol))
+                .FirstOrDefault();
+            tbId = firstTb?.Id ?? ElementId.InvalidElementId;
+        }
+
+        if (tbId == ElementId.InvalidElementId)
+            return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No title block found");
+
+        var results = new List<object>();
+        using var tx = new Transaction(doc, "RiveTT: Convert Placeholder Sheets");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
+        tx.Start();
+
+        foreach (var sid in sheetIds)
+        {
+            var sheet = doc.GetElement(new ElementId(sid)) as ViewSheet;
+            if (sheet == null || !sheet.IsPlaceholder)
+            {
+                results.Add(new { sheetId = sid, success = false, reason = "Not a placeholder sheet" });
+                continue;
+            }
+
+            var savedNumber = sheet.SheetNumber;
+            var savedName = sheet.Name;
+
+            doc.Delete(sheet.Id);
+            var newSheet = ViewSheet.Create(doc, tbId);
+            newSheet.SheetNumber = savedNumber;
+            newSheet.Name = savedName;
+
+            results.Add(new
+            {
+                sheetId = ToolHelpers.GetElementIdValue(newSheet.Id),
+                number = savedNumber,
+                name = savedName,
+                success = true
+            });
+        }
+
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
+        return CortexResult<object>.Ok(new { convertedCount = results.Count(r => ((dynamic)r).success), sheets = results });
+    }
+
+    private static CortexResult<object> DeletePlaceholders(Document doc, JObject input, CortexSession session)
+    {
+        var sheetIds = input["sheetIds"]?.ToObject<List<long>>() ?? new List<long>();
+        if (sheetIds.Count == 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "sheetIds required for delete");
+
+        // H23: confirm before permanently deleting sheets.
+        if (!session.RequestConfirmation("delete placeholder sheets", sheetIds.Count))
+            return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+        using var tx = new Transaction(doc, "RiveTT: Delete Placeholder Sheets");
+        var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
+        tx.Start();
+        int deleted = 0;
+        foreach (var sid in sheetIds)
+        {
+            var sheet = doc.GetElement(new ElementId(sid)) as ViewSheet;
+            if (sheet != null) { doc.Delete(sheet.Id); deleted++; }
+        }
+        if (tx.Commit() != TransactionStatus.Committed)
+            return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                suggestion: "Fix the reported model errors and retry.");
+        return CortexResult<object>.Ok(new { deletedCount = deleted });
+    }
+}

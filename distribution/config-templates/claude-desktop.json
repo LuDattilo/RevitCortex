@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "revitcortex": {
-      "command": "C:\\Users\\<YOUR_USERNAME>\\.revitcortex\\server\\RevitCortex.Server.exe"
-    }
-  }
-}

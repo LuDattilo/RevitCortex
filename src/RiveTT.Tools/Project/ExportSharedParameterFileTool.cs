@@ -1,0 +1,103 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Newtonsoft.Json.Linq;
+using RiveTT.Core.Results;
+using RiveTT.Core.Session;
+using RiveTT.Core.Tools;
+
+namespace RiveTT.Tools.Project;
+
+/// <summary>
+/// Exports the shared parameter file contents as structured data or to a file path.
+/// </summary>
+[ToolSafety(true, false)]
+public class ExportSharedParameterFileTool : ICortexTool
+{
+    public string Name => "export_shared_parameter_file";
+    public string Category => "Project";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+    public string Description => "Exports the shared parameter file contents as structured data or to a file path.";
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+        var doc = session.Store.Get<object>("activeDocument") as Document;
+        if (doc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
+
+        // outputPath is the name the MCP surface publishes; filePath is the runtime
+        // name. Only filePath was read, so the export never wrote a file.
+        var filePath = input["filePath"]?.Value<string>()
+                       ?? input["outputPath"]?.Value<string>();
+
+        // H25-wave: File.Copy below overwrites the destination — restrict it to
+        // user-owned directories; reject traversal/UNC/system paths.
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            if (!Utilities.PathSafety.TryResolveSafe(filePath, out var safePath, out var pathError))
+                return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                    pathError,
+                    suggestion: "Provide a path under Documents, Desktop, Downloads, the user profile, or temp");
+            filePath = safePath;
+        }
+
+        try
+        {
+            var app = doc.Application;
+            var spFile = app.OpenSharedParameterFile();
+
+            if (spFile == null)
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound,
+                    "No shared parameter file is set",
+                    suggestion: "Set a shared parameter file in Revit settings");
+
+            var groups = new List<object>();
+            foreach (DefinitionGroup group in spFile.Groups)
+            {
+                var parameters = new List<object>();
+                foreach (ExternalDefinition def in group.Definitions)
+                {
+                    parameters.Add(new
+                    {
+                        name = def.Name,
+                        guid = def.GUID.ToString(),
+                        dataType = def.GetDataType()?.TypeId ?? "Unknown",
+                        description = def.Description,
+                        visible = def.Visible
+                    });
+                }
+                groups.Add(new { groupName = group.Name, parameterCount = parameters.Count, parameters });
+            }
+
+            // Copy file if path requested
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                var sourceFile = app.SharedParametersFilename;
+                if (File.Exists(sourceFile))
+                {
+                    File.Copy(sourceFile, filePath, true);
+                    return CortexResult<object>.Ok(new
+                    {
+                        exportedTo = filePath,
+                        sourceFile,
+                        groupCount = groups.Count,
+                        groups
+                    });
+                }
+            }
+
+            return CortexResult<object>.Ok(new
+            {
+                sourceFile = app.SharedParametersFilename,
+                groupCount = groups.Count,
+                groups
+            });
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
+        }
+    }
+}

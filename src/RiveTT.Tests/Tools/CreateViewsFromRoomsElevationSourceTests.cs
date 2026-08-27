@@ -1,0 +1,75 @@
+using System;
+using System.IO;
+using Xunit;
+
+namespace RiveTT.Tests.Tools;
+
+/// <summary>
+/// Regression guard for room interior elevations. The live behavior depends on
+/// Revit's ElevationMarker API, so these tests lock the source-level contract.
+/// </summary>
+public class CreateViewsFromRoomsElevationSourceTests
+{
+    private static string ReadTool()
+    {
+        return File.ReadAllText(Path.GetFullPath(Path.Combine(
+            "..", "..", "..", "..",
+            "RiveTT.Tools", "Views", "CreateViewsFromRoomsTool.cs")));
+    }
+
+    private static string ExtractElevationBranch(string src)
+    {
+        var start = src.IndexOf("case \"elevation\":", StringComparison.Ordinal);
+        var end = src.IndexOf("default:", start, StringComparison.Ordinal);
+        Assert.True(start >= 0, "Elevation branch not found.");
+        Assert.True(end > start, "Elevation branch end not found.");
+        return src.Substring(start, end - start);
+    }
+
+    [Fact]
+    public void ElevationBranch_UsesRevitElevationMarkersInsteadOfSectionBoxes()
+    {
+        var src = ReadTool();
+        var elevationBranch = ExtractElevationBranch(src);
+
+        Assert.Contains("ViewFamily.Elevation", src);
+        Assert.Contains("ElevationMarker.CreateElevationMarker", src);
+        Assert.Contains(".CreateElevation(doc, ownerPlan.Id, 0)", src);
+        Assert.Contains("FindOwnerFloorPlan(doc, room)", elevationBranch);
+        Assert.Contains("CreateElevationsFromRoom(", elevationBranch);
+        Assert.DoesNotContain("CreateSectionFromBB(doc, bb, offset, dir)", elevationBranch);
+    }
+
+    [Fact]
+    public void ElevationCreation_UsesOneRotatedMarkerPerDirection()
+    {
+        var src = ReadTool();
+
+        // A single marker only hosts one elevation reliably (index 1-3 throw
+        // "index is occupied or out of range"), so we rotate a fresh marker per side.
+        Assert.Contains("RotateElevationMarker(doc, marker.Id, markerOrigin, RotationAngleForDirection(dir))", src);
+        Assert.Contains("ElementTransformUtils.RotateElement", src);
+        Assert.DoesNotContain("ElevationIndexForDirection", src);
+        Assert.DoesNotContain(".CreateElevation(doc, ownerPlan.Id, index)", src);
+    }
+
+    [Fact]
+    public void CatchBlock_IncludesExceptionTypeWhenRevitProvidesAnEmptyMessage()
+    {
+        var src = ReadTool();
+
+        Assert.Contains("FormatException(ex)", src);
+        Assert.Contains("ex.GetType().FullName", src);
+        Assert.Contains("string.IsNullOrWhiteSpace(message)", src);
+    }
+
+    [Fact]
+    public void ViewTypeValidation_RejectsUnknownValuesInsteadOfFallingBackToCallout()
+    {
+        var src = ReadTool();
+
+        Assert.Contains("Invalid viewType", src);
+        Assert.Contains("Use one of: callout, section, elevation", src);
+        Assert.Contains("normalizedViewType", src);
+    }
+}

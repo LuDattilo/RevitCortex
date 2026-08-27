@@ -1,0 +1,118 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Newtonsoft.Json.Linq;
+using RiveTT.Core.Results;
+using RiveTT.Core.Session;
+using RiveTT.Core.Tools;
+using RiveTT.Tools.Utilities;
+
+namespace RiveTT.Tools.Project;
+
+/// <summary>
+/// Analyzes and cleans up imported/linked CAD files in the model.
+/// </summary>
+[ToolSafety(false, true)]
+public class CadLinkCleanupTool : ICortexTool
+{
+    public string Name => "clean_cad_links";
+    public string Category => "Project";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+    public string Description => "Analyzes and cleans up imported/linked CAD files in the model.";
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+        var doc = session.Store.Get<object>("activeDocument") as Document;
+        if (doc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
+
+        var action = input["action"]?.Value<string>() ?? "list";
+        var deleteImports = input["deleteImports"]?.Value<bool>() ?? false;
+        var deleteLinks = input["deleteLinks"]?.Value<bool>() ?? false;
+        var elementIds = input["elementIds"]?.ToObject<List<long>>() ?? new List<long>();
+
+        try
+        {
+            var imports = new FilteredElementCollector(doc)
+                .OfClass(typeof(ImportInstance))
+                .Cast<ImportInstance>()
+                .Select(i => new
+                {
+                    Id = i.Id,
+                    Name = i.Name,
+                    IsLinked = i.IsLinked,
+                    ViewSpecific = i.OwnerViewId != ElementId.InvalidElementId,
+                    ViewName = i.OwnerViewId != ElementId.InvalidElementId
+                        ? (doc.GetElement(i.OwnerViewId) as View)?.Name
+                        : null
+                })
+                .ToList();
+
+            if (action == "list")
+            {
+                return CortexResult<object>.Ok(new
+                {
+                    totalCount = imports.Count,
+                    importCount = imports.Count(i => !i.IsLinked),
+                    linkCount = imports.Count(i => i.IsLinked),
+                    items = imports.Select(i => new
+                    {
+                        id = ToolHelpers.GetElementIdValue(i.Id),
+                        name = i.Name,
+                        type = i.IsLinked ? "link" : "import",
+                        viewSpecific = i.ViewSpecific,
+                        viewName = i.ViewName
+                    }).ToList()
+                });
+            }
+
+            // Delete action — resolve the target set BEFORE opening the transaction so the
+            // confirmation dialog reports an accurate count (ultrareview C7).
+            var toDelete = imports.AsEnumerable();
+            if (elementIds.Count > 0)
+            {
+                var idSet = elementIds.ToHashSet();
+                toDelete = toDelete.Where(i => idSet.Contains(ToolHelpers.GetElementIdValue(i.Id)));
+            }
+            else
+            {
+                // H32: the old two-WHERE chain contradicted itself when both flags were
+                // false (keep-links AND keep-imports → empty set, silent zero-delete).
+                // Build an inclusive predicate instead: keep an item only if its kind was
+                // explicitly requested for deletion.
+                if (!deleteImports && !deleteLinks)
+                    return CortexResult<object>.Fail(CortexErrorCode.InvalidInput,
+                        "Nothing selected to delete: set deleteImports and/or deleteLinks to true, or pass explicit elementIds.",
+                        suggestion: "deleteImports=true removes CAD imports; deleteLinks=true removes CAD links.");
+
+                toDelete = toDelete.Where(i =>
+                    (deleteLinks && i.IsLinked) || (deleteImports && !i.IsLinked));
+            }
+
+            var targets = toDelete.ToList();
+
+            if (!session.RequestConfirmation("delete CAD imports/links", targets.Count))
+                return CortexResult<object>.Fail(CortexErrorCode.Cancelled, "Operation cancelled by user");
+
+            using var tx = new Transaction(doc, "RiveTT: CAD Link Cleanup");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
+            tx.Start();
+            int deleted = 0;
+            foreach (var item in targets)
+            {
+                try { doc.Delete(item.Id); deleted++; } catch { }
+            }
+
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
+            return CortexResult<object>.Ok(new { action = "delete", deletedCount = deleted });
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
+        }
+    }
+}

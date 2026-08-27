@@ -1,0 +1,214 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Newtonsoft.Json.Linq;
+using RiveTT.Core.Results;
+using RiveTT.Core.Session;
+using RiveTT.Core.Tools;
+using RiveTT.Tools.Utilities;
+
+namespace RiveTT.Tools.Sheets;
+
+/// <summary>
+/// Duplicates a sheet including all annotations and detail items.
+/// Views can optionally be duplicated with detailing.
+/// </summary>
+[ToolSafety(false, false)]
+public class DuplicateSheetWithContentTool : ICortexTool
+{
+    public string Name => "duplicate_sheet_with_content";
+    public string Category => "Sheets";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+    public string Description => "Duplicates a sheet including all annotations and detail items. Views can optionally be duplicated with detailing.";
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+        var doc = session.Store.Get<object>("activeDocument") as Document;
+        if (doc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
+
+        var sheetId = input["sheetId"]?.Value<long>() ?? 0;
+        var copies = input["copies"]?.Value<int>() ?? 1;
+        var duplicateViews = input["duplicateViews"]?.Value<bool>() ?? true;
+        var keepLegends = input["keepLegends"]?.Value<bool>() ?? true;
+        var keepSchedules = input["keepSchedules"]?.Value<bool>() ?? true;
+        var copyRevisions = input["copyRevisions"]?.Value<bool>() ?? false;
+        var sheetNumberPrefix = input["sheetNumberPrefix"]?.Value<string>()
+            ?? input["newSheetNumberPrefix"]?.Value<string>()
+            ?? "";
+        var sheetNumberSuffix = input["sheetNumberSuffix"]?.Value<string>() ?? "";
+        var newNumber = input["newNumber"]?.Value<string>();
+        var newName = input["newName"]?.Value<string>();
+
+        if (sheetId <= 0)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "sheetId is required");
+
+        try
+        {
+            var sourceSheet = doc.GetElement(new ElementId(sheetId)) as ViewSheet;
+            if (sourceSheet == null)
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "Sheet not found");
+
+            // Get title block type
+            var titleBlockId = GetTitleBlockTypeId(doc, sourceSheet);
+
+            // Get viewports and their positions
+            var viewportData = new FilteredElementCollector(doc, sourceSheet.Id)
+                .OfClass(typeof(Viewport))
+                .Cast<Viewport>()
+                .Select(vp => new
+                {
+                    ViewId = vp.ViewId,
+                    Center = vp.GetBoxCenter(),
+                    View = doc.GetElement(vp.ViewId) as View
+                })
+                .Where(vp => vp.View != null)
+                .ToList();
+
+            // Get schedule instances
+            var scheduleInstances = new FilteredElementCollector(doc, sourceSheet.Id)
+                .OfClass(typeof(ScheduleSheetInstance))
+                .Cast<ScheduleSheetInstance>()
+                .Select(si => new { ScheduleId = si.ScheduleId, Point = si.Point })
+                .ToList();
+
+            var results = new List<object>();
+
+            using var tx = new Transaction(doc, "RiveTT: Duplicate Sheet With Content");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
+            tx.Start();
+
+            for (int i = 0; i < copies; i++)
+            {
+                var newSheet = ViewSheet.Create(doc, titleBlockId);
+                var suffix = copies > 1 ? $"-{i + 1:D2}" : "";
+                newSheet.SheetNumber = !string.IsNullOrWhiteSpace(newNumber)
+                    ? $"{newNumber}{suffix}"
+                    : $"{sheetNumberPrefix}{sourceSheet.SheetNumber}{sheetNumberSuffix}{suffix}";
+                try { newSheet.Name = !string.IsNullOrWhiteSpace(newName) ? newName! : sourceSheet.Name; } catch { /* duplicate name */ }
+
+                if (copyRevisions)
+                {
+                    var revIds = sourceSheet.GetAllRevisionIds();
+                    if (revIds.Count > 0)
+                        newSheet.SetAdditionalRevisionIds(revIds);
+                }
+
+                int viewportCount = 0;
+                foreach (var vpData in viewportData)
+                {
+                    var view = vpData.View!;
+                    var isLegend = view.ViewType == ViewType.Legend;
+                    var isSchedule = view.ViewType == ViewType.Schedule;
+
+                    if (isLegend && !keepLegends) continue;
+                    if (isSchedule && !keepSchedules) continue;
+
+                    if (isLegend || !duplicateViews)
+                    {
+                        if (Viewport.CanAddViewToSheet(doc, newSheet.Id, vpData.ViewId))
+                        {
+                            Viewport.Create(doc, newSheet.Id, vpData.ViewId, vpData.Center);
+                            viewportCount++;
+                        }
+                    }
+                    else
+                    {
+                        var newViewId = view.Duplicate(ViewDuplicateOption.WithDetailing);
+                        var newView = doc.GetElement(newViewId) as View;
+                        if (newView != null)
+                        {
+                            try { newView.Name = $"{view.Name} - {newSheet.SheetNumber}"; } catch { }
+                            Viewport.Create(doc, newSheet.Id, newViewId, vpData.Center);
+                            viewportCount++;
+                        }
+                    }
+                }
+
+                if (keepSchedules)
+                {
+                    foreach (var si in scheduleInstances)
+                    {
+                        try { ScheduleSheetInstance.Create(doc, newSheet.Id, si.ScheduleId, si.Point); }
+                        catch { /* skip schedules that cannot be placed on sheets */ }
+                    }
+                }
+
+                // Copy loose annotations placed directly on the sheet
+                // (text notes, generic annotations, detail items, detail lines).
+                int annotationCount = CopySheetAnnotations(doc, sourceSheet, newSheet);
+
+                results.Add(new
+                {
+                    sheetId = ToolHelpers.GetElementIdValue(newSheet.Id),
+                    number = newSheet.SheetNumber,
+                    name = newSheet.Name,
+                    viewportCount,
+                    annotationCount
+                });
+            }
+
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
+            return CortexResult<object>.Ok(new { duplicatedCount = results.Count, sheets = results });
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
+        }
+    }
+
+    private static readonly BuiltInCategory[] SheetAnnotationCategories =
+    {
+        BuiltInCategory.OST_TextNotes,
+        BuiltInCategory.OST_GenericAnnotation,
+        BuiltInCategory.OST_DetailComponents,
+        BuiltInCategory.OST_Lines
+    };
+
+    /// <summary>
+    /// Copies loose annotation elements owned directly by the source sheet onto the
+    /// destination sheet. Excludes viewports, schedule instances and the title block,
+    /// which are handled separately. Returns the number of elements copied.
+    /// </summary>
+    private static int CopySheetAnnotations(Document doc, ViewSheet sourceSheet, ViewSheet destSheet)
+    {
+        var annoIds = new FilteredElementCollector(doc, sourceSheet.Id)
+            .WhereElementIsNotElementType()
+            .Where(e => e.Category != null
+                && SheetAnnotationCategories.Contains(
+                    (BuiltInCategory)ToolHelpers.GetElementIdValue(e.Category.Id)))
+            .Select(e => e.Id)
+            .ToList();
+
+        if (annoIds.Count == 0) return 0;
+
+        try
+        {
+            var copied = ElementTransformUtils.CopyElements(
+                sourceSheet, annoIds, destSheet, Transform.Identity, new CopyPasteOptions());
+            return copied?.Count ?? 0;
+        }
+        catch
+        {
+            // Some annotation kinds resist cross-view copy; skip rather than fail the duplicate.
+            return 0;
+        }
+    }
+
+    private static ElementId GetTitleBlockTypeId(Document doc, ViewSheet sheet)
+    {
+        var tb = new FilteredElementCollector(doc, sheet.Id)
+            .OfCategory(BuiltInCategory.OST_TitleBlocks)
+            .FirstOrDefault();
+        if (tb != null) return tb.GetTypeId();
+
+        return new FilteredElementCollector(doc)
+            .OfCategory(BuiltInCategory.OST_TitleBlocks)
+            .OfClass(typeof(FamilySymbol))
+            .FirstOrDefault()?.Id ?? ElementId.InvalidElementId;
+    }
+}

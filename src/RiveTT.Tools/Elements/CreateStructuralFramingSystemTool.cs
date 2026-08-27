@@ -1,0 +1,166 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Structure;
+using Newtonsoft.Json.Linq;
+using RiveTT.Core.Results;
+using RiveTT.Core.Session;
+using RiveTT.Core.Tools;
+using RiveTT.Tools.Utilities;
+using static RiveTT.Tools.Utilities.LengthUnits;
+
+namespace RiveTT.Tools.Elements;
+
+/// <summary>
+/// Creates a beam system (structural framing system) from boundary on a level.
+/// </summary>
+[ToolSafety(false, false)]
+public class CreateStructuralFramingSystemTool : ICortexTool
+{
+    public string Name => "create_structural_framing_system";
+    public string Category => "Elements";
+    public bool RequiresDocument => true;
+    public bool IsDynamic => false;
+    public string Description => "Creates a beam system on a level over a rectangular area. By default builds a real associative Revit BeamSystem (a single element with editable layout); set associative=false for loose independent beams.";
+
+    public CortexResult<object> Execute(JObject input, CortexSession session)
+    {
+        var doc = session.Store.Get<object>("activeDocument") as Document;
+        if (doc == null)
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "No active document in session");
+
+        var levelName = input["levelName"]?.Value<string>();
+        var xMin = input["xMin"]?.Value<double>() ?? 0;
+        var xMax = input["xMax"]?.Value<double>() ?? 10000;
+        var yMin = input["yMin"]?.Value<double>() ?? 0;
+        var yMax = input["yMax"]?.Value<double>() ?? 10000;
+        var spacingMm = input["spacing"]?.Value<double>() ?? 1000;
+        var beamTypeName = input["beamTypeName"]?.Value<string>();
+        var elevationMm = input["elevation"]?.Value<double>() ?? 0;
+        var associative = input["associative"]?.Value<bool>() ?? true;
+
+        if (string.IsNullOrEmpty(levelName))
+            return CortexResult<object>.Fail(CortexErrorCode.InvalidInput, "levelName is required");
+
+        try
+        {
+            var level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                .FirstOrDefault(l => l.Name.Equals(levelName, StringComparison.OrdinalIgnoreCase));
+            if (level == null)
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, $"Level '{levelName}' not found");
+
+            // Resolve beam type
+            var beamType = new FilteredElementCollector(doc)
+                .OfCategory(BuiltInCategory.OST_StructuralFraming)
+                .OfClass(typeof(FamilySymbol))
+                .Cast<FamilySymbol>()
+                .FirstOrDefault(fs => string.IsNullOrEmpty(beamTypeName) ||
+                    fs.Name.Equals(beamTypeName, StringComparison.OrdinalIgnoreCase) ||
+                    $"{fs.FamilyName}: {fs.Name}".Equals(beamTypeName, StringComparison.OrdinalIgnoreCase));
+
+            if (beamType == null)
+                return CortexResult<object>.Fail(CortexErrorCode.ElementNotFound, "No beam type found");
+
+            // Convert to feet
+            var x0 = xMin / MmPerFoot;
+            var x1 = xMax / MmPerFoot;
+            var y0 = yMin / MmPerFoot;
+            var y1 = yMax / MmPerFoot;
+            var spacing = spacingMm / MmPerFoot;
+            var elev = elevationMm / MmPerFoot;
+            var zPlane = level.Elevation + elev;
+
+            // ── Associative Revit BeamSystem (default) ────────────────────────
+            if (associative)
+            {
+                var p00 = new XYZ(x0, y0, zPlane);
+                var p10 = new XYZ(x1, y0, zPlane);
+                var p11 = new XYZ(x1, y1, zPlane);
+                var p01 = new XYZ(x0, y1, zPlane);
+                var profile = new List<Curve>
+                {
+                    Line.CreateBound(p00, p10),
+                    Line.CreateBound(p10, p11),
+                    Line.CreateBound(p11, p01),
+                    Line.CreateBound(p01, p00),
+                };
+
+                using var btx = new Transaction(doc, "RiveTT: Create Beam System");
+                var btxFailures = TransactionFailureHandling.SuppressWarnings(btx);
+                btx.Start();
+                if (!beamType.IsActive) beamType.Activate();
+                // direction = beam run direction (along Y); is3D = false (planar).
+                var bs = BeamSystem.Create(doc, profile, level, XYZ.BasisY, false);
+                // Apply the requested layout: fixed spacing. A failure here still
+                // commits the BeamSystem, so it must be reported, not swallowed.
+                string? layoutWarning = null;
+                try
+                {
+                    bs.LayoutRule = new LayoutRuleFixedDistance(spacing, BeamSystemJustifyType.Beginning);
+                    bs.BeamType = beamType;
+                }
+                catch (Exception ex) { layoutWarning = ex.Message; }
+                if (btx.Commit() != TransactionStatus.Committed)
+                    return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                        $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(btxFailures)}",
+                        suggestion: "Fix the reported model errors and retry.");
+
+                return CortexResult<object>.Ok(new
+                {
+                    associative = true,
+                    beamSystemId = ToolHelpers.GetElementIdValue(bs.Id),
+                    beamTypeName = beamType.Name,
+                    levelName = level.Name,
+                    spacingMm,
+                    layoutApplied = layoutWarning == null,
+                    layoutWarning,
+                    message = layoutWarning == null
+                        ? $"Created associative beam system {ToolHelpers.GetElementIdValue(bs.Id)}"
+                        : $"Created associative beam system {ToolHelpers.GetElementIdValue(bs.Id)}, but the layout/beam type was NOT applied: {layoutWarning}"
+                });
+            }
+
+            using var tx = new Transaction(doc, "RiveTT: Create Structural Framing System");
+            var txFailures = TransactionFailureHandling.SuppressWarnings(tx);
+            tx.Start();
+
+            if (!beamType.IsActive) beamType.Activate();
+
+            var createdBeams = new List<long>();
+            var z = level.Elevation + elev;
+
+            // Create beams along Y direction at spacing intervals in X
+            var count = (int)Math.Floor((x1 - x0) / spacing) + 1;
+            for (int i = 0; i < count; i++)
+            {
+                var x = x0 + i * spacing;
+                if (x > x1) break;
+
+                var start = new XYZ(x, y0, z);
+                var end = new XYZ(x, y1, z);
+                var line = Line.CreateBound(start, end);
+
+                var beam = doc.Create.NewFamilyInstance(line, beamType, level, StructuralType.Beam);
+                if (beam != null) createdBeams.Add(ToolHelpers.GetElementIdValue(beam.Id));
+            }
+
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CortexResult<object>.Fail(CortexErrorCode.TransactionFailed,
+                    $"Revit rolled back the transaction: {TransactionFailureHandling.Describe(txFailures)}",
+                    suggestion: "Fix the reported model errors and retry.");
+            return CortexResult<object>.Ok(new
+            {
+                beamCount = createdBeams.Count,
+                beamTypeName = beamType.Name,
+                levelName = level.Name,
+                spacingMm,
+                beamIds = createdBeams
+            });
+        }
+        catch (Exception ex)
+        {
+            return CortexResult<object>.Fail(CortexErrorCode.Unknown, $"Failed: {ex.Message}");
+        }
+    }
+}
